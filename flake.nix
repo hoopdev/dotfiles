@@ -36,7 +36,7 @@
               home-manager.useUserPackages = true;
               home-manager.users.${username} =
                 # { pkgs, lib, ... }: import ./hosts/kt-mac-studio/home-manager.nix { inherit pkgs lib username; };
-                { pkgs, lib, ... }: import ./hosts { inherit pkgs lib username; };
+                { pkgs, lib, ... }: import ./hosts/${hostname}.nix { inherit pkgs lib username; };
             }
           ];
           specialArgs = {
