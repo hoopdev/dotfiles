@@ -8,7 +8,6 @@
     	pkgs.slack
     	pkgs.zoom-us
     	pkgs.signal-desktop
-	pkgs.hackgen-nf-font
     	pkgs.uv
     	pkgs.deno
     	pkgs.zsh-autocomplete
@@ -18,6 +17,7 @@
     	pkgs.obsidian
     	pkgs.docker
     	pkgs.xld
+	pkgs.nixfmt-rfc-style
     ];
 
     # Homebrew設定
