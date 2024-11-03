@@ -21,6 +21,7 @@
             export USE_SYMENGINE=1
             export PATH="/Users/ktaga/.deno/bin:$PATH"
             export DARWIN_HOST=$(hostname -s)
+            eval "$(/opt/homebrew/bin/brew shellenv)"
         '';
     plugins = [
       {
