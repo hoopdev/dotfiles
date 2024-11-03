@@ -17,6 +17,7 @@
         x = 2;
         y = 2;
       };
+      window.opacity = 0.90;
       terminal.shell.program = "${pkgs.zsh}/bin/zsh";
       cursor.style = "Beam";
 
