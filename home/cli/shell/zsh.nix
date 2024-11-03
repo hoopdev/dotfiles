@@ -10,7 +10,18 @@
     syntaxHighlighting.enable = true;
 
     shellAliases = import ./aliases.nix;
-
+    initExtra =
+        # bash
+        ''
+            export EDITOR="nvim"
+            export NIXPKGS_ALLOW_UNFREE=1
+            export PATH="/Users/ktaga/.local/bin:$PATH"
+            export OLLAMA_HOST=0.0.0.0
+            export OneDrive=/Users/ktaga/Library/CloudStorage/OneDrive-KyotoUniversity
+            export USE_SYMENGINE=1
+            export PATH="/Users/ktaga/.deno/bin:$PATH"
+            export DARWIN_HOST=$(hostname -s)
+        '';
     plugins = [
       {
         name = "fast-syntax-highlighting";

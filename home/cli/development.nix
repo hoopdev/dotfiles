@@ -5,5 +5,6 @@
     uv
     deno
     docker
+    vscode
   ];
 }

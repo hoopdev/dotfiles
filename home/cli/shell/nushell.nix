@@ -1,8 +1,7 @@
 
 { pkgs, ... }:
 {
-  programs.zsh = {
+  programs.nushell = {
     enable = true;
-    configDir = ".config/nushell";
   };
 }
