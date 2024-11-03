@@ -37,7 +37,15 @@
               home-manager.useGlobalPkgs = true;
               home-manager.useUserPackages = true;
               home-manager.users.${username} =
-                { pkgs, lib, ... }: import ./hosts/mac.nix { inherit pkgs lib username inputs; };
+                { pkgs, lib, ... }:
+                import ./hosts/mac.nix {
+                  inherit
+                    pkgs
+                    lib
+                    username
+                    inputs
+                    ;
+                };
             }
           ];
           specialArgs = {

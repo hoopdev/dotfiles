@@ -3,6 +3,7 @@
   home.packages = with pkgs; [
     arc-browser
   ];
-  programs = {
-  };
+  programs =
+    {
+    };
 }

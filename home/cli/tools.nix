@@ -17,6 +17,7 @@
     zip
     hackgen-nf-font
 	nixfmt-rfc-style
+    neovim
   ];
   programs.zoxide = {
     enable = true;
