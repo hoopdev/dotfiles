@@ -23,12 +23,17 @@
     # Homebrew設定
     homebrew = {
         enable = true;
+	masApps = 
+	{
+	Tailscale = 1475387142;
+	};
 	brews =
 	[
 	];
 	casks =
 	    [
 	    "aerospace"
+	    "orbstack"
 	    "vivaldi"
 	    "warp"
 	    "notion"
