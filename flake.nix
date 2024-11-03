@@ -20,7 +20,7 @@
     }:
     let
       darwinUser = "ktaga";
-      darwinHost = "KT-Mac-Studio";
+      darwinHost = builtins.getEnv "DARWIN_HOST";
 
       mkDarwinSystem =
         { hostname, username }:
@@ -35,7 +35,6 @@
               home-manager.useGlobalPkgs = true;
               home-manager.useUserPackages = true;
               home-manager.users.${username} =
-                # { pkgs, lib, ... }: import ./hosts/kt-mac-studio/home-manager.nix { inherit pkgs lib username; };
                 { pkgs, lib, ... }: import ./hosts/${hostname}.nix { inherit pkgs lib username; };
             }
           ];
