@@ -26,6 +26,9 @@
 	masApps = 
 	{
 	Tailscale = 1475387142;
+	WindowsApp = 1295203466;
+	Line = 539883307;
+	Perplexity = 6714467650;
 	};
 	brews =
 	[
@@ -33,7 +36,6 @@
 	casks =
 	    [
 	    "aerospace"
-	    "orbstack"
 	    "vivaldi"
 	    "warp"
 	    "notion"
@@ -49,6 +51,7 @@
 	    "arduino"
 	    "google-drive"
 	    "font-hackgen-nerd"
+	    "chatgpt"
 	    ];
     };
 
