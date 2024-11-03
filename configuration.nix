@@ -1,29 +1,11 @@
 { pkgs, ... }: {
     # List packages installed in system profile. To search by name, run:
     # $ nix-env -qaP | grep wget
-    environment.systemPackages =
-    [
-    	pkgs.arc-browser
-    	pkgs.discord
-    	pkgs.slack
-    	pkgs.zoom-us
-    	pkgs.signal-desktop
-    	pkgs.uv
-    	pkgs.deno
-    	pkgs.zsh-autocomplete
-    	pkgs.zsh-autosuggestions
-    	pkgs.zsh-autopair
-    	pkgs.ollama
-    	pkgs.obsidian
-    	pkgs.docker
-    	pkgs.xld
-	pkgs.nixfmt-rfc-style
-    ];
 
     # Homebrew設定
     homebrew = {
         enable = true;
-	masApps = 
+	masApps =
 	{
 	Tailscale = 1475387142;
 	WindowsApp = 1295203466;

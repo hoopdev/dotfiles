@@ -15,5 +15,6 @@
     unrar
     unzip
     zip
+	nixfmt-rfc-style
   ];
 }
