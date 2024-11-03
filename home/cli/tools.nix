@@ -15,6 +15,7 @@
     unrar
     unzip
     zip
+    hackgen-nf-font
 	nixfmt-rfc-style
   ];
   programs.zoxide = {

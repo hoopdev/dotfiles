@@ -2,6 +2,7 @@
   pkgs,
   lib,
   username,
+  inputs,
   ...
 }:
 {
@@ -18,7 +19,9 @@
   imports = [
     ../home/cli
     ../home/gui
+    inputs.nix-colors.homeManagerModules.default
   ];
+  colorScheme = inputs.nix-colors.colorSchemes.catppuccin-frappe;
 
   home.packages =
     with pkgs;
