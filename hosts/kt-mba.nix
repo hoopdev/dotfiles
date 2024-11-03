@@ -1,8 +1,8 @@
 { pkgs, ... }:
 {
   imports = [
-    ../../home-manager/cli
-    ../../home-manager/gui
+    ../../home/cli
+    ../../home/gui
   ];
 
   home.packages =
