@@ -3,6 +3,8 @@
   rm = "rm -i";
   cp = "cp -i";
 
+  cd = "z";
+
   # Core
   ls = "eza --icons always --classify always";
   la = "eza --icons always --classify always --all ";
