@@ -7,3 +7,8 @@ config.nix
 .vscode/
 flake.nix
 flake.lock
+
+{{- if (eq .chezmoi.os "darwin") }}
+.glzr
+.config/starship.toml
+{{- end }}
