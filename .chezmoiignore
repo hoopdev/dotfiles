@@ -1,0 +1,9 @@
+README.md
+.gitignore
+home/
+hosts/
+.aerospace.toml
+config.nix
+.vscode/
+flake.nix
+flake.lock
