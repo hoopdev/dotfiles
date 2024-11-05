@@ -1,0 +1,52 @@
+{
+    // vimrc
+    // jupyterlab-vimrc:vimrc
+    // Settings to be applied to codemirror vim mode
+    // *********************************************
+
+    // imap commands
+    // [lhs, rhs] - e.g. "imap": [["ii", "<Esc>"]]
+    "imap": [],
+
+    // inoremap commands
+    // [lhs, rhs]
+    "inoremap": [
+        {}
+    ],
+
+    // nmap commands
+    // [lhs, rhs]
+    "nmap": [
+        {}
+    ],
+
+    // nnoremap commands
+    // [lhs, rhs]
+    "nnoremap": [
+            // ["<S-h>", "^"],
+            // ["<S-j>", "}"],
+            // ["<S-k>", "{"],
+            // ["<S-l>", "$"],
+            ["H", "^"],
+            ["J", "}"],
+            ["K", "{"],
+            ["L", "$"],
+            ["m", "%"],
+    ],
+
+    // set unnamedplus
+    // If true, yanking without specifying a register will also yank to the system clipboard.
+    "unnamedplus": false,
+
+    // vmap commands
+    // [lhs, rhs]
+    "vmap": [
+        {}
+    ],
+
+    // vnoremap commands
+    // [lhs, rhs]
+    "vnoremap": [
+        {}
+    ]
+}

@@ -1,0 +1,27 @@
+format = "[░▒▓](#f2d5cf)[  ](bg:#f2d5cf fg:#303446)[](bg:#e5c890 fg:#f2d5cf)$directory[](fg:#e5c890 bg:#a6d189)$git_branch$git_status[](fg:#a6d189 bg:#81c8be)$time[ ](fg:#81c8be)$character"
+[directory]
+format = "[ $path ]($style)"
+style = "fg:#292c3c bg:#e5c890"
+truncation_length = 3
+truncation_symbol = "…/"
+
+[directory.substitutions]
+Documents = "󰈙 "
+Downloads = " "
+Music = " "
+Pictures = " "
+
+[git_branch]
+format = "[[ $symbol $branch ](fg:#292c3c bg:#a6d189)]($style)"
+style = "bg:#626880"
+symbol = ""
+
+[git_status]
+format = "[[($all_status$ahead_behind )](fg:#292c3c bg:#a6d189)]($style)"
+style = "bg:#626880"
+
+[time]
+disabled = false
+format = "[[  $time ](fg:#292c3c bg:#81c8be)]($style)"
+style = "bg:#f2d5cf"
+time_format = "%R"
