@@ -7,12 +7,6 @@
     enable = true;
 
     keymaps = [
-      # Equivalent to nnoremap ; :
-      {
-        key = ";";
-        action = ":";
-      }
-
       # Equivalent to nmap <silent> <buffer> <leader>gg <cmd>Man<CR>
       {
         key = "<leader>gg";
@@ -22,11 +16,99 @@
           remap = false;
         };
       }
+      {
+        key = "j";
+        action = "gj";
+        options = {
+          silent = true;
+          remap = false;
+        };
+      }
+      {
+        key = "k";
+        action = "gk";
+        options = {
+          silent = true;
+          remap = false;
+        };
+      }
+      {
+        key = "<S-h>";
+        action = "^";
+        options = {
+          silent = true;
+          remap = false;
+        };
+      }
+      {
+        key = "<S-l>";
+        action = "$";
+        options = {
+          silent = true;
+          remap = false;
+        };
+      }
+      {
+        key = "<S-k>";
+        action = "{";
+        options = {
+          silent = true;
+          remap = false;
+        };
+      }
+      {
+        key = "<S-j>";
+        action = "}";
+        options = {
+          silent = true;
+          remap = false;
+        };
+      }
+      {
+        key = "m";
+        action = "%";
+        options = {
+          silent = true;
+          remap = false;
+        };
+      }
+      {
+        key = "<leader>w";
+        action = ":w<CR>";
+        options = {
+          silent = true;
+          remap = true;
+        };
+      }
+      {
+        key = "<leader>q";
+        action = ":q<CR>";
+        options = {
+          silent = true;
+          remap = true;
+        };
+      }
+      {
+        key = "<leader>wq";
+        action = ":wq<CR>";
+        options = {
+          silent = true;
+          remap = true;
+        };
+      }
+      {
+        key = "<esc><esc>";
+        action = ":nohlsearch<CR><esc>";
+        options = {
+          silent = true;
+          remap = true;
+        };
+      }
       # Etc...
     ];
 
     # We can set the leader key:
-    globals.mapleader = ",";
+    globals.mapleader = " ";
 
     # We can create maps for every mode!
     # There is .normal, .insert, .visual, .operator, etc!
