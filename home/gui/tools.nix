@@ -8,5 +8,6 @@
     signal-desktop
     ollama
     xld
+    discord
   ];
 }
