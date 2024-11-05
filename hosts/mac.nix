@@ -20,8 +20,9 @@
     ../home/cli
     ../home/gui
     inputs.nix-colors.homeManagerModules.default
+    inputs.nixvim.homeManagerModules.nixvim
   ];
-  colorScheme = inputs.nix-colors.colorSchemes.catppuccin-frappe;
+  colorScheme = inputs.nix-colors.colorSchemes.nord;
 
   home.packages =
     with pkgs;
