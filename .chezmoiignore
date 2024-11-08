@@ -9,6 +9,7 @@ flake.nix
 flake.lock
 
 {{- if (eq .chezmoi.os "darwin") }}
+AppData
 .glzr
-.config/starship.toml
+.config
 {{- end }}
