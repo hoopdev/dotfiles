@@ -897,3 +897,5 @@ $env.config = {
     ]
 }
 source ~/.config/starship/init.nu
+source ~/.config/zoxide/init.nu
+alias cd = z
