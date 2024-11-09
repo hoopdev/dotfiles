@@ -46,8 +46,9 @@
         options = {
           silent = true;
           remap = false;
-        };
+		};
       }
+
       {
         key = "<S-k>";
         action = "{";
@@ -104,7 +105,15 @@
           remap = true;
         };
       }
-      # Etc...
+      # Plugins
+      {
+        key = "<leader>n";
+        action = ":Neotree filesystem reveal left<CR>";
+        options = {
+          silent = true;
+          remap = true;
+        };
+      }
     ];
 
     # We can set the leader key:
@@ -163,10 +172,59 @@
         };
       };
 
+	  lazy = {
+	    enable = true;
+	  };
+	  nvim-autopairs = {
+	    enable = true;
+	  };
+	  comment = {
+	    enable = true;
+	  };
+	  nvim-colorizer = {
+	    enable = true;
+	  };
+	  cmp = {
+	    enable = true;
+	  };
+	  copilot-cmp = {
+	    enable = true;
+	  };
+	  copilot-lua = {
+	    enable = true;
+		suggestion = {
+		  enabled = false;
+		};
+		panel = {
+		  enabled = false;
+		};
+	  };
+	  telescope = {
+        enable = true;
+	  };
+	  web-devicons = {
+	    enable = true;
+	  };
+	  neo-tree = {
+	    enable = true;
+	  };
+	  treesitter = {
+	    enable = true;
+	  };
+
+
+
       # Of course, there are a lot more plugins available.
       # You can find an up-to-date list here:
       # https://nixvim.pta2002.com/plugins
     };
+
+	extraConfigLua = ''
+		require("copilot").setup({
+		suggestion = { enabled = false },
+		panel = { enabled = false },
+		})
+	'';
 
     # There is a separate namespace for colorschemes:
     colorschemes.nord.enable = true;

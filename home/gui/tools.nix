@@ -4,6 +4,7 @@
     obsidian
     slack
     vscode
+    zed-editor
     zoom-us
     signal-desktop
     ollama

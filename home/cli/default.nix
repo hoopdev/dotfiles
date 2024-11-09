@@ -4,6 +4,6 @@
     ./git.nix
     ./tools.nix
     ./development.nix
-    ./neovim.nix
+    #./neovim.nix
   ];
 }

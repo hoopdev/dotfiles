@@ -15,9 +15,11 @@
     unrar
     unzip
     zip
+    zellij
+    ripgrep
     hackgen-nf-font
     nixfmt-rfc-style
-    helix
+    quarto
   ];
   programs.zoxide = {
     enable = true;
