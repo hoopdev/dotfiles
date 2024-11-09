@@ -1,10 +1,10 @@
 {
 	"$schema" : "https://aka.ms/winget-packages.schema.2.0.json",
-	"CreationDate" : "2024-11-08T21:06:38.660-00:00",
-	"Sources" :
+	"CreationDate" : "2024-11-09T22:58:58.529-00:00",
+	"Sources" : 
 	[
 		{
-			"Packages" :
+			"Packages" : 
 			[
 				{
 					"PackageIdentifier" : "Bambulab.Bambustudio"
@@ -19,22 +19,10 @@
 					"PackageIdentifier" : "Git.Git"
 				},
 				{
-					"PackageIdentifier" : "Microsoft.Office"
-				},
-				{
-					"PackageIdentifier" : "Microsoft.OneDrive"
-				},
-				{
 					"PackageIdentifier" : "Parsec.ParsecVDD"
 				},
 				{
-					"PackageIdentifier" : "VideoLAN.VLC"
-				},
-				{
 					"PackageIdentifier" : "Neovim.Neovim"
-				},
-				{
-					"PackageIdentifier" : "Microsoft.VCRedist.2010.x64"
 				},
 				{
 					"PackageIdentifier" : "Zoom.Zoom"
@@ -46,16 +34,7 @@
 					"PackageIdentifier" : "Nushell.Nushell"
 				},
 				{
-					"PackageIdentifier" : "Apple.Bonjour"
-				},
-				{
-					"PackageIdentifier" : "Microsoft.VCRedist.2008.x64"
-				},
-				{
 					"PackageIdentifier" : "Google.GoogleDrive"
-				},
-				{
-					"PackageIdentifier" : "MacType.MacType"
 				},
 				{
 					"PackageIdentifier" : "glzr-io.zebar"
@@ -64,10 +43,16 @@
 					"PackageIdentifier" : "OpenJS.NodeJS"
 				},
 				{
+					"PackageIdentifier" : "Microsoft.PowerShell"
+				},
+				{
 					"PackageIdentifier" : "Starship.Starship"
 				},
 				{
 					"PackageIdentifier" : "Alacritty.Alacritty"
+				},
+				{
+					"PackageIdentifier" : "gerardog.gsudo"
 				},
 				{
 					"PackageIdentifier" : "glzr-io.glazewm"
@@ -76,22 +61,34 @@
 					"PackageIdentifier" : "Adobe.CreativeCloud"
 				},
 				{
-					"PackageIdentifier" : "Dropbox.Dropbox"
+					"PackageIdentifier" : "Microsoft.Edge"
+				},
+				{
+					"PackageIdentifier" : "Microsoft.EdgeWebView2Runtime"
+				},
+				{
+					"PackageIdentifier" : "Parsec.Parsec"
 				},
 				{
 					"PackageIdentifier" : "tailscale.tailscale"
 				},
 				{
-					"PackageIdentifier" : "DEVCOM.JetBrainsMonoNerdFont"
-				},
-				{
-					"PackageIdentifier" : "Microsoft.PowerToys"
-				},
-				{
 					"PackageIdentifier" : "Kensington.KensingtonWorks"
 				},
 				{
-					"PackageIdentifier" : "Microsoft.PowerShell"
+					"PackageIdentifier" : "DEVCOM.JetBrainsMonoNerdFont"
+				},
+				{
+					"PackageIdentifier" : "Microsoft.VCRedist.2015+.x64"
+				},
+				{
+					"PackageIdentifier" : "Microsoft.VCRedist.2015+.x86"
+				},
+				{
+					"PackageIdentifier" : "Microsoft.DotNet.DesktopRuntime.6"
+				},
+				{
+					"PackageIdentifier" : "Microsoft.DotNet.DesktopRuntime.8"
 				},
 				{
 					"PackageIdentifier" : "Notion.Notion"
@@ -103,7 +100,7 @@
 					"PackageIdentifier" : "Gyan.FFmpeg"
 				},
 				{
-					"PackageIdentifier" : "LINE.LINE"
+					"PackageIdentifier" : "Microsoft.OneDrive"
 				},
 				{
 					"PackageIdentifier" : "Vivaldi.Vivaldi"
@@ -127,21 +124,63 @@
 					"PackageIdentifier" : "Microsoft.VisualStudioCode"
 				},
 				{
+					"PackageIdentifier" : "Microsoft.PowerToys"
+				},
+				{
 					"PackageIdentifier" : "Mathpix.MathpixSnippingTool"
 				},
 				{
 					"PackageIdentifier" : "Microsoft.AppInstaller"
 				},
 				{
+					"PackageIdentifier" : "Microsoft.UI.Xaml.2.7"
+				},
+				{
+					"PackageIdentifier" : "Microsoft.UI.Xaml.2.8"
+				},
+				{
+					"PackageIdentifier" : "Microsoft.VCLibs.Desktop.14"
+				},
+				{
 					"PackageIdentifier" : "Microsoft.WindowsTerminal"
 				}
 			],
-			"SourceDetails" :
+			"SourceDetails" : 
 			{
 				"Argument" : "https://cdn.winget.microsoft.com/cache",
 				"Identifier" : "Microsoft.Winget.Source_8wekyb3d8bbwe",
 				"Name" : "winget",
 				"Type" : "Microsoft.PreIndexed.Package"
+			}
+		},
+		{
+			"Packages" : 
+			[
+				{
+					"PackageIdentifier" : "XPFCC4CD725961"
+				},
+				{
+					"PackageIdentifier" : "9NGHP3DX8HDX"
+				},
+				{
+					"PackageIdentifier" : "9P6RC76MSMMJ"
+				},
+				{
+					"PackageIdentifier" : "9PFHDD62MXS1"
+				},
+				{
+					"PackageIdentifier" : "9PKTQ5699M62"
+				},
+				{
+					"PackageIdentifier" : "9NT1R1C2HH7J"
+				}
+			],
+			"SourceDetails" : 
+			{
+				"Argument" : "https://storeedgefd.dsx.mp.microsoft.com/v9.0",
+				"Identifier" : "StoreEdgeFD",
+				"Name" : "msstore",
+				"Type" : "Microsoft.Rest"
 			}
 		}
 	],
