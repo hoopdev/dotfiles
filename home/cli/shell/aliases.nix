@@ -4,17 +4,19 @@
   cp = "cp -i";
 
   cd = "z";
-
   cat = "bat";
+  ps = "procs";
+  du = "dust";
+  diff = "difft";
 
-  # Core
   ls = "eza --icons always --classify always";
   la = "eza --icons always --classify always --all ";
   ll = "eza --icons always --long --all --git ";
-  tree = "eza --icons always --classify always --tree";
+  lt = "eza --icons always --classify always --tree";
 
   vim = "nvim";
   zj = "zellij";
   yz = "yazi";
+  ch = "chezmoi";
 
 }
