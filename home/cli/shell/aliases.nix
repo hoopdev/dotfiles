@@ -5,6 +5,8 @@
 
   cd = "z";
 
+  cat = "bat";
+
   # Core
   ls = "eza --icons always --classify always";
   la = "eza --icons always --classify always --all ";
@@ -12,5 +14,7 @@
   tree = "eza --icons always --classify always --tree";
 
   vim = "nvim";
+  zj = "zellij";
+  yz = "yazi";
 
 }

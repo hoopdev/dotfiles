@@ -1,7 +1,8 @@
 {
   imports = [
     ./zsh.nix
-    ./starship.nix
     ./nushell.nix
+    ./starship.nix
   ];
 }
+

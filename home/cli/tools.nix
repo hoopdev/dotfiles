@@ -6,6 +6,10 @@
     fd
     fx
     fzf
+    difftastic
+    dust
+    procs
+    bottom
     ghq
     httpie
     imagemagick
@@ -16,6 +20,8 @@
     unzip
     zip
     zellij
+    gotop
+    yazi
     ripgrep
     hackgen-nf-font
     nixfmt-rfc-style
@@ -26,5 +32,13 @@
     package = pkgs.zoxide;
     enableNushellIntegration = true;
     enableZshIntegration = true;
+  };
+  programs.zellij = {
+    enable = true;
+    package = pkgs.zellij;
+    enableZshIntegration = true;
+    settings = {
+      theme = "nord";
+    };
   };
 }

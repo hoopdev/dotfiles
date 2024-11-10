@@ -5,6 +5,9 @@
 {
   programs.starship = {
     enable = true;
+    enableNushellIntegration = true;
+    enableZshIntegration = true;
+
     # settings = builtins.fromTOML (builtins.readFile ./starship.toml);
     settings = {
 
