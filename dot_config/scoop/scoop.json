@@ -1,0 +1,54 @@
+{
+    "apps": [
+        {
+            "Info": "",
+            "Source": "main",
+            "Name": "gping",
+            "Version": "1.17.3",
+            "Updated": "2024-11-10T15:23:37.8069888+09:00"
+        },
+        {
+            "Info": "",
+            "Source": "main",
+            "Name": "grex",
+            "Version": "1.4.5",
+            "Updated": "2024-11-10T15:49:59.0247302+09:00"
+        },
+        {
+            "Info": "",
+            "Source": "main",
+            "Name": "hexyl",
+            "Version": "0.15.0",
+            "Updated": "2024-11-10T15:36:50.1605654+09:00"
+        },
+        {
+            "Info": "",
+            "Source": "main",
+            "Name": "imagemagick",
+            "Version": "7.1.1-40",
+            "Updated": "2024-11-10T07:17:26.9993015+09:00"
+        },
+        {
+            "Info": "",
+            "Source": "main",
+            "Name": "innounp",
+            "Version": "1.76",
+            "Updated": "2024-11-10T07:16:42.8209621+09:00"
+        },
+        {
+            "Info": "",
+            "Source": "main",
+            "Name": "poppler",
+            "Version": "24.08.0-0",
+            "Updated": "2024-11-10T07:17:38.5949858+09:00"
+        }
+    ],
+    "buckets": [
+        {
+            "Name": "main",
+            "Source": "https://github.com/ScoopInstaller/Main.git",
+            "Updated": "2024-11-10T13:28:50+09:00",
+            "Manifests": 1347
+        }
+    ]
+}
