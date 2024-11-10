@@ -249,14 +249,14 @@ $env.config = {
         # osc8 is also implemented as the deprecated setting ls.show_clickable_links, it shows clickable links in ls output if your terminal supports it. show_clickable_links is deprecated in favor of osc8
         osc8: true
         # osc9_9 is from ConEmu and is starting to get wider support. It's similar to osc7 in that it communicates the path to the terminal
-        osc9_9: false
+        osc9_9: true
         # osc133 is several escapes invented by Final Term which include the supported ones below.
         # 133;A - Mark prompt start
         # 133;B - Mark prompt end
         # 133;C - Mark pre-execution
         # 133;D;exit - Mark execution finished with exit code
         # This is used to enable terminals to know where the prompt is, the command is, where the command finishes, and where the output of the command is
-        osc133: true
+        osc133: false
         # osc633 is closely related to osc133 but only exists in visual studio code (vscode) and supports their shell integration features
         # 633;A - Mark prompt start
         # 633;B - Mark prompt end
@@ -898,4 +898,14 @@ $env.config = {
 }
 source ~/.config/starship/init.nu
 source ~/.config/zoxide/init.nu
+
 alias cd = z
+alias cat = bat
+alias diff = difft
+alias du = dust
+alias yz = yazi
+alias ps = procs
+alias ls = eza --icons always --classify always
+alias la = eza --icons always --classify always --all
+alias ll = eza --icons always --long --all --git
+alias lt = eza --icons always --classify always --tree
