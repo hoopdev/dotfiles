@@ -905,6 +905,7 @@ alias diff = difft
 alias du = dust
 alias yz = yazi
 alias ps = procs
+alias ch = chezmoi
 alias ls = eza --icons always --classify always
 alias la = eza --icons always --classify always --all
 alias ll = eza --icons always --long --all --git

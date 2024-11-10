@@ -75,9 +75,6 @@
 					"PackageIdentifier" : "Git.Git"
 				},
 				{
-					"PackageIdentifier" : "Parsec.ParsecVDD"
-				},
-				{
 					"PackageIdentifier" : "Neovim.Neovim"
 				},
 				{
@@ -105,9 +102,6 @@
 					"PackageIdentifier" : "Starship.Starship"
 				},
 				{
-					"PackageIdentifier" : "Alacritty.Alacritty"
-				},
-				{
 					"PackageIdentifier" : "gerardog.gsudo"
 				},
 				{
@@ -130,9 +124,6 @@
 				},
 				{
 					"PackageIdentifier" : "Kensington.KensingtonWorks"
-				},
-				{
-					"PackageIdentifier" : "DEVCOM.JetBrainsMonoNerdFont"
 				},
 				{
 					"PackageIdentifier" : "Notion.Notion"
