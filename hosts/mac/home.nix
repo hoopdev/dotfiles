@@ -17,8 +17,9 @@
   programs.home-manager.enable = true;
 
   imports = [
-    ../home/cli
-    ../home/gui
+    ../../home/common/cli
+    ../../home/common/gui
+    ../../home/mac/gui
     inputs.nix-colors.homeManagerModules.default
     #inputs.nixvim.homeManagerModules.nixvim
   ];

@@ -3,8 +3,10 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    nix-darwin.url = "github:LnL7/nix-darwin";
-    nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
+    nix-darwin = {
+      url = "github:LnL7/nix-darwin";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     home-manager = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -26,15 +28,41 @@
       ...
     }:
     let
-      darwinUser = "ktaga";
-      darwinHost = builtins.getEnv "DARWIN_HOST";
+      # Function for NixOS configuration
+      mkNixosConfiguration = 
+      { hostname, username }:
+      nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          ./hosts/prox-nix/configuration.nix
+          home-manager.nixosModules.home-manager
+          {
+            networking.hostName = hostname;
+            users.users.${username}.home = "/home/${username}";
+            home-manager.useGlobalPkgs = true;
+            home-manager.useUserPackages = true;
+            home-manager.users.${username} =
+              { pkgs, lib, ... }:
+              import ./hosts/prox-nix/home.nix {
+                inherit
+                  pkgs
+                  lib
+                  username
+                  inputs
+                  ;
+              };
+          }
+        ];
+      };
 
-      mkDarwinSystem =
+
+      # Function for macOS configuration
+      mkDarwinConfiguration =
         { hostname, username }:
         nix-darwin.lib.darwinSystem {
           system = "aarch64-darwin";
           modules = [
-            ./config.nix
+            ./hosts/mac/configuration.nix
             home-manager.darwinModules.home-manager
             {
               networking.hostName = hostname;
@@ -43,7 +71,7 @@
               home-manager.useUserPackages = true;
               home-manager.users.${username} =
                 { pkgs, lib, ... }:
-                import ./hosts/mac.nix {
+                import ./hosts/mac/home.nix {
                   inherit
                     pkgs
                     lib
@@ -59,13 +87,27 @@
             inherit inputs;
           };
         };
+
     in
     {
-      # Build darwin flake using:
-      # $ darwin-rebuild build --flake .#simple
-      darwinConfigurations.${darwinHost} = mkDarwinSystem {
-        hostname = darwinHost;
-        username = darwinUser;
+      # Build nixos using flake
+      nixosConfigurations = {
+        prox-nix = mkNixosConfiguration {
+	  hostname = "kt-prox-nix";
+	  username = "ktaga";
+	};
+      };
+
+      # Build darwin using flake
+      darwinConfigurations = {
+        kt-mac-studio = mkDarwinConfiguration {
+          hostname = "kt-mac-studio";
+          username = "ktaga";
+	};
+        kt-mba = mkDarwinConfiguration {
+          hostname = "kt-mba";
+          username = "ktaga";
+	};
       };
     };
 }
