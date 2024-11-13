@@ -29,32 +29,31 @@
     }:
     let
       # Function for NixOS configuration
-      mkNixosConfiguration = 
-      { hostname, username }:
-      nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [
-          ./hosts/prox-nix/configuration.nix
-          home-manager.nixosModules.home-manager
-          {
-            networking.hostName = hostname;
-            users.users.${username}.home = "/home/${username}";
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
-            home-manager.users.${username} =
-              { pkgs, lib, ... }:
-              import ./hosts/prox-nix/home.nix {
-                inherit
-                  pkgs
-                  lib
-                  username
-                  inputs
-                  ;
-              };
-          }
-        ];
-      };
-
+      mkNixosConfiguration =
+        { hostname, username }:
+        nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [
+            ./hosts/prox-nix/configuration.nix
+            home-manager.nixosModules.home-manager
+            {
+              networking.hostName = hostname;
+              users.users.${username}.home = "/home/${username}";
+              home-manager.useGlobalPkgs = true;
+              home-manager.useUserPackages = true;
+              home-manager.users.${username} =
+                { pkgs, lib, ... }:
+                import ./hosts/prox-nix/home.nix {
+                  inherit
+                    pkgs
+                    lib
+                    username
+                    inputs
+                    ;
+                };
+            }
+          ];
+        };
 
       # Function for macOS configuration
       mkDarwinConfiguration =
@@ -93,9 +92,9 @@
       # Build nixos using flake
       nixosConfigurations = {
         prox-nix = mkNixosConfiguration {
-	  hostname = "kt-prox-nix";
-	  username = "ktaga";
-	};
+          hostname = "kt-prox-nix";
+          username = "ktaga";
+        };
       };
 
       # Build darwin using flake
@@ -103,11 +102,11 @@
         kt-mac-studio = mkDarwinConfiguration {
           hostname = "kt-mac-studio";
           username = "ktaga";
-	};
+        };
         kt-mba = mkDarwinConfiguration {
           hostname = "kt-mba";
           username = "ktaga";
-	};
+        };
       };
     };
 }
