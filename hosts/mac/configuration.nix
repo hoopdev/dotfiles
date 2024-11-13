@@ -6,7 +6,7 @@
   services = {
     aerospace = {
       enable = true;
-      settings = builtins.fromTOML (builtins.readFile ./.aerospace.toml);
+      settings = builtins.fromTOML (builtins.readFile ../../.aerospace.toml);
     };
   };
 
