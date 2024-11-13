@@ -21,4 +21,9 @@
     #inputs.nixvim.homeManagerModules.nixvim
   ];
   colorScheme = inputs.nix-colors.colorSchemes.nord;
+
+  home.packages = 
+  [
+    inputs.nixvim.packages.x86_64-linux.default
+  ];
 }
