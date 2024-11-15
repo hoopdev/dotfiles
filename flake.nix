@@ -17,6 +17,9 @@
       url = "github:dc-tec/nixvim";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    hyprland = {
+      url = "github:hyprwm/Hyprland";
+    };
   };
 
   outputs =
@@ -25,6 +28,7 @@
       nix-darwin,
       nixpkgs,
       home-manager,
+      hyprland,
       ...
     }:
     let
@@ -53,6 +57,11 @@
                 };
             }
           ];
+          specialArgs = {
+            inherit (nixpkgs) lib;
+            inherit username;
+            inherit inputs;
+          };
         };
 
       # Function for macOS configuration
