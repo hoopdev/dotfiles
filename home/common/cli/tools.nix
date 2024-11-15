@@ -36,7 +36,7 @@
   programs.zellij = {
     enable = true;
     package = pkgs.zellij;
-    enableZshIntegration = true;
+    enableZshIntegration = false;
     settings = {
       theme = "nord";
     };

@@ -11,15 +11,19 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nixos-hardware.url = "github:NixOS/nixos-hardware";
     nix-colors.url = "github:misterio77/nix-colors";
+    wezterm = {
+      url = "github:wez/wezterm?dir=nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     nixvim = {
       #url = "github:nix-community/nixvim";
       url = "github:dc-tec/nixvim";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    hyprland = {
-      url = "github:hyprwm/Hyprland";
-    };
+    hyprland.url = "github:hyprwm/Hyprland";
+    xremap.url = "github:xremap/nix-flake";
   };
 
   outputs =
@@ -27,8 +31,11 @@
       self,
       nix-darwin,
       nixpkgs,
+      nixos-hardware,
       home-manager,
+      wezterm,
       hyprland,
+      xremap,
       ...
     }:
     let
@@ -38,7 +45,7 @@
         nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";
           modules = [
-            ./hosts/prox-nix/configuration.nix
+            ./hosts/${hostname}/configuration.nix
             home-manager.nixosModules.home-manager
             {
               networking.hostName = hostname;
@@ -46,8 +53,12 @@
               home-manager.useGlobalPkgs = true;
               home-manager.useUserPackages = true;
               home-manager.users.${username} =
-                { pkgs, lib, ... }:
-                import ./hosts/prox-nix/home.nix {
+                {
+                  pkgs,
+                  lib,
+                  ...
+                }:
+                import ./hosts/${hostname}/home.nix {
                   inherit
                     pkgs
                     lib
@@ -100,8 +111,12 @@
     {
       # Build nixos using flake
       nixosConfigurations = {
-        prox-nix = mkNixosConfiguration {
+        kt-prox-nix = mkNixosConfiguration {
           hostname = "kt-prox-nix";
+          username = "ktaga";
+        };
+        kt-thinkpad = mkNixosConfiguration {
+          hostname = "kt-thinkpad";
           username = "ktaga";
         };
       };

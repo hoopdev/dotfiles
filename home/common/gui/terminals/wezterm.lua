@@ -19,6 +19,7 @@ return {
 	window_decorations = "RESIZE",
 
 	front_end = "WebGpu",
+	enable_wayland = false,
 	use_ime = true,
 	check_for_updates = false,
 }

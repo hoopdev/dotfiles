@@ -1,18 +1,33 @@
 { pkgs, ... }:
 {
-  home.packages =
-    with pkgs;
-    [
-    ];
+  home.packages = with pkgs; [
+    wofi
+    wofi-emoji
+    hyprpicker
+    hyprpaper
+    waybar
+    wl-clipboard
+    brightnessctl
+    playerctl
+  ];
   programs = {
     kitty.enable = true; # required for the default Hyprland config
   };
+  services.dunst.enable = true;
   wayland.windowManager.hyprland.enable = true; # enable Hyprland
+  wayland.windowManager.hyprland.xwayland.enable = true;
   wayland.windowManager.hyprland.settings = {
-    "$mod" = "SUPER";
+    exec-once = [
+      "waybar"
+      "hyprpaper"
+      "fcitx5 -d --replace"
+    ];
+    "$mod" = "ALT";
     bind =
       [
-        "$mod, F, exec, firefox"
+        "$mod, V, exec, vivaldi"
+        "$mod, C, exec, wezterm"
+        "$mod SHIFT, M, exit"
         ", Print, exec, grimblast copy area"
       ]
       ++ (
