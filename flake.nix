@@ -1,5 +1,5 @@
 {
-  description = "KT Darwin & home-manager system flake";
+  description = "KT Nix System Flake";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";

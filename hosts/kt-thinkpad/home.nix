@@ -19,8 +19,21 @@
       ];
   };
 
+  xdg = {
+    enable = true;
+    userDirs = {
+      extraConfig = {
+        desktop = "/home/ktaga/Desktop";
+        download = "/home/ktaga/Downloads";
+        documents = "/home/ktaga/Documents";
+        music = "/home/ktaga/Music";
+        videos = "/home/ktaga/Videos";
+      };
+    };
+  };
+
   programs.home-manager.enable = true;
-  #programs.kitty.enable = true;
+
   imports = [
     ../../home/common/cli
     ../../home/common/gui
