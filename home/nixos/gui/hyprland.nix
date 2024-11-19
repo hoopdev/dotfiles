@@ -1,8 +1,6 @@
-{ pkgs, ... }:
+{ inputs, pkgs, ... }:
 {
   home.packages = with pkgs; [
-    wofi
-    wofi-emoji
     hyprpicker
     hypridle
     hyprpaper
@@ -11,35 +9,6 @@
     brightnessctl
     playerctl
   ];
-
-  programs.waybar = {
-    enable = true;
-    systemd.enable = true;
-    settings = {
-      mainBar = {
-        layer = "top";
-        position = "top";
-        height = 30;
-        modules-left = [
-          "hyprland/workspaces"
-          "cpu"
-          "memory"
-          "temperature"
-          "disk"
-        ];
-        modules-center = [ "hyprland/window" ];
-        modules-right = [
-          "idle_inhibitor"
-          "pulseaudio"
-          "backlight"
-          "battery"
-          "clock"
-          "keyboard-state"
-          "tray"
-        ];
-      };
-    };
-  };
 
   services.dunst.enable = true;
 
@@ -58,6 +27,7 @@
     xwayland.enable = true;
     settings = {
       exec-once = [
+        "hyprpanel"
         "fcitx5 -d --replace"
       ];
       monitor = [ "eDP-1, 2160x1440@60, 0x0, 1" ];
@@ -90,10 +60,12 @@
         };
       };
       "$mod" = "ALT";
+      "$term" = "wezterm";
       bind =
         [
           "$mod, V, exec, vivaldi"
           "$mod, C, exec, wezterm"
+          "$mod, SPACE, exec, wofi --show drun"
           "$mod SHIFT, M, exit"
           ", Print, exec, grimblast copy area"
         ]

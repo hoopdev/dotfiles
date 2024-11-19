@@ -26,6 +26,7 @@
     hackgen-nf-font
     nixfmt-rfc-style
     quarto
+    fastfetch
   ];
   programs.zoxide = {
     enable = true;

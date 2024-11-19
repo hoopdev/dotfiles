@@ -24,6 +24,7 @@
     };
     hyprland.url = "github:hyprwm/Hyprland";
     xremap.url = "github:xremap/nix-flake";
+    hyprpanel.url = "github:Jas-SinghFSU/HyprPanel";
   };
 
   outputs =
@@ -36,6 +37,7 @@
       wezterm,
       hyprland,
       xremap,
+      hyprpanel,
       ...
     }:
     let
