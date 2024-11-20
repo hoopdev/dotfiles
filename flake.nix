@@ -22,6 +22,7 @@
       url = "github:dc-tec/nixvim";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nixos-wsl.url = "github:nix-community/nixos-wsl";
     hyprland.url = "github:hyprwm/Hyprland";
     xremap.url = "github:xremap/nix-flake";
     hyprpanel.url = "github:Jas-SinghFSU/HyprPanel";
@@ -31,6 +32,7 @@
     inputs@{
       self,
       nix-darwin,
+      nixos-wsl,
       nixpkgs,
       nixos-hardware,
       home-manager,
@@ -119,6 +121,10 @@
         };
         kt-thinkpad = mkNixosConfiguration {
           hostname = "kt-thinkpad";
+          username = "ktaga";
+        };
+        kt-wsl-nix = mkNixosConfiguration {
+          hostname = "kt-wsl-nix";
           username = "ktaga";
         };
       };
