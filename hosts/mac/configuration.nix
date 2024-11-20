@@ -38,6 +38,7 @@
       "arduino"
       "google-drive"
       "chatgpt"
+      "google-japanese-ime"
     ];
   };
 
