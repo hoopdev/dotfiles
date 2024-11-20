@@ -11,6 +11,8 @@ let
       ""
     else if pkgs.stdenv.hostPlatform.system == "x86_64-darwin" then
       ""
+    else if pkgs.stdenv.hostPlatform.system == "aarch64-darwin" then
+      ""
     else
       "";
 in
