@@ -1,6 +1,4 @@
 {
-  pkgs,
-  lib,
   username,
   inputs,
   ...
@@ -13,11 +11,9 @@
   };
 
   programs.home-manager.enable = true;
-  #programs.kitty.enable = true;
   imports = [
     ../../home/common/cli
     inputs.nix-colors.homeManagerModules.default
-    #inputs.nixvim.homeManagerModules.nixvim
   ];
   colorScheme = inputs.nix-colors.colorSchemes.nord;
 

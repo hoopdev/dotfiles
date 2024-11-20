@@ -45,9 +45,13 @@
     let
       # Function for NixOS configuration
       mkNixosConfiguration =
-        { hostname, username }:
+        {
+          hostname,
+          username,
+          system,
+        }:
         nixpkgs.lib.nixosSystem {
-          system = "x86_64-linux";
+          inherit system;
           modules = [
             ./hosts/${hostname}/configuration.nix
             home-manager.nixosModules.home-manager
@@ -64,8 +68,6 @@
                 }:
                 import ./hosts/${hostname}/home.nix {
                   inherit
-                    pkgs
-                    lib
                     username
                     inputs
                     ;
@@ -93,7 +95,11 @@
               home-manager.useGlobalPkgs = true;
               home-manager.useUserPackages = true;
               home-manager.users.${username} =
-                { pkgs, lib, ... }:
+                {
+                  pkgs,
+                  lib,
+                  ...
+                }:
                 import ./hosts/mac/home.nix {
                   inherit
                     pkgs
@@ -118,14 +124,17 @@
         kt-prox-nix = mkNixosConfiguration {
           hostname = "kt-prox-nix";
           username = "ktaga";
+          system = "x86_64-linux";
         };
         kt-thinkpad = mkNixosConfiguration {
           hostname = "kt-thinkpad";
           username = "ktaga";
+          system = "x86_64-linux";
         };
         kt-wsl-nix = mkNixosConfiguration {
           hostname = "kt-wsl-nix";
           username = "ktaga";
+          system = "x86_64-linux";
         };
       };
 

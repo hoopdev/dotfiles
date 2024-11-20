@@ -1,17 +1,29 @@
 {
+  pkgs,
   config,
   ...
 }:
+let
+  systemlogo =
+    if pkgs.stdenv.hostPlatform.system == "x86_64-linux" then
+      ""
+    else if pkgs.stdenv.hostPlatform.system == "aarch64-linux" then
+      ""
+    else if pkgs.stdenv.hostPlatform.system == "x86_64-darwin" then
+      ""
+    else
+      "";
+in
 {
   programs.starship = {
     enable = true;
     enableNushellIntegration = true;
     enableZshIntegration = true;
 
-    # settings = builtins.fromTOML (builtins.readFile ./starship.toml);
     settings = {
 
-      format = "[░▒▓](#${config.colorScheme.palette.base06})[  ](bg:#${config.colorScheme.palette.base06} fg:#${config.colorScheme.palette.base00})[](bg:#${config.colorScheme.palette.base0A} fg:#${config.colorScheme.palette.base06})$directory[](fg:#${config.colorScheme.palette.base0A} bg:#${config.colorScheme.palette.base0B})$git_branch$git_status[](fg:#${config.colorScheme.palette.base0B} bg:#${config.colorScheme.palette.base0C})$time[ ](fg:#${config.colorScheme.palette.base0C})$character";
+      format = "[░▒▓](#${config.colorScheme.palette.base06})[ ${systemlogo} ](bg:#${config.colorScheme.palette.base06} fg:#${config.colorScheme.palette.base00})[](bg:#${config.colorScheme.palette.base0A} fg:#${config.colorScheme.palette.base06})$directory[](fg:#${config.colorScheme.palette.base0A} bg:#${config.colorScheme.palette.base0B})$git_branch$git_status[](fg:#${config.colorScheme.palette.base0B} bg:#${config.colorScheme.palette.base0C})$time[ ](fg:#${config.colorScheme.palette.base0C})$character";
+      #format = "[░▒▓](#${config.colorScheme.palette.base06})[  ](bg:#${config.colorScheme.palette.base06} fg:#${config.colorScheme.palette.base00})[](bg:#${config.colorScheme.palette.base0A} fg:#${config.colorScheme.palette.base06})$directory[](fg:#${config.colorScheme.palette.base0A} bg:#${config.colorScheme.palette.base0B})$git_branch$git_status[](fg:#${config.colorScheme.palette.base0B} bg:#${config.colorScheme.palette.base0C})$time[ ](fg:#${config.colorScheme.palette.base0C})$character";
 
       directory = {
         format = "[ $path ]($style)";

@@ -5,4 +5,3 @@
     ./starship.nix
   ];
 }
-
