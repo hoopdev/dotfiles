@@ -22,11 +22,10 @@ return {
 	front_end = "WebGpu",
 	-- use_ime = true,
 	check_for_updates = false,
-    leader = { key="a", mods="CTRL" },
+    leader = { key="t", mods="CTRL" },
     disable_default_key_bindings = true,
     keys = {
-        -- Send "CTRL-A" to the terminal when pressing CTRL-A, CTRL-A
-        { key = "a", mods = "LEADER|CTRL",  action=wezterm.action{SendString="\x01"}},
+        { key = "t", mods = "LEADER|CTRL",  action=wezterm.action{SendString="\x01"}},
         { key = "-", mods = "LEADER",       action=wezterm.action{SplitVertical={domain="CurrentPaneDomain"}}},
         { key = "\\",mods = "LEADER",       action=wezterm.action{SplitHorizontal={domain="CurrentPaneDomain"}}},
         { key = "z", mods = "LEADER",       action="TogglePaneZoomState" },

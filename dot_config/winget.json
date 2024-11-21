@@ -18,6 +18,9 @@
 					"PackageIdentifier" : "7zip.7zip"
 				},
 				{
+					"PackageIdentifier" : "rsteube.Carapace"
+				},
+				{
 					"PackageIdentifier" : "jqlang.jq"
 				},
 				{
@@ -154,6 +157,12 @@
 				},
 				{
 					"PackageIdentifier" : "Microsoft.PowerToys"
+				},
+				{
+					"PackageIdentifier" : "Google.JapaneseIME"
+				},
+				{
+					"PackageIdentifier" : "AutoHotKey.AutoHotKey"
 				},
 				{
 					"PackageIdentifier" : "Mathpix.MathpixSnippingTool"
