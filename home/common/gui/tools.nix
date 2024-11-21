@@ -5,6 +5,5 @@
     slack
     vscode
     zed-editor
-    ollama
   ];
 }
