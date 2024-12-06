@@ -2,7 +2,7 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 
 {
   imports = [
@@ -54,7 +54,7 @@
       noto-fonts-cjk-serif
       noto-fonts-cjk-sans
       noto-fonts-emoji
-      nerdfonts
+      nerd-fonts.hack
     ];
     fontDir.enable = true;
     fontconfig = {
@@ -77,6 +77,7 @@
   };
 
   # Nvidia
+  nixpkgs.config.cudaSupport = true;
   hardware.graphics = {
     enable = true;
   };
@@ -86,7 +87,6 @@
   hardware.nvidia-container-toolkit.enable = true;
 
   hardware.nvidia = {
-
     # Modesetting is required.
     modesetting.enable = true;
 
@@ -114,16 +114,12 @@
     nvidiaSettings = true;
 
     # Optionally, you may need to select the appropriate driver version for your specific GPU.
-    package = config.boot.kernelPackages.nvidiaPackages.stable;
+    package = config.boot.kernelPackages.nvidiaPackages.beta;
   };
   boot.kernelParams = [ "nvidia_drm.fbdev=1" ];
 
   # Enable the X11 windowing system.
-  services.xserver.enable = true;
-
-  # Enable the GNOME Desktop Environment.
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.desktopManager.gnome.enable = true;
+  services.xserver.enable = false;
 
   # Configure keymap in X11
   services.xserver.xkb = {
@@ -173,15 +169,13 @@
   # Install programs
   programs = {
     zsh.enable = true;
-    hyprland.enable = true;
+    # hyprland.enable = true;
   };
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
     cudaPackages.cudatoolkit
-    #  vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
-    #  wget
   ];
 
   # Some programs need SUID wrappers, can be configured further or are
@@ -198,9 +192,35 @@
   services.openssh.enable = true;
 
   services.tailscale.enable = true;
+  services.ollama = {
+    enable = true;
+    acceleration = "cuda";
+    host = "0.0.0.0";
+    port = 11434;
+    environmentVariables = {
+      #CUDA_VISIBLE_DEVICES = "0";
+      OLLAMA_LLM_LIBRARY = "cuda";
+      #LD_LIBRARY_PATH = "${pkgs.cudaPackages.cudatoolkit}/lib:${pkgs.cudaPackages.cudatoolkit}/lib64";
+      LD_LIBRARY_PATH = "run/opengl-driver/lib";
+    };
+  };
+  systemd.services.ollama.serviceConfig = {
+    DeviceAllow = lib.mkForce [
+      "char-nvidia-caps"
+      "char-nvidia-frontend"
+      "char-nvidia-uvm"
+      "char-nvidiactl"
+    ];
+  };
 
-  virtualisation.docker.enable = true;
-  virtualisation.docker.enableOnBoot = true;
+  virtualisation.docker = {
+    enable = true;
+    enableOnBoot = true;
+    #rootless = {
+    #  enable = true;
+    #  setSocketVariable = true; # $DOCKER_HOSTを設定
+    #};
+  };
 
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
@@ -214,7 +234,7 @@
   # this value at the release version of the first install of this system.
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "24.11"; # Did you read the comment?
+  system.stateVersion = "24.05"; # Did you read the comment?
   nix = {
     settings = {
       auto-optimise-store = true;
@@ -222,8 +242,8 @@
         "nix-command"
         "flakes"
       ];
-      substituters = [ "https://hyprland.cachix.org" ];
-      trusted-public-keys = [ "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc=" ];
+      substituters = [ "https://hyprland.cachix.org" "https://cuda-maintainers.cachix.org" ];
+      trusted-public-keys = [ "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc=" "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E=" ];
     };
   };
   nixpkgs.config.allowUnfree = true;
