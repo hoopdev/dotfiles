@@ -24,7 +24,6 @@
       ];
     casks = [
       "vivaldi"
-      "warp"
       "notion"
       "orbstack"
       "parsec"
