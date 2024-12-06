@@ -8,6 +8,7 @@
     wl-clipboard
     brightnessctl
     playerctl
+    pamixer
   ];
 
   services.dunst.enable = true;
@@ -67,6 +68,11 @@
           "$mod, C, exec, wezterm"
           "$mod, SPACE, exec, wofi --show drun"
           "$mod SHIFT, M, exit"
+          ", XF86AudioMute, exec, pamixer -t"
+          ", XF86AudioRaiseVolume, exec, pamixer -i 10"
+          ", XF86AudioLowerVolume, exec, pamixer -d 10"
+          ", XF86MonBrightnessUp, exec, brightnessctl set +10%"
+          ", XF86MonBrightnessDown, exec, brightnessctl set 10%-"
           ", Print, exec, grimblast copy area"
         ]
         ++ (
