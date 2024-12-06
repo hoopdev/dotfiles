@@ -6,5 +6,6 @@
     ollama
     xld
     discord
+    vscode
   ];
 }
