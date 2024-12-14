@@ -8,6 +8,11 @@
       enable = true;
       settings = builtins.fromTOML (builtins.readFile ../../.aerospace.toml);
     };
+    #ollama = {
+    #  enable = true;
+    #  host = "0.0.0.0";
+    #  port = 11434;
+    #};
   };
 
   # Homebrew設定
