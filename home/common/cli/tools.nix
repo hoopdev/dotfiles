@@ -27,6 +27,7 @@
     nixfmt-rfc-style
     quarto
     fastfetch
+    _1password-cli
   ];
   programs.zoxide = {
     enable = true;

@@ -24,9 +24,8 @@
       Line = 539883307;
       Perplexity = 6714467650;
     };
-    brews =
-      [
-      ];
+    brews = [
+    ];
     casks = [
       "vivaldi"
       "notion"
@@ -38,7 +37,6 @@
       "raycast"
       "ngrok"
       "karabiner-elements"
-      "clipy"
       "arduino"
       "google-drive"
       "chatgpt"

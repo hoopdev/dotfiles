@@ -18,8 +18,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixvim = {
-      #url = "github:nix-community/nixvim";
-      url = "github:dc-tec/nixvim";
+      url = "github:hoopdev/nixvim";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixos-wsl.url = "github:nix-community/nixos-wsl";

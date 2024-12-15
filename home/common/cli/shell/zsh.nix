@@ -10,6 +10,9 @@
     syntaxHighlighting.enable = true;
 
     shellAliases = import ./aliases.nix;
+    #initExtra = ''
+    #  eval "$(op signin)"
+    #'';
     #initExtra =
     # bash
     #  ''
