@@ -1485,11 +1485,11 @@
         "pre-commit-hooks": "pre-commit-hooks_2"
       },
       "locked": {
-        "lastModified": 1735573119,
-        "narHash": "sha256-7zGO2noWOaZgSeLcYejj1uOLfCiktKFBG4/t6rVDprE=",
+        "lastModified": 1735574240,
+        "narHash": "sha256-S8ExklkGYMXaZt+T/grbkgtRnevU4p+/mZuJPDKYJBA=",
         "owner": "hoopdev",
         "repo": "nixvim",
-        "rev": "8d2d1df51bdec7f914b61cb627bea00b8655966c",
+        "rev": "2ff57dd41911d6e2265f53dbc08b555c7bea2e53",
         "type": "github"
       },
       "original": {

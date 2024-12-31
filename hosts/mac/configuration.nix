@@ -42,6 +42,7 @@
       "chatgpt"
       "google-japanese-ime"
       "figma"
+      "blender"
     ];
   };
 
