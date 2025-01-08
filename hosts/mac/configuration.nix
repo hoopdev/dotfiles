@@ -28,6 +28,7 @@
     ];
     casks = [
       "vivaldi"
+      "1password"
       "notion"
       "orbstack"
       "parsec"
