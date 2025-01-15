@@ -143,6 +143,10 @@
           hostname = "kt-mac-studio";
           username = "ktaga";
         };
+        kt-mac-mini = mkDarwinConfiguration {
+          hostname = "kt-mac-mini";
+          username = "ktaga";
+        };
         kt-mba = mkDarwinConfiguration {
           hostname = "kt-mba";
           username = "ktaga";

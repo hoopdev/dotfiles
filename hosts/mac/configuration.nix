@@ -19,7 +19,6 @@
   homebrew = {
     enable = true;
     masApps = {
-      Tailscale = 1475387142;
       WindowsApp = 1295203466;
       Line = 539883307;
       Perplexity = 6714467650;
@@ -38,12 +37,12 @@
       "raycast"
       "ngrok"
       "karabiner-elements"
-      "arduino"
       "google-drive"
       "chatgpt"
       "google-japanese-ime"
       "figma"
       "blender"
+      "tailscale"
     ];
   };
 
