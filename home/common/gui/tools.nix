@@ -4,5 +4,6 @@
     obsidian
     slack
     zed-editor
+    vscode
   ];
 }

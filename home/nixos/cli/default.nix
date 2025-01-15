@@ -1,10 +1,8 @@
 { pkgs, ... }:
 {
-  imports =
-    [
-    ];
-  home.packages =
-    with pkgs;
-    [
-    ];
+  imports = [
+  ];
+  home.packages = with pkgs; [
+    ollama
+  ];
 }
