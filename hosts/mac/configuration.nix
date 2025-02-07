@@ -20,6 +20,8 @@
     };
     brews = [
       "ffmpeg"
+      "rsync"
+      "libiconv"
     ];
     casks = [
       "vivaldi"
@@ -39,6 +41,7 @@
       "blender"
       "tailscale"
       "bambu-studio"
+      "ollama"
       "ollama"
     ];
   };
