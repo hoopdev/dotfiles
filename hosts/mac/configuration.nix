@@ -22,6 +22,7 @@
       "ffmpeg"
       "rsync"
       "libiconv"
+      "node"
     ];
     casks = [
       "vivaldi"
@@ -42,6 +43,7 @@
       "tailscale"
       "bambu-studio"
       "ollama"
+      "claude"
     ];
   };
 
