@@ -40,20 +40,21 @@
     hyprpanel,
     ...
   }: let
-      # Common home-manager configuration
-      mkHomeConfiguration = { username, hostname, hostPath, isNixOS ? false, extraModules ? [] }: {
-        home-manager.useGlobalPkgs = true;
-        home-manager.useUserPackages = true;
-        home-manager.users.${username} = { pkgs, lib, ... }:
-          import hostPath {
-            inherit pkgs lib username inputs;
+      mkHomeConfiguration = { username, hostname, hostPath, isNixOS ? false }: {
+        home-manager = {
+          useGlobalPkgs = true;
+          useUserPackages = true;
+          users.${username} = import hostPath;
+          extraSpecialArgs = {
+            inherit username inputs;
           };
+        };
         networking.hostName = hostname;
         users.users.${username}.home = if isNixOS then "/home/${username}" else "/Users/${username}";
       };
 
       # Common specialArgs
-      commonSpecialArgs = {
+      commonArgs = {
         inherit (nixpkgs) lib;
         inherit inputs;
       };
@@ -73,7 +74,7 @@
           ] ++ (if hostname == "kt-wsl-nix" then [
             nixos-wsl.nixosModules.wsl
           ] else []);
-          specialArgs = commonSpecialArgs // { inherit username; };
+          specialArgs = commonArgs;
         };
 
       # Function for macOS configuration
@@ -88,7 +89,7 @@
               hostPath = ./hosts/mac/home.nix;
             })
           ];
-          specialArgs = commonSpecialArgs // { inherit username; };
+          specialArgs = commonArgs;
         };
 
     in

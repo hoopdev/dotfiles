@@ -1,4 +1,5 @@
-{ pkgs, lib, username, inputs, ... }:
+{ lib, pkgs, username, inputs, ... }:
+
 {
   imports = [
     ../../home/mac
@@ -6,10 +7,11 @@
   ];
 
   home = {
+    inherit username;
     homeDirectory = "/Users/${username}";
   };
 
-  home.packages = with pkgs; [
+  home.packages = [
     inputs.nixvim.packages.aarch64-darwin.default
   ];
 }

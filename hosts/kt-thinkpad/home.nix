@@ -1,4 +1,5 @@
-{ pkgs, lib, username, inputs, ... }:
+{ lib, pkgs, username, inputs, ... }:
+
 {
   imports = [
     ../../home/nixos
@@ -6,6 +7,7 @@
   ];
 
   home = {
+    inherit username;
     homeDirectory = "/home/${username}";
   };
 

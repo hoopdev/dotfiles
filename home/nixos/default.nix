@@ -1,4 +1,5 @@
-{ config, pkgs, ... }:
+{ lib, pkgs, ... }:
+
 {
   imports = [
     ../common
@@ -9,12 +10,14 @@
   xdg = {
     enable = true;
     userDirs = {
+      enable = true;
+      createDirectories = true;
       extraConfig = {
-        desktop = "/home/ktaga/Desktop";
-        download = "/home/ktaga/Downloads";
-        documents = "/home/ktaga/Documents";
-        music = "/home/ktaga/Music";
-        videos = "/home/ktaga/Videos";
+        desktop = "$HOME/Desktop";
+        download = "$HOME/Downloads";
+        documents = "$HOME/Documents";
+        music = "$HOME/Music";
+        videos = "$HOME/Videos";
       };
     };
   };
