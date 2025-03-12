@@ -51,6 +51,23 @@
         };
         networking.hostName = hostname;
         users.users.${username}.home = if isNixOS then "/home/${username}" else "/Users/${username}";
+
+        # Automatic garbage collection settings
+        nix = {
+          gc = {
+            automatic = true;
+            options = "--delete-older-than 7d";
+          } // (if isNixOS then {
+            dates = "weekly";
+            persistent = true;
+          } else {
+            options = "--delete-older-than 7d";
+          });
+          settings = {
+            max-free = 10737418240; # 10GB
+            min-free = 536870912;   # 512MB
+          };
+        };
       };
 
       # Common specialArgs
