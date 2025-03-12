@@ -176,6 +176,7 @@
   # $ nix search wget
   environment.systemPackages = with pkgs; [
     cudaPackages.cudatoolkit
+    devenv
   ];
 
   # Some programs need SUID wrappers, can be configured further or are
