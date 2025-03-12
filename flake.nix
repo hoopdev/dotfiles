@@ -27,93 +27,68 @@
     hyprpanel.url = "github:Jas-SinghFSU/HyprPanel";
   };
 
-  outputs =
-    inputs@{
-      self,
-      nix-darwin,
-      nixos-wsl,
-      nixpkgs,
-      nixos-hardware,
-      home-manager,
-      wezterm,
-      hyprland,
-      xremap,
-      hyprpanel,
-      ...
-    }:
-    let
+  outputs = inputs@{
+    self,
+    nixpkgs,
+    nix-darwin,
+    home-manager,
+    nixos-wsl,
+    nixos-hardware,
+    wezterm,
+    hyprland,
+    xremap,
+    hyprpanel,
+    ...
+  }: let
+      # Common home-manager configuration
+      mkHomeConfiguration = { username, hostname, hostPath, isNixOS ? false, extraModules ? [] }: {
+        home-manager.useGlobalPkgs = true;
+        home-manager.useUserPackages = true;
+        home-manager.users.${username} = { pkgs, lib, ... }:
+          import hostPath {
+            inherit pkgs lib username inputs;
+          };
+        networking.hostName = hostname;
+        users.users.${username}.home = if isNixOS then "/home/${username}" else "/Users/${username}";
+      };
+
+      # Common specialArgs
+      commonSpecialArgs = {
+        inherit (nixpkgs) lib;
+        inherit inputs;
+      };
+
       # Function for NixOS configuration
-      mkNixosConfiguration =
-        {
-          hostname,
-          username,
-          system,
-        }:
+      mkNixosConfiguration = { hostname, username, system }:
         nixpkgs.lib.nixosSystem {
           inherit system;
           modules = [
             ./hosts/${hostname}/configuration.nix
             home-manager.nixosModules.home-manager
-            {
-              networking.hostName = hostname;
-              users.users.${username}.home = "/home/${username}";
-              home-manager.useGlobalPkgs = true;
-              home-manager.useUserPackages = true;
-              home-manager.users.${username} =
-                {
-                  pkgs,
-                  lib,
-                  ...
-                }:
-                import ./hosts/${hostname}/home.nix {
-                  inherit
-                    username
-                    inputs
-                    ;
-                };
-            }
-          ];
-          specialArgs = {
-            inherit (nixpkgs) lib;
-            inherit username;
-            inherit inputs;
-          };
+            (mkHomeConfiguration {
+              inherit username hostname;
+              hostPath = ./hosts/${hostname}/home.nix;
+              isNixOS = true;
+            })
+          ] ++ (if hostname == "kt-wsl-nix" then [
+            nixos-wsl.nixosModules.wsl
+          ] else []);
+          specialArgs = commonSpecialArgs // { inherit username; };
         };
 
       # Function for macOS configuration
-      mkDarwinConfiguration =
-        { hostname, username }:
+      mkDarwinConfiguration = { hostname, username }:
         nix-darwin.lib.darwinSystem {
           system = "aarch64-darwin";
           modules = [
             ./hosts/mac/configuration.nix
             home-manager.darwinModules.home-manager
-            {
-              networking.hostName = hostname;
-              users.users.${username}.home = "/Users/${username}";
-              home-manager.useGlobalPkgs = true;
-              home-manager.useUserPackages = true;
-              home-manager.users.${username} =
-                {
-                  pkgs,
-                  lib,
-                  ...
-                }:
-                import ./hosts/mac/home.nix {
-                  inherit
-                    pkgs
-                    lib
-                    username
-                    inputs
-                    ;
-                };
-            }
+            (mkHomeConfiguration {
+              inherit username hostname;
+              hostPath = ./hosts/mac/home.nix;
+            })
           ];
-          specialArgs = {
-            inherit (nixpkgs) lib;
-            inherit username;
-            inherit inputs;
-          };
+          specialArgs = commonSpecialArgs // { inherit username; };
         };
 
     in
