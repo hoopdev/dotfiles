@@ -18,5 +18,5 @@
 
   programs.home-manager.enable = true;
 
-  colorscheme = inputs.nix-colors.colorSchemes.nord;
+  colorScheme = inputs.nix-colors.colorSchemes.nord;
 }

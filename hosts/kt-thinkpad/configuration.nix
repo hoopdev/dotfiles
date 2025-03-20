@@ -49,7 +49,7 @@
       device = "nodev";
     };
   };
-  # boot.loader.grub.useOSProber = true; 
+  # boot.loader.grub.useOSProber = true;
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 
   # Configure network proxy if necessary
@@ -115,7 +115,7 @@
   services.printing.enable = true;
 
   # Enable sound with pipewire.
-  hardware.pulseaudio.enable = false;
+  services.pulseaudio.enable = false;
   security.rtkit.enable = true;
   services.pipewire = {
     enable = true;
