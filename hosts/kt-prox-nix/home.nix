@@ -7,7 +7,7 @@
   home = rec {
     inherit username;
     homeDirectory = "/home/${username}";
-    stateVersion = "24.11";
+    stateVersion = "24.05";
     sessionVariables = {
       EDITOR = "nvim";
       NIXPKGS_ALLOW_UNFREE = 1;

@@ -19,9 +19,17 @@
     inputs.nixos-wsl.nixosModules.wsl
   ];
 
-  wsl.enable = true;
-  wsl.defaultUser = "ktaga";
-  wsl.wslConf.interop.appendWindowsPath = false;
+  wsl = {
+    enable = true;
+    defaultUser = "ktaga";
+    wslConf = {
+      interop.appendWindowsPath = false;
+      automount = {
+        root = "/mnt";
+        enabled = true;
+      };
+    };
+  };
 
   virtualisation.docker = {
     enable = true;
