@@ -12,9 +12,6 @@
 					"PackageIdentifier" : "rustlang.rustup"
 				},
 				{
-					"PackageIdentifier" : "Insecure.Npcap"
-				},
-				{
 					"PackageIdentifier" : "7zip.7zip"
 				},
 				{
@@ -163,9 +160,6 @@
 				},
 				{
 					"PackageIdentifier" : "AutoHotKey.AutoHotKey"
-				},
-				{
-					"PackageIdentifier" : "Mathpix.MathpixSnippingTool"
 				}
 			],
 			"SourceDetails" :
