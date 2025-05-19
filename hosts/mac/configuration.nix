@@ -44,6 +44,7 @@
       "bambu-studio"
       "ollama"
       "claude"
+      "signal"
     ];
   };
 
@@ -78,6 +79,9 @@
   # Used for backwards compatibility, please read the changelog before changing.
   # $ darwin-rebuild changelog
   system.stateVersion = 5;
+
+  # Set primary user for nix-darwin migration
+  system.primaryUser = "ktaga";
 
   # Allow unfree
   nixpkgs.config.allowUnfree = true;
