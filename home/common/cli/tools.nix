@@ -28,6 +28,7 @@
     quarto
     fastfetch
     _1password-cli
+    claude-code
   ];
   programs.zoxide = {
     enable = true;
