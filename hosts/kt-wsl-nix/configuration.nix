@@ -21,7 +21,7 @@
 
   wsl = {
     enable = true;
-    defaultUser = "nixos";
+    defaultUser = "ktaga";
     wslConf = {
       interop.appendWindowsPath = false;
       automount = {
