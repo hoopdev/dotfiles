@@ -7,7 +7,7 @@
   ];
 
   home.sessionVariables = {
-    OneDrive = "/Users/ktaga/Library/CloudStorage/OneDrive-KyotoUniversity";
+    # OneDrive = "/Users/ktaga/Library/CloudStorage/OneDrive-KyotoUniversity";
     USE_SYMENGINE = "1";
     OLLAMA_HOST = "0.0.0.0";
   };
