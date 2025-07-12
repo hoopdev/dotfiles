@@ -70,7 +70,8 @@ This repository manages my dotfiles using two distinct systems:
 
 ### WSL Setup
 
-1. Set up NixOS WSL
+1. Install NixOS in WSL using the [NixOS-WSL project](https://github.com/nix-community/NixOS-WSL)
+   - Simply click and install from the project's installation options
 2. Clone the repository
 3. Apply the configuration:
    ```bash
