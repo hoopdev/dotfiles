@@ -1,5 +1,13 @@
 { pkgs, lib, ... }:
 
+let
+  # Import common CLI tools from home-manager configuration
+  commonCliTools = import ../home/common/cli/tools.nix { inherit pkgs; };
+  commonAliases = import ../home/common/cli/shell/aliases.nix;
+  
+  # Extract packages from home.packages
+  cliPackages = commonCliTools.home.packages;
+in
 {
   # Common shell packages used across all development environments
   shellPackages = with pkgs; [
@@ -7,70 +15,45 @@
     zsh
     starship
     
-    # CLI tools (matching aliases.nix)
-    bat          # cat replacement
-    eza          # ls replacement  
-    procs        # ps replacement
-    dust         # du replacement
-    difftastic   # diff replacement
-    zoxide       # cd replacement
-    
-    # File management
-    yazi         # Terminal file manager
-    
     # Development utilities
     direnv
     nix-direnv
-    
-    # Session management
-    zellij
-  ];
+  ] ++ cliPackages;
 
   # Common shell hook for development environments
-  shellHook = environment: ''
-    echo "${environment}"
-    
-    # Set up zsh if available
-    if command -v zsh >/dev/null 2>&1; then
-      export SHELL=$(which zsh)
+  shellHook = environment: 
+    let
+      # Generate alias commands from commonAliases
+      aliasCommands = lib.concatStringsSep "\n" (
+        lib.mapAttrsToList (name: value: "alias ${name}='${value}'") commonAliases
+      );
+    in
+    ''
+      echo "${environment}"
       
-      # Load direnv if available
-      if command -v direnv >/dev/null 2>&1; then
-        eval "$(direnv hook zsh)"
+      # Set up zsh if available
+      if command -v zsh >/dev/null 2>&1; then
+        export SHELL=$(command -v zsh)
+        
+        # Load direnv if available (only in zsh context)
+        if [[ -n "$ZSH_VERSION" ]] && command -v direnv >/dev/null 2>&1; then
+          eval "$(direnv hook zsh)"
+        fi
+        
+        # Load starship if available (only in zsh context)  
+        if [[ -n "$ZSH_VERSION" ]] && command -v starship >/dev/null 2>&1; then
+          eval "$(starship init zsh)"
+        fi
+        
+        # Load zoxide if available (only in zsh context)
+        if [[ -n "$ZSH_VERSION" ]] && command -v zoxide >/dev/null 2>&1; then
+          eval "$(zoxide init zsh)"
+        fi
       fi
       
-      # Load starship if available
-      if command -v starship >/dev/null 2>&1; then
-        eval "$(starship init zsh)"
-      fi
-      
-      # Load zoxide if available
-      if command -v zoxide >/dev/null 2>&1; then
-        eval "$(zoxide init zsh)"
-      fi
-    fi
-    
-    # Set up shell aliases (matching aliases.nix)
-    alias rm='rm -i'
-    alias cp='cp -i'
-    alias cd='z'
-    alias cat='bat'
-    alias ps='procs'
-    alias du='dust'
-    alias diff='difft'
-    alias ls='eza --icons always --classify always'
-    alias la='eza --icons always --classify always --all'
-    alias ll='eza --icons always --long --all --git'
-    alias lt='eza --icons always --classify always --tree'
-    alias vim='nvim'
-    alias zj='zellij'
-    alias yz='yazi'
-    
-    # Auto-switch to zsh if we're not already in it
-    if [ "$SHELL" != "$(which zsh)" ] && command -v zsh >/dev/null 2>&1; then
-      exec zsh
-    fi
-  '';
+      # Set up shell aliases from home/common/cli/shell/aliases.nix
+      ${aliasCommands}
+    '';
   
   # Shell configuration with additional packages
   mkShell = { environment, packages ? [], shellHook ? "" }: 
@@ -79,28 +62,19 @@
     in
     pkgs.mkShell {
       packages = common.shellPackages ++ packages;
-      shellHook = common.shellHook environment + shellHook;
+      shellHook = common.shellHook environment + shellHook + ''
+        # Force zsh to be the shell if not already running in zsh
+        if [ -z "$ZSH_VERSION" ] && command -v zsh >/dev/null 2>&1; then
+          export SHELL="${pkgs.zsh}/bin/zsh"
+          exec zsh
+        fi
+      '';
     };
 
   # Predefined development shells
   shells = {
-    # Default development shell
-    default = { environment, devshell }: devshell.mkShell {
-      environment = "🏠 Dotfiles development environment";
-      packages = with pkgs; [
-        # Nix development
-        nixpkgs-fmt
-        statix
-        deadnix
-        
-        # Git and version control
-        git
-        pre-commit
-      ];
-    };
-
-    # Python development shell
-    python = { environment, devshell }:
+    # Unified default development shell with Python support
+    default = { environment, devshell }:
       let
         isLinux = pkgs.stdenv.isLinux;
         isDarwin = pkgs.stdenv.isDarwin;
@@ -134,8 +108,27 @@
         ];
       in
       devshell.mkShell {
-        environment = "🐍 Python development environment with uv";
+        environment = "🚀 Unified development environment with Python & Nix tools";
         packages = with pkgs; [
+          # Essential development tools
+          git
+          curl
+          wget
+          
+          # Text editors and utilities
+          vim
+          less
+          tree
+          
+          # Process management
+          htop
+          which
+          
+          # Nix development
+          nixpkgs-fmt
+          statix
+          deadnix
+          
           # Python runtime
           python313
           
@@ -153,8 +146,7 @@
           gcc
           pkg-config
           
-          # Version control
-          git
+          # Version control tools
           pre-commit
         ] ++ libraries ++ pkgs.lib.optionals isLinux [
           # Linux-specific packages for manylinux compatibility
@@ -178,8 +170,6 @@
           # デバッグ情報
           echo "libstdc++ location:"
           find ${pkgs.stdenv.cc.cc.lib}/lib -name "libstdc++.so*" 2>/dev/null | head -5
-          
-          echo "環境が更新されました。'uv sync'を実行して依存関係を再インストールすることをお勧めします。"
         '';
       };
   };

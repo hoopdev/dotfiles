@@ -154,12 +154,14 @@
       # Development shells
       devShells = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-darwin" ] (system:
         let
-          pkgs = nixpkgs.legacyPackages.${system};
-          devshell = import ./lib/devshell.nix { inherit pkgs nixpkgs.lib; };
+          pkgs = import nixpkgs {
+            inherit system;
+            config.allowUnfree = true;
+          };
+          devshell = import ./lib/devshell.nix { inherit pkgs; lib = nixpkgs.lib; };
         in
         {
           default = devshell.shells.default { inherit devshell; environment = system; };
-          python = devshell.shells.python { inherit devshell; environment = system; };
         }
       );
     };
