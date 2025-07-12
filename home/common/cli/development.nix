@@ -1,9 +1,19 @@
 { pkgs, ... }:
 {
   home.packages = with pkgs; [
-    uv
+    # Python development (Python versions managed by uv)
+    uv                    # Fast Python package manager
+    ruff                  # Fast Python linter and formatter
+    
+    # JavaScript/TypeScript development
     deno
+    
+    # Container development
     docker
+    
+    # Build tools
+    gcc
+    pkg-config
   ];
 }
 

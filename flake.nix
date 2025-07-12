@@ -88,7 +88,7 @@
               hostPath = ./hosts/${hostname}/home.nix;
               isNixOS = true;
             })
-          ] ++ (if hostname == "kt-wsl-nix" then [
+          ] ++ (if hostname == "kt-wsl-nix" || hostname == "kt-wsl" then [
             nixos-wsl.nixosModules.wsl
           ] else []);
           specialArgs = commonArgs;
@@ -128,6 +128,11 @@
           username = "ktaga";
           system = "x86_64-linux";
         };
+        kt-wsl = mkNixosConfiguration {
+          hostname = "kt-wsl";
+          username = "ktaga";
+          system = "x86_64-linux";
+        };
       };
 
       # Build darwin using flake
@@ -145,5 +150,70 @@
           username = "ktaga";
         };
       };
+
+      # Development shells
+      devShells = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-darwin" ] (system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          isLinux = pkgs.stdenv.isLinux;
+          isDarwin = pkgs.stdenv.isDarwin;
+        in
+        {
+          default = pkgs.mkShell {
+            packages = with pkgs; [
+              # Nix development
+              nixpkgs-fmt
+              statix
+              deadnix
+              
+              # Git and version control
+              git
+              pre-commit
+            ];
+            shellHook = ''
+              echo "🏠 Dotfiles development environment"
+            '';
+          };
+
+          python = pkgs.mkShell {
+            packages = with pkgs; [
+              # Python package manager
+              uv
+              
+              # Development tools
+              ruff          # Fast Python linter and formatter
+              mypy          # Static type checker
+              pytest        # Testing framework
+              
+              # Build tools
+              gcc
+              pkg-config
+              
+              # Version control
+              git
+              pre-commit
+            ] ++ pkgs.lib.optionals isLinux [
+              # Linux-specific packages
+            ] ++ pkgs.lib.optionals isDarwin [
+              # macOS-specific packages
+            ];
+
+            shellHook = ''
+              echo "🐍 Python development environment with uv"
+              
+              # Set up uv environment variables
+              export UV_CACHE_DIR="$PWD/.uv-cache"
+              export UV_PYTHON_PREFERENCE="managed"
+              
+              # Create cache directory if it doesn't exist
+              mkdir -p .uv-cache
+            '';
+
+            # Environment variables
+            UV_CACHE_DIR = "./.uv-cache";
+            UV_PYTHON_PREFERENCE = "managed";
+          };
+        }
+      );
     };
 }
