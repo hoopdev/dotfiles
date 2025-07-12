@@ -750,8 +750,11 @@
       "locked": {
         "lastModified": 1750371812,
         "narHash": "sha256-D868K1dVEACw17elVxRgXC6hOxY+54wIEjURztDWLk8=",
+        "lastModified": 1750371812,
+        "narHash": "sha256-D868K1dVEACw17elVxRgXC6hOxY+54wIEjURztDWLk8=",
         "owner": "hyprwm",
         "repo": "hyprland-qtutils",
+        "rev": "b13c7481e37856f322177010bdf75fccacd1adc8",
         "rev": "b13c7481e37856f322177010bdf75fccacd1adc8",
         "type": "github"
       },
@@ -848,8 +851,11 @@
       "locked": {
         "lastModified": 1750371198,
         "narHash": "sha256-/iuJ1paQOBoSLqHflRNNGyroqfF/yvPNurxzcCT0cAE=",
+        "lastModified": 1750371198,
+        "narHash": "sha256-/iuJ1paQOBoSLqHflRNNGyroqfF/yvPNurxzcCT0cAE=",
         "owner": "hyprwm",
         "repo": "hyprlang",
+        "rev": "cee01452bca58d6cadb3224e21e370de8bc20f0b",
         "rev": "cee01452bca58d6cadb3224e21e370de8bc20f0b",
         "type": "github"
       },

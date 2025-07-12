@@ -176,6 +176,8 @@
   environment.systemPackages = with pkgs; [
     cudaPackages.cudatoolkit
     devenv
+    git-lfs
+    google-cloud-sdk
   ];
 
   # Some programs need SUID wrappers, can be configured further or are
@@ -223,33 +225,6 @@
   };
 
 
-  virtualisation.oci-containers = {
-    backend = "docker";
-    containers = {
-      voicevox = {
-        image = "voicevox/voicevox_engine:nvidia-latest";
-        extraOptions = [
-          "--device=nvidia.com/gpu=all"
-        ];
-        ports = [
-          "50021:50021"
-        ];
-        autoStart = true;
-      };
-
-      fish-speech = {
-        image = "fish-speech";
-        extraOptions = [
-          "--device=nvidia.com/gpu=all"
-        ];
-        ports = [
-          "8080:8080"
-        ];
-        autoStart = true;
-      };
-    };
-  };
-
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
   # networking.firewall.allowedUDPPorts = [ ... ];
@@ -270,6 +245,7 @@
         "nix-command"
         "flakes"
       ];
+      trusted-users = [ "root" "ktaga" ];
       substituters = [ "https://hyprland.cachix.org" "https://cuda-maintainers.cachix.org" ];
       trusted-public-keys = [ "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc=" "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E=" ];
     };
