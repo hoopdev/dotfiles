@@ -175,15 +175,49 @@
             '';
           };
 
-          python = pkgs.mkShell {
+          python = pkgs.mkShell rec {
+            libraries = with pkgs; [
+              # 基本的なライブラリ
+              glibc
+              stdenv.cc.cc
+              stdenv.cc.cc.lib  # libstdc++を含む
+              
+              # Python関連ライブラリ
+              zlib
+              glib
+              libffi
+              openssl
+              xz
+              bzip2
+              ncurses
+              readline
+              sqlite
+              
+              # グラフィックス・UI関連
+              libGL
+              xorg.libX11
+              xorg.libXext
+              xorg.libXrender
+              xorg.libICE
+              xorg.libSM
+              freetype
+              fontconfig
+              expat
+            ];
+            
             packages = with pkgs; [
+              # Python runtime
+              python313
+              
               # Python package manager
               uv
               
               # Development tools
               ruff          # Fast Python linter and formatter
               mypy          # Static type checker
-              pytest        # Testing framework
+              pkgs.python3Packages.pytest        # Testing framework
+              ninja
+              meson
               
               # Build tools
               gcc
@@ -192,14 +226,20 @@
               # Version control
               git
               pre-commit
-            ] ++ pkgs.lib.optionals isLinux [
-              # Linux-specific packages
+            ] ++ libraries ++ pkgs.lib.optionals isLinux [
+              # Linux-specific packages for manylinux compatibility
+              nix-ld
             ] ++ pkgs.lib.optionals isDarwin [
               # macOS-specific packages
             ];
 
+            NIX_LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath libraries;
+
             shellHook = ''
               echo "🐍 Python development environment with uv"
+              
+              # LD_LIBRARY_PATHを設定
+              export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath libraries}:$LD_LIBRARY_PATH"
               
               # Set up uv environment variables
               export UV_CACHE_DIR="$PWD/.uv-cache"
@@ -207,6 +247,12 @@
               
               # Create cache directory if it doesn't exist
               mkdir -p .uv-cache
+              
+              # デバッグ情報
+              echo "libstdc++ location:"
+              find ${pkgs.stdenv.cc.cc.lib}/lib -name "libstdc++.so*" 2>/dev/null | head -5
+              
+              echo "環境が更新されました。'uv sync'を実行して依存関係を再インストールすることをお勧めします。"
             '';
 
             # Environment variables
