@@ -19,7 +19,7 @@
 
   programs.zsh = {
     enable = true;
-    initExtra = ''
+    initContent = ''
       export LANG=ja_JP.utf8
       eval "$(/opt/homebrew/bin/brew shellenv)"
     '';
