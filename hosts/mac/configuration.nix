@@ -16,7 +16,6 @@
     masApps = {
       WindowsApp = 1295203466;
       Line = 539883307;
-      Perplexity = 6714467650;
     };
     brews = [
       "ffmpeg"
@@ -69,6 +68,26 @@
     mineffect = "scale";
     launchanim = true;
   };
+
+
+  # DS_Store作成防止設定
+  system.defaults.CustomUserPreferences = {
+    "com.apple.desktopservices" = {
+      # ネットワークボリュームでDS_Storeを作成しない
+      DSDontWriteNetworkStores = true;
+      # USBボリュームでDS_Storeを作成しない
+      DSDontWriteUSBStores = true;
+    };
+  };
+
+  # キーボード設定
+  system.keyboard = {
+    enableKeyMapping = true;
+    remapCapsLockToControl = true;
+  };
+
+  # Touch ID for sudo
+  security.pam.services.sudo_local.touchIdAuth = true;
 
   # Auto upgrade nix package and the daemon service.
   nix.package = pkgs.nix;

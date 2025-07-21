@@ -93,6 +93,7 @@ nix develop .#python            # Python development shell with uv
 - **Development tools**: Neovim (via nixvim), Git, shell configurations (Nushell, Zsh)
 - **Window managers**: Hyprland for NixOS, AeroSpace for macOS
 - **Terminal**: WezTerm with consistent configuration across platforms
+- **System optimizations**: DS_Store prevention, Touch ID for sudo, keyboard remapping
 
 ### Flake Inputs
 - **nixpkgs**: Main package repository (unstable channel)
