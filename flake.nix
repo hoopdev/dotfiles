@@ -146,9 +146,18 @@
           hostname = "kt-mac-mini";
           username = "ktaga";
         };
-        kt-mba = mkDarwinConfiguration {
-          hostname = "kt-mba";
-          username = "ktaga";
+        kt-mba = nix-darwin.lib.darwinSystem {
+          system = "aarch64-darwin";
+          modules = [
+            ./hosts/kt-mba/configuration.nix
+            home-manager.darwinModules.home-manager
+            (mkHomeConfiguration {
+              username = "ktaga";
+              hostname = "kt-mba";
+              hostPath = ./hosts/kt-mba/home.nix;
+            })
+          ];
+          specialArgs = commonArgs;
         };
       };
 
