@@ -45,6 +45,7 @@
           useGlobalPkgs = true;
           useUserPackages = true;
           users.${username} = import hostPath;
+          backupFileExtension = "backup";
           extraSpecialArgs = {
             inherit username inputs;
           };
