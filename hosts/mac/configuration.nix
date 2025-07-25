@@ -80,10 +80,9 @@
     };
   };
 
-  # キーボード設定
+  # キーボード設定 (CapsLockのremapはkarabiner-elementsで実行)
   system.keyboard = {
     enableKeyMapping = true;
-    remapCapsLockToControl = true;
   };
 
   # Touch ID for sudo
