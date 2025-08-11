@@ -12,6 +12,7 @@
   };
 
   home.packages = [
-    inputs.nixvim.packages.aarch64-darwin.default
+    # Temporarily disabled due to wayland dependency issues on macOS
+    # inputs.nixvim.packages.aarch64-darwin.default
   ];
 }
