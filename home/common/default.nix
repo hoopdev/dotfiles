@@ -3,6 +3,7 @@
 {
   imports = [
     inputs.nix-colors.homeManagerModules.default
+    inputs.nixvim.homeModules.nixvim
     ./cli
     ./gui
   ];
@@ -15,6 +16,7 @@
       EDITOR = "nvim";
       NIXPKGS_ALLOW_UNFREE = "1";
     };
+
   };
 
   programs.home-manager.enable = true;
