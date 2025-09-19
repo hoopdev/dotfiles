@@ -14,8 +14,8 @@
   homebrew = {
     enable = true;
     masApps = {
-      WindowsApp = 1295203466;
-      Line = 539883307;
+      # WindowsApp = 1295203466;
+      # Line = 539883307;
     };
     brews = [
       "ffmpeg"
