@@ -25,32 +25,6 @@
     hyprland.url = "github:hyprwm/Hyprland";
     xremap.url = "github:xremap/nix-flake";
     hyprpanel.url = "github:Jas-SinghFSU/HyprPanel";
-    
-    # dpp plugin manager dependencies
-    dpp-vim = {
-      url = "github:Shougo/dpp.vim";
-      flake = false;
-    };
-    denops-vim = {
-      url = "github:vim-denops/denops.vim";
-      flake = false;
-    };
-    dpp-ext-installer = {
-      url = "github:Shougo/dpp-ext-installer";
-      flake = false;
-    };
-    dpp-ext-lazy = {
-      url = "github:Shougo/dpp-ext-lazy";
-      flake = false;
-    };
-    dpp-ext-toml = {
-      url = "github:Shougo/dpp-ext-toml";
-      flake = false;
-    };
-    dpp-protocol-git = {
-      url = "github:Shougo/dpp-protocol-git";
-      flake = false;
-    };
   };
 
   outputs = inputs@{
