@@ -390,7 +390,7 @@ require("lazy").setup({
 
       for server, opts in pairs(servers) do
         opts.capabilities = capabilities
-        lspconfig[server].setup(opts)
+        vim.lsp.config[server] = opts
       end
 
       -- LSP keymaps
@@ -524,6 +524,221 @@ require("lazy").setup({
     end,
   },
 
+  -- Snacks.nvim - Collection of useful utilities
+  {
+    "folke/snacks.nvim",
+    priority = 1000,
+    lazy = false,
+    dependencies = { "nvim-tree/nvim-web-devicons" },
+    opts = {
+      bigfile = { enabled = true },
+      dashboard = { enabled = true },
+      notifier = { enabled = true },
+      quickfile = { enabled = true },
+      statuscolumn = { enabled = true },
+      words = { enabled = true },
+      lazygit = { enabled = true },
+      git = { enabled = true },
+      gitbrowse = { enabled = true },
+      zen = { enabled = true },
+      scroll = { enabled = true },
+      indent = { enabled = true },
+      animate = { enabled = true },
+      picker = { enabled = true },
+      explorer = { enabled = true },
+    },
+    keys = {
+      { "<leader>z", function() Snacks.zen() end, desc = "Toggle Zen Mode" },
+      { "<leader>Z", function() Snacks.zen.zoom() end, desc = "Toggle Zoom" },
+      { "<leader>gg", function() Snacks.lazygit() end, desc = "Lazygit" },
+      { "<leader>gb", function() Snacks.git.blame_line() end, desc = "Git Blame Line" },
+      { "<leader>gB", function() Snacks.gitbrowse() end, desc = "Git Browse" },
+      { "<leader>gf", function() Snacks.lazygit.log_file() end, desc = "Lazygit Current File History" },
+      { "<leader>gl", function() Snacks.lazygit.log() end, desc = "Lazygit Log (cwd)" },
+      { "<leader>cR", function() Snacks.rename.rename_file() end, desc = "Rename File" },
+      { "<leader>gY", function() Snacks.gitbrowse.open({ what = "repo" }) end, desc = "Open Repo URL" },
+      { "<c-/>", function() Snacks.terminal() end, desc = "Toggle Terminal" },
+      { "<c-_>", function() Snacks.terminal() end, desc = "Toggle Terminal (which-key shows this)" },
+      { "]]", function() Snacks.words.jump(vim.v.count1) end, desc = "Next Reference", mode = { "n", "t" } },
+      { "[[", function() Snacks.words.jump(-vim.v.count1) end, desc = "Prev Reference", mode = { "n", "t" } },
+      { "<leader>bd", function() Snacks.bufdelete() end, desc = "Delete Buffer" },
+      { "<leader>bo", function() Snacks.bufdelete.other() end, desc = "Delete Other Buffers" },
+      { "<leader>ba", function() Snacks.bufdelete.all() end, desc = "Delete All Buffers" },
+      { "<leader>N", function() Snacks.notifier.show_history() end, desc = "Notification History" },
+      { "<leader>un", function() Snacks.notifier.hide() end, desc = "Dismiss All Notifications" },
+      { "<leader>ps", function() Snacks.picker.smart() end, desc = "Smart Picker" },
+      { "<leader>pf", function() Snacks.picker.files() end, desc = "Find Files" },
+      { "<leader>pg", function() Snacks.picker.grep() end, desc = "Grep" },
+      { "<leader>pb", function() Snacks.picker.buffers() end, desc = "Buffers" },
+      { "<leader>ph", function() Snacks.picker.help() end, desc = "Help" },
+      { "<leader>pr", function() Snacks.picker.recent() end, desc = "Recent Files" },
+      { "<leader>pc", function() Snacks.picker.commands() end, desc = "Commands" },
+      { "<leader>pk", function() Snacks.picker.keymaps() end, desc = "Keymaps" },
+      { "<leader>pgs", function() Snacks.picker.git_status() end, desc = "Git Status" },
+      { "<leader>pgc", function() Snacks.picker.git_log() end, desc = "Git Commits" },
+      { "<leader>se", function() Snacks.explorer() end, desc = "Toggle Explorer" },
+    },
+    config = function(_, opts)
+      require("snacks").setup(opts)
+
+      -- Create autocmd for snacks dashboard
+      vim.api.nvim_create_autocmd("User", {
+        pattern = "VeryLazy",
+        callback = function()
+          -- Show the dashboard when starting Neovim with no arguments
+          if vim.o.filetype == "" and vim.api.nvim_buf_line_count(0) == 1 and vim.api.nvim_buf_get_lines(0, 0, -1, false)[1] == "" then
+            require("snacks").dashboard()
+          end
+        end,
+      })
+    end,
+  },
+
+  -- Claude Code integration
+  {
+    "coder/claudecode.nvim",
+    cmd = { "ClaudeCode" },
+    keys = {
+      { "<leader>cc", "<cmd>ClaudeCode<cr>", desc = "Open Claude Code" },
+    },
+    config = function()
+      require("claudecode").setup({
+        -- Configuration options (if any)
+      })
+    end,
+  },
+
+  -- Jupytext for notebook conversion and rendering
+  {
+    "GCBallesteros/jupytext.nvim",
+    config = function()
+      require("jupytext").setup({
+        style = "markdown",
+        output_extension = "md",
+        force_ft = "markdown",
+      })
+    end,
+    -- Lazy load on .ipynb files
+    ft = { "ipynb" },
+  },
+
+  -- Jupyter notebook ecosystem
+  {
+    "benlubas/molten-nvim",
+    version = "^1.0.0",
+    build = ":UpdateRemotePlugins",
+    dependencies = { "GCBallesteros/jupytext.nvim" },
+    init = function()
+      -- Configuration for molten with WezTerm image provider
+      vim.g.molten_output_win_max_height = 20
+      vim.g.molten_auto_open_output = false
+      vim.g.molten_wrap_output = true
+      vim.g.molten_virt_text_output = true
+      vim.g.molten_virt_lines_off_by_1 = true
+      vim.g.molten_image_provider = "wezterm"
+      vim.g.molten_split_direction = "right"
+      vim.g.molten_split_size = 40
+    end,
+    keys = {
+      { "<leader>mi", ":MoltenInit<CR>", desc = "Initialize Molten" },
+      { "<leader>e", ":MoltenEvaluateOperator<CR>", desc = "Evaluate operator", mode = "n" },
+      { "<leader>r", ":<C-u>MoltenEvaluateVisual<CR>gv", desc = "Evaluate visual", mode = "v" },
+      { "<leader>rr", ":MoltenReevaluateCell<CR>", desc = "Re-evaluate cell" },
+      { "<leader>os", ":noautocmd MoltenEnterOutput<CR>", desc = "Enter output window" },
+      { "<leader>oh", ":MoltenHideOutput<CR>", desc = "Hide output" },
+      { "<leader>md", ":MoltenDelete<CR>", desc = "Delete cell" },
+    },
+    ft = { "ipynb", "markdown" },
+  },
+
+  -- Quarto support for mixed notebook/document editing
+  {
+    "quarto-dev/quarto-nvim",
+    ft = { "quarto", "markdown" },
+    dependencies = {
+      "jmbuhr/otter.nvim",
+      "nvim-treesitter/nvim-treesitter",
+    },
+    opts = {
+      lspFeatures = {
+        enabled = true,
+        languages = { "python", "bash", "html" },
+        chunks = "curly",
+        diagnostics = {
+          enabled = true,
+          triggers = { "BufWritePost" },
+        },
+        completion = {
+          enabled = true,
+        },
+      },
+      codeRunner = {
+        enabled = true,
+        default_method = "molten",
+      },
+    },
+  },
+
+  -- Otter for embedded language support
+  {
+    "jmbuhr/otter.nvim",
+    ft = { "quarto", "markdown" },
+    opts = {
+      lsp = {
+        hover = {
+          border = "rounded",
+        },
+      },
+      buffers = {
+        set_filetype = true,
+      },
+      handle_leading_whitespace = true,
+    },
+  },
+
+  -- WezTerm integration
+  {
+    "willothy/wezterm.nvim",
+    config = true,
+  },
+
+  -- Jupyter notebook autocommands and configuration
+  {
+    "benlubas/molten-nvim",
+    ft = "ipynb",
+    config = function()
+      -- Autocommands for notebook handling
+      local augroup = vim.api.nvim_create_augroup("MoltenNotebook", { clear = true })
+
+      -- Import output chunks when opening .ipynb files
+      local function imb()
+        vim.schedule(function()
+          if vim.fn.executable("jupyter") == 1 then
+            vim.cmd("MoltenInit")
+            vim.cmd("MoltenImportOutput")
+          end
+        end)
+      end
+
+      vim.api.nvim_create_autocmd("BufAdd", {
+        group = augroup,
+        pattern = "*.ipynb",
+        callback = imb,
+      })
+
+      -- Export output chunks when saving .ipynb files
+      vim.api.nvim_create_autocmd("BufWritePost", {
+        group = augroup,
+        pattern = "*.ipynb",
+        callback = function()
+          if require("molten.status").initialized() == "Molten" then
+            vim.cmd("MoltenExportOutput!")
+          end
+        end,
+      })
+    end,
+  },
+
   -- Library dependencies (lazy loaded automatically)
   { "nvim-lua/plenary.nvim", lazy = true },
   { "nvim-tree/nvim-web-devicons", lazy = true },
@@ -534,6 +749,13 @@ require("lazy").setup({
   },
   change_detection = {
     notify = false,
+  },
+})
+
+-- Filetype detection for Jupyter notebooks
+vim.filetype.add({
+  extension = {
+    ipynb = 'ipynb',
   },
 })
 
