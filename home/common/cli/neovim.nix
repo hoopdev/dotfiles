@@ -6,6 +6,13 @@
     # Load external Lua configuration (init.lua)
     extraConfigLua = builtins.readFile ./init.lua;
 
+    # Python packages for Neovim plugins
+    extraPython3Packages = ps: with ps; [
+      jupyter-client
+      jupytext
+      pynvim
+    ];
+
     # Add lazy.nvim plugin to be available for bootstrapping
     extraPlugins = with pkgs.vimPlugins; [
       lazy-nvim
