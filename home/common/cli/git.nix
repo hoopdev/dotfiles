@@ -2,9 +2,11 @@
 {
   programs.git = {
     enable = true;
-    userName = "hoopdev";
-    userEmail = "taga.kotaro.62d@st.kyoto-u.ac.jp";
-    extraConfig = {
+    settings = {
+      user = {
+        name = "hoopdev";
+        email = "taga@sanken.osaka-u.ac.jp";
+      };
       init = {
         defaultBranch = "main";
       };
