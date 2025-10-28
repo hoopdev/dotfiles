@@ -1,43 +1,39 @@
 # KT's Dotfiles
 
-This repository manages my dotfiles using two distinct systems:
+Dotfiles managed by **Nix/Home-Manager** with **Chezmoi** for cross-platform support.
 
-## 1. Nix Configuration
+## System Overview
 
-### Purpose and Scope
-- System-level package management and configuration
-- Development environment setup
-- Cross-platform environment management (NixOS, macOS, WSL)
-- User environment configuration via home-manager
+**Nix (Primary)**: System configs for NixOS/macOS/WSL via home-manager
+**Chezmoi (Secondary)**: Cross-platform dotfile distribution, auto-synced from Nix
 
-### Key Components
-- Flake-based configuration for reproducible builds
-- Home-manager for user environment management
-- Platform-specific configurations
-- Shared common configurations
+### Auto-Synced Configs
+On every Nix rebuild, these files are automatically copied to Chezmoi:
+- `~/.config/nvim/init.lua` ← `home/common/cli/init.lua`
+- `~/.config/wezterm/wezterm.lua` ← `home/common/gui/terminals/wezterm.lua`
 
-### Supported Platforms
-- **NixOS**: Full system configuration for Linux machines
-- **macOS**: System configuration via nix-darwin
-- **WSL**: NixOS configuration optimized for Windows Subsystem for Linux
+## Chezmoi Quick Start
 
-## 2. Windows Configuration via Chezmoi
+```bash
+# Initialize chezmoi with this repo
+chezmoi init https://github.com/yourusername/dotfiles
 
-### Purpose and Scope
-- Windows-specific application configurations
-- AppData directory management
-- Windows-only tools and settings
+# Preview changes
+chezmoi diff
 
-### Managed Configurations
-- Terminal emulator settings (Alacritty)
-- Shell configurations for Windows
-- Window manager settings (GlazeWM)
-- Other Windows-specific application configs
+# Apply dotfiles
+chezmoi apply
 
-### Location
-- AppData/Roaming configurations
-- Windows-specific dotfiles
-- Tool-specific settings for Windows environment
+# Update from repo
+chezmoi update
+```
+
+## Platform Support
+
+- **NixOS**: Full system configuration
+- **macOS**: via nix-darwin
+- **WSL**: NixOS-WSL
+- **Windows/Other**: via Chezmoi only
 
 ## Prerequisites
 
