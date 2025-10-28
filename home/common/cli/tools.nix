@@ -40,7 +40,7 @@
   programs.zellij = {
     enable = true;
     package = pkgs.zellij;
-    enableZshIntegration = false;
+    enableZshIntegration = true;
     settings = {
       theme = "nord";
       copy_command = "pbcopy";
