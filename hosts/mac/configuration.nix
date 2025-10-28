@@ -39,9 +39,9 @@
       "google-japanese-ime"
       "figma"
       "blender"
-      "tailscale"
+      "tailscale-app"
       "bambu-studio"
-      "ollama"
+      "ollama-app"
       "claude"
       "signal"
     ];
