@@ -22,4 +22,7 @@ return {
 	enable_wayland = false,
 	use_ime = true,
 	check_for_updates = false,
+
+	-- Set Nushell as default shell on Windows
+	default_prog = { "nu" },
 }
