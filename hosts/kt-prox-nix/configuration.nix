@@ -53,7 +53,7 @@
     packages = with pkgs; [
       noto-fonts-cjk-serif
       noto-fonts-cjk-sans
-      noto-fonts-emoji
+      noto-fonts-color-emoji
       nerd-fonts.hack
     ];
     fontDir.enable = true;
@@ -218,6 +218,7 @@
   virtualisation.docker = {
     enable = true;
     enableOnBoot = true;
+    extraPackages = with pkgs; [ docker-buildx ];
     #rootless = {
     #  enable = true;
     #  setSocketVariable = true; # $DOCKER_HOSTを設定
