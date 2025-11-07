@@ -1,6 +1,7 @@
 {
   username,
   inputs,
+  lib,
   ...
 }:
 {
@@ -38,12 +39,15 @@
     #../../home/common/gui
     #../../home/nixos/gui
     inputs.nix-colors.homeManagerModules.default
+    inputs.nixvim.homeModules.nixvim
   ];
 
   colorScheme = inputs.nix-colors.colorSchemes.nord;
 
+  # Disable zellij auto-start on zsh for kt-prox-nix
+  programs.zellij.enableZshIntegration = lib.mkForce false;
+
   home.packages = [
-    inputs.nixvim.packages.x86_64-linux.default
     #inputs.hyprpanel.packages.x86_64-linux.default
   ];
 }
