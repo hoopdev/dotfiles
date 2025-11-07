@@ -3,8 +3,6 @@
 {
   imports = [
     ../../home/nixos
-    inputs.nix-colors.homeManagerModules.default
-    inputs.nixvim.homeModules.nixvim
   ];
 
   home = {

@@ -41,7 +41,10 @@
     hyprpanel,
     ...
   }: let
-      mkHomeConfiguration = { username, hostname, hostPath, isNixOS ? false }: {
+      # Default username for all configurations
+      defaultUsername = "ktaga";
+
+      mkHomeConfiguration = { username ? defaultUsername, hostname, hostPath, isNixOS ? false }: {
         home-manager = {
           useGlobalPkgs = true;
           useUserPackages = true;
@@ -62,9 +65,7 @@
           } // (if isNixOS then {
             dates = "weekly";
             persistent = true;
-          } else {
-            options = "--delete-older-than 7d";
-          });
+          } else {});
           settings = {
             max-free = 10737418240; # 10GB
             min-free = 536870912;   # 512MB
@@ -79,7 +80,7 @@
       };
 
       # Function for NixOS configuration
-      mkNixosConfiguration = { hostname, username, system }:
+      mkNixosConfiguration = { hostname, username ? defaultUsername, system }:
         nixpkgs.lib.nixosSystem {
           inherit system;
           modules = [
@@ -90,22 +91,20 @@
               hostPath = ./hosts/${hostname}/home.nix;
               isNixOS = true;
             })
-          ] ++ (if hostname == "kt-wsl-nix" || hostname == "kt-wsl" then [
-            nixos-wsl.nixosModules.wsl
-          ] else []);
+          ];
           specialArgs = commonArgs;
         };
 
       # Function for macOS configuration
-      mkDarwinConfiguration = { hostname, username }:
+      mkDarwinConfiguration = { hostname, username ? defaultUsername, configPath ? ./hosts/mac/configuration.nix, homePath ? ./hosts/mac/home.nix }:
         nix-darwin.lib.darwinSystem {
           system = "aarch64-darwin";
           modules = [
-            ./hosts/mac/configuration.nix
+            configPath
             home-manager.darwinModules.home-manager
             (mkHomeConfiguration {
               inherit username hostname;
-              hostPath = ./hosts/mac/home.nix;
+              hostPath = homePath;
             })
           ];
           specialArgs = commonArgs;
@@ -117,22 +116,14 @@
       nixosConfigurations = {
         kt-prox-nix = mkNixosConfiguration {
           hostname = "kt-prox-nix";
-          username = "ktaga";
           system = "x86_64-linux";
         };
         kt-thinkpad = mkNixosConfiguration {
           hostname = "kt-thinkpad";
-          username = "ktaga";
-          system = "x86_64-linux";
-        };
-        kt-wsl-nix = mkNixosConfiguration {
-          hostname = "kt-wsl-nix";
-          username = "ktaga";
           system = "x86_64-linux";
         };
         kt-wsl = mkNixosConfiguration {
           hostname = "kt-wsl";
-          username = "ktaga";
           system = "x86_64-linux";
         };
       };
@@ -141,24 +132,14 @@
       darwinConfigurations = {
         kt-mac-studio = mkDarwinConfiguration {
           hostname = "kt-mac-studio";
-          username = "ktaga";
         };
         kt-mac-mini = mkDarwinConfiguration {
           hostname = "kt-mac-mini";
-          username = "ktaga";
         };
-        kt-mba = nix-darwin.lib.darwinSystem {
-          system = "aarch64-darwin";
-          modules = [
-            ./hosts/kt-mba/configuration.nix
-            home-manager.darwinModules.home-manager
-            (mkHomeConfiguration {
-              username = "ktaga";
-              hostname = "kt-mba";
-              hostPath = ./hosts/kt-mba/home.nix;
-            })
-          ];
-          specialArgs = commonArgs;
+        kt-mba = mkDarwinConfiguration {
+          hostname = "kt-mba";
+          configPath = ./hosts/kt-mba/configuration.nix;
+          homePath = ./hosts/kt-mba/home.nix;
         };
       };
 

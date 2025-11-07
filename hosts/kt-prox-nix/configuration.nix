@@ -8,6 +8,8 @@
   imports = [
     # Include the results of the hardware scan.
     ./hardware-configuration.nix
+    ../../lib/nixos-common.nix
+    ../../lib/japanese-locale.nix
   ];
 
   # Bootloader.
@@ -15,22 +17,12 @@
   boot.loader.grub.device = "/dev/sda";
   boot.loader.grub.useOSProber = true;
 
-  networking.hostName = "kt-prox-nix"; # Define your hostname.
-  # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
-
-  # Configure network proxy if necessary
-  # networking.proxy.default = "http://user:password@proxy:port/";
-  # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
+  networking.hostName = "kt-prox-nix";
 
   # Enable networking
   networking.networkmanager.enable = true;
 
-  # Set your time zone.
-  time.timeZone = "Asia/Tokyo";
-
-  # Select internationalisation properties.
-  i18n.defaultLocale = "ja_JP.UTF-8";
-
+  # Additional Japanese locale settings for this host
   i18n.extraLocaleSettings = {
     LC_ADDRESS = "ja_JP.UTF-8";
     LC_IDENTIFICATION = "ja_JP.UTF-8";
@@ -41,39 +33,6 @@
     LC_PAPER = "ja_JP.UTF-8";
     LC_TELEPHONE = "ja_JP.UTF-8";
     LC_TIME = "ja_JP.UTF-8";
-  };
-
-  i18n.inputMethod = {
-    enable = true;
-    type = "fcitx5";
-    fcitx5.addons = [ pkgs.fcitx5-mozc ];
-  };
-
-  fonts = {
-    packages = with pkgs; [
-      noto-fonts-cjk-serif
-      noto-fonts-cjk-sans
-      noto-fonts-color-emoji
-      nerd-fonts.hack
-    ];
-    fontDir.enable = true;
-    fontconfig = {
-      defaultFonts = {
-        serif = [
-          "Noto Serif CJK JP"
-          "Noto Color Emoji"
-        ];
-        sansSerif = [
-          "Noto Sans CJK JP"
-          "Noto Color Emoji"
-        ];
-        monospace = [
-          "Hack Nerd Font"
-          "Noto Color Emoji"
-        ];
-        emoji = [ "Noto Color Emoji" ];
-      };
-    };
   };
 
   # Nvidia
@@ -219,37 +178,20 @@
     enable = true;
     enableOnBoot = true;
     extraPackages = with pkgs; [ docker-buildx ];
-    #rootless = {
-    #  enable = true;
-    #  setSocketVariable = true; # $DOCKER_HOSTを設定
-    #};
   };
-
-
-  # Open ports in the firewall.
-  # networking.firewall.allowedTCPPorts = [ ... ];
-  # networking.firewall.allowedUDPPorts = [ ... ];
-  # Or disable the firewall altogether.
-  # networking.firewall.enable = false;
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
-  # on your system were taken. It‘s perfectly fine and recommended to leave
+  # on your system were taken. It's perfectly fine and recommended to leave
   # this value at the release version of the first install of this system.
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
   system.stateVersion = "24.05"; # Did you read the comment?
-  nix = {
-    settings = {
-      auto-optimise-store = true;
-      experimental-features = [
-        "nix-command"
-        "flakes"
-      ];
-      trusted-users = [ "root" "ktaga" ];
-      substituters = [ "https://hyprland.cachix.org" "https://cuda-maintainers.cachix.org" ];
-      trusted-public-keys = [ "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc=" "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E=" ];
-    };
+
+  # Host-specific Nix settings (extends nixos-common.nix)
+  nix.settings = {
+    trusted-users = [ "root" "ktaga" ];
+    substituters = lib.mkAfter [ "https://cuda-maintainers.cachix.org" ];
+    trusted-public-keys = lib.mkAfter [ "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E=" ];
   };
-  nixpkgs.config.allowUnfree = true;
 }
