@@ -13,10 +13,6 @@
 
     plugins = [
       {
-        name = "fast-syntax-highlighting";
-        src = pkgs.zsh-fast-syntax-highlighting.src;
-      }
-      {
         name = "zsh-completions";
         src = pkgs.zsh-completions.src;
       }
