@@ -36,7 +36,7 @@
       env = [
         "GDK_SCALE,2"
         "XCURSOR_SIZE,32"
-        "GTK_THEME,Nord"
+        "GTK_THEME,Nordic"
       ];
       xwayland = {
         force_zero_scaling = true;
