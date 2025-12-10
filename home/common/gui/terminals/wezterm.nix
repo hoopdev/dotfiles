@@ -4,21 +4,38 @@
   ...
 }:
 let
-  weztermConfigSource = ./wezterm.lua;
-  dotfilesDir = "${config.home.homeDirectory}/git/dotfiles";
+  isLinux = pkgs.stdenv.isLinux;
+  isDarwin = pkgs.stdenv.isDarwin;
 in
 {
   programs.wezterm = {
     enable = true;
-    extraConfig = builtins.readFile weztermConfigSource;
-  };
+    extraConfig = ''
+      local wezterm = require("wezterm")
 
-  # Copy wezterm.lua to chezmoi dotfiles directory on activation
-  home.activation.syncWeztermConfig = config.lib.dag.entryAfter ["writeBoundary"] ''
-    if [ -d "${dotfilesDir}" ]; then
-      $DRY_RUN_CMD mkdir -p "${dotfilesDir}/dot_config/wezterm"
-      $DRY_RUN_CMD cp -f ${weztermConfigSource} "${dotfilesDir}/dot_config/wezterm/wezterm.lua"
-      echo "Synced wezterm.lua to chezmoi dotfiles"
-    fi
-  '';
+      return {
+        color_scheme = "nord",
+        window_background_opacity = 0.9,
+
+        font = wezterm.font("HackGen Console NF", { weight = "Regular", stretch = "Normal", style = "Normal" }),
+        font_size = 14.0,
+
+        window_padding = {
+          left = 10,
+          right = 10,
+          top = 10,
+          bottom = 10,
+        },
+
+        use_fancy_tab_bar = false,
+        hide_tab_bar_if_only_one_tab = true,
+        window_decorations = "NONE",
+
+        front_end = "WebGpu",
+        enable_wayland = ${if isLinux then "true" else "false"},
+        use_ime = true,
+        check_for_updates = false,
+      }
+    '';
+  };
 }

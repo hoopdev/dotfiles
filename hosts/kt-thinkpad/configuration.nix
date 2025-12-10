@@ -109,6 +109,12 @@
     };
   };
 
+  # xdg-desktop-portal for dark mode detection
+  xdg.portal = {
+    enable = true;
+    extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
+  };
+
   environment.systemPackages = with pkgs; [ ];
   environment.variables = { };
 
