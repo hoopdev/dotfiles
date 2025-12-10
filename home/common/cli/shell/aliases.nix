@@ -19,4 +19,6 @@
   yz = "yazi";
   ch = "chezmoi";
 
+  # Claude Code with MCP config
+  claude = "claude --mcp-config ~/.claude/mcp.json";
 }
