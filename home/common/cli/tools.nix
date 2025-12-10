@@ -28,7 +28,6 @@
     quarto
     fastfetch
     _1password-cli
-    claude-code
     lua-language-server
   ];
   programs.zoxide = {

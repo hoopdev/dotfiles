@@ -6,6 +6,7 @@
     ruff                  # Fast Python linter and formatter
     
     # JavaScript/TypeScript development
+    nodejs
     deno
     
     # Container development
