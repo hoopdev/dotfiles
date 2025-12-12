@@ -22,11 +22,11 @@ in
       lazy-nvim
     ];
 
-    # Enable lazy loading support in nixvim
+    # Disable nixvim's built-in lazy plugin management
+    # We use lazy.nvim directly in init.lua for full control
     plugins = {
-      # Disable nixvim's built-in package management to let lazy.nvim handle it
       lazy = {
-        enable = true;
+        enable = false;
       };
     };
 

@@ -20,6 +20,7 @@
     ]);
 
   services.xremap = {
+    enable = true;
     userName = "ktaga";
     serviceMode = "system";
     config = {
@@ -59,8 +60,8 @@
   services.xserver.enable = true;
 
   # Enable the GNOME Desktop Environment.
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.desktopManager.gnome.enable = true;
+  services.displayManager.gdm.enable = true;
+  services.desktopManager.gnome.enable = true;
 
   # Configure keymap in X11
   services.xserver.xkb = {
@@ -102,7 +103,16 @@
   # Install programs
   programs = {
     zsh.enable = true;
-    hyprland.enable = true;
+    hyprland = {
+      enable = true;
+      xwayland.enable = true;
+    };
+  };
+
+  # xdg-desktop-portal for dark mode detection
+  xdg.portal = {
+    enable = true;
+    extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
   };
 
   environment.systemPackages = with pkgs; [ ];

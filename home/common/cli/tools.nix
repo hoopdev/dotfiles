@@ -28,7 +28,6 @@
     quarto
     fastfetch
     _1password-cli
-    claude-code
     lua-language-server
   ];
   programs.zoxide = {
@@ -40,7 +39,7 @@
   programs.zellij = {
     enable = true;
     package = pkgs.zellij;
-    enableZshIntegration = true;
+    enableZshIntegration = false;
     settings = {
       theme = "nord";
       copy_command = "pbcopy";
