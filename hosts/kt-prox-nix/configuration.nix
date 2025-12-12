@@ -35,47 +35,10 @@
     LC_TIME = "ja_JP.UTF-8";
   };
 
-  # Nvidia
-  nixpkgs.config.cudaSupport = true;
+  # Hardware graphics
   hardware.graphics = {
     enable = true;
   };
-  # Load nvidia driver for Xorg and Wayland
-  services.xserver.videoDrivers = [ "nvidia" ];
-
-  hardware.nvidia-container-toolkit.enable = true;
-
-  hardware.nvidia = {
-    # Modesetting is required.
-    modesetting.enable = true;
-
-    # Nvidia power management. Experimental, and can cause sleep/suspend to fail.
-    # Enable this if you have graphical corruption issues or application crashes after waking
-    # up from sleep. This fixes it by saving the entire VRAM memory to /tmp/ instead
-    # of just the bare essentials.
-    powerManagement.enable = false;
-
-    # Fine-grained power management. Turns off GPU when not in use.
-    # Experimental and only works on modern Nvidia GPUs (Turing or newer).
-    powerManagement.finegrained = false;
-
-    # Use the NVidia open source kernel module (not to be confused with the
-    # independent third-party "nouveau" open source driver).
-    # Support is limited to the Turing and later architectures. Full list of
-    # supported GPUs is at:
-    # https://github.com/NVIDIA/open-gpu-kernel-modules#compatible-gpus
-    # Only available from driver 515.43.04+
-    # Currently alpha-quality/buggy, so false is currently the recommended setting.
-    open = false;
-
-    # Enable the Nvidia settings menu,
-    # accessible via `nvidia-settings`.
-    nvidiaSettings = true;
-
-    # Optionally, you may need to select the appropriate driver version for your specific GPU.
-    package = config.boot.kernelPackages.nvidiaPackages.beta;
-  };
-  boot.kernelParams = [ "nvidia_drm.fbdev=1" ];
 
   # Enable the X11 windowing system.
   services.xserver.enable = false;
@@ -133,7 +96,6 @@
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
-    cudaPackages.cudatoolkit
     devenv
     git-lfs
     google-cloud-sdk
@@ -155,23 +117,8 @@
   services.tailscale.enable = true;
   services.ollama = {
     enable = true;
-    acceleration = "cuda";
     host = "0.0.0.0";
     port = 11434;
-    environmentVariables = {
-      #CUDA_VISIBLE_DEVICES = "0";
-      OLLAMA_LLM_LIBRARY = "cuda";
-      #LD_LIBRARY_PATH = "${pkgs.cudaPackages.cudatoolkit}/lib:${pkgs.cudaPackages.cudatoolkit}/lib64";
-      LD_LIBRARY_PATH = "run/opengl-driver/lib";
-    };
-  };
-  systemd.services.ollama.serviceConfig = {
-    DeviceAllow = lib.mkForce [
-      "char-nvidia-caps"
-      "char-nvidia-frontend"
-      "char-nvidia-uvm"
-      "char-nvidiactl"
-    ];
   };
 
   virtualisation.docker = {
@@ -191,7 +138,5 @@
   # Host-specific Nix settings (extends nixos-common.nix)
   nix.settings = {
     trusted-users = [ "root" "ktaga" ];
-    substituters = lib.mkAfter [ "https://cuda-maintainers.cachix.org" ];
-    trusted-public-keys = lib.mkAfter [ "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E=" ];
   };
 }
