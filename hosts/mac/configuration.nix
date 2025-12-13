@@ -13,6 +13,11 @@
   # Homebrew設定
   homebrew = {
     enable = true;
+    onActivation = {
+      autoUpdate = true;   # brew update を自動実行
+      upgrade = true;      # brew upgrade を自動実行
+      cleanup = "zap";     # 未使用パッケージを削除 (zap: caskの設定ファイルも削除)
+    };
     masApps = {
       # WindowsApp = 1295203466;
       # Line = 539883307;
@@ -44,6 +49,7 @@
       "ollama-app"
       "claude"
       "signal"
+      "alt-tab"
     ];
   };
 
