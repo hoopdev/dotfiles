@@ -702,6 +702,134 @@ require("lazy").setup({
     config = true,
   },
 
+  -- Obsidian.nvim for note-taking
+  {
+    "epwalsh/obsidian.nvim",
+    version = "*",
+    lazy = true,
+    ft = "markdown",
+    dependencies = {
+      "nvim-lua/plenary.nvim",
+    },
+    opts = function()
+      -- Use vaults from Nix configuration (vim.g.obsidian_vaults)
+      local vaults = vim.g.obsidian_vaults or {
+        { name = "Main", path = vim.fn.expand("~/Obsidian/Main") }
+      }
+
+      -- Convert to obsidian.nvim format
+      local workspaces = {}
+      for _, vault in ipairs(vaults) do
+        table.insert(workspaces, {
+          name = vault.name,
+          path = vault.path,
+        })
+      end
+
+      return {
+        workspaces = workspaces,
+
+        -- Note formatting
+        notes_subdir = "notes",
+        new_notes_location = "notes_subdir",
+
+        -- Daily notes configuration
+        daily_notes = {
+          folder = "daily",
+          date_format = "%Y-%m-%d",
+          template = nil,
+        },
+
+        -- Completion
+        completion = {
+          nvim_cmp = true,
+          min_chars = 2,
+        },
+
+        -- Note ID generation
+        note_id_func = function(title)
+          local suffix = ""
+          if title ~= nil then
+            suffix = title:gsub(" ", "-"):gsub("[^A-Za-z0-9-]", ""):lower()
+          else
+            for _ = 1, 4 do
+              suffix = suffix .. string.char(math.random(65, 90))
+            end
+          end
+          return tostring(os.date("%Y%m%d%H%M")) .. "-" .. suffix
+        end,
+
+        -- UI settings
+        ui = {
+          enable = true,
+          update_debounce = 200,
+          checkboxes = {
+            [" "] = { char = "󰄱", hl_group = "ObsidianTodo" },
+            ["x"] = { char = "", hl_group = "ObsidianDone" },
+            [">"] = { char = "", hl_group = "ObsidianRightArrow" },
+            ["~"] = { char = "󰰱", hl_group = "ObsidianTilde" },
+          },
+          bullets = { char = "•", hl_group = "ObsidianBullet" },
+          external_link_icon = { char = "", hl_group = "ObsidianExtLinkIcon" },
+          reference_text = { hl_group = "ObsidianRefText" },
+          highlight_text = { hl_group = "ObsidianHighlightText" },
+          tags = { hl_group = "ObsidianTag" },
+          hl_groups = {
+            ObsidianTodo = { bold = true, fg = "#f78c6c" },
+            ObsidianDone = { bold = true, fg = "#89ddff" },
+            ObsidianRightArrow = { bold = true, fg = "#f78c6c" },
+            ObsidianTilde = { bold = true, fg = "#ff5370" },
+            ObsidianBullet = { bold = true, fg = "#89ddff" },
+            ObsidianRefText = { underline = true, fg = "#c792ea" },
+            ObsidianExtLinkIcon = { fg = "#c792ea" },
+            ObsidianTag = { italic = true, fg = "#89ddff" },
+            ObsidianHighlightText = { bg = "#75662e" },
+          },
+        },
+
+        -- Mappings
+        mappings = {
+          ["gf"] = {
+            action = function()
+              return require("obsidian").util.gf_passthrough()
+            end,
+            opts = { noremap = false, expr = true, buffer = true },
+          },
+          ["<leader>ch"] = {
+            action = function()
+              return require("obsidian").util.toggle_checkbox()
+            end,
+            opts = { buffer = true },
+          },
+        },
+
+        -- Picker for link suggestions
+        picker = {
+          name = "telescope.nvim",
+          mappings = {
+            new = "<C-x>",
+            insert_link = "<C-l>",
+          },
+        },
+      }
+    end,
+    keys = {
+      { "<leader>on", "<cmd>ObsidianNew<cr>", desc = "New Obsidian note" },
+      { "<leader>oo", "<cmd>ObsidianOpen<cr>", desc = "Open in Obsidian" },
+      { "<leader>os", "<cmd>ObsidianSearch<cr>", desc = "Search Obsidian notes" },
+      { "<leader>oq", "<cmd>ObsidianQuickSwitch<cr>", desc = "Quick switch note" },
+      { "<leader>ob", "<cmd>ObsidianBacklinks<cr>", desc = "Show backlinks" },
+      { "<leader>ol", "<cmd>ObsidianLinks<cr>", desc = "Show links" },
+      { "<leader>ot", "<cmd>ObsidianToday<cr>", desc = "Today's daily note" },
+      { "<leader>oy", "<cmd>ObsidianYesterday<cr>", desc = "Yesterday's daily note" },
+      { "<leader>om", "<cmd>ObsidianTomorrow<cr>", desc = "Tomorrow's daily note" },
+      { "<leader>od", "<cmd>ObsidianDailies<cr>", desc = "List daily notes" },
+      { "<leader>ow", "<cmd>ObsidianWorkspace<cr>", desc = "Switch workspace" },
+      { "<leader>op", "<cmd>ObsidianPasteImg<cr>", desc = "Paste image" },
+      { "<leader>or", "<cmd>ObsidianRename<cr>", desc = "Rename note" },
+    },
+  },
+
   -- Jupyter notebook autocommands and configuration
   {
     "benlubas/molten-nvim",
