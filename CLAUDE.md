@@ -49,9 +49,8 @@ nix flake show
 # Garbage collection (automatic, but can be run manually)
 nix-collect-garbage -d
 
-# Development environments
-nix develop                     # Default development shell (Nix tools)
-nix develop .#python            # Python development shell with uv
+# Development shell (Python, Nix tools, uv)
+nix develop
 ```
 
 ## Architecture
@@ -65,18 +64,23 @@ nix develop .#python            # Python development shell with uv
 ### Directory Structure
 ```
 ├── flake.nix                 # Main Nix Flake configuration
+├── lib/                      # Shared Nix modules
+│   ├── devshell.nix         # Development shell configuration
+│   ├── nixos-common.nix     # Common NixOS settings (nix-ld, 1Password, etc.)
+│   ├── japanese-locale.nix  # Japanese locale settings
+│   └── wsl-common.nix       # WSL-specific settings
 ├── home/                     # Home-manager configurations
 │   ├── common/              # Shared configurations across platforms
 │   │   ├── cli/            # Command-line tools (git, neovim, shells)
 │   │   └── gui/            # GUI applications and terminals
-│   ├── mac/                # macOS-specific home configurations  
+│   ├── mac/                # macOS-specific home configurations
 │   └── nixos/              # NixOS-specific home configurations
 └── hosts/                  # Host-specific system configurations
     ├── kt-prox-nix/       # Proxmox NixOS configuration
     ├── kt-thinkpad/       # ThinkPad NixOS configuration
-    ├── kt-wsl-nix/        # WSL NixOS configuration
     ├── kt-wsl/            # WSL NixOS configuration
-    └── mac/               # macOS system configuration
+    ├── kt-mba/            # MacBook Air configuration
+    └── mac/               # macOS system configuration (Mac Studio, Mac Mini)
 ```
 
 ### Configuration Philosophy
@@ -94,6 +98,15 @@ nix develop .#python            # Python development shell with uv
 - **Window managers**: Hyprland for NixOS, AeroSpace for macOS
 - **Terminal**: WezTerm with consistent configuration across platforms
 - **System optimizations**: DS_Store prevention, Touch ID for sudo, keyboard remapping
+- **nix-ld**: Enabled on NixOS for running unpatched binaries (uv, Python wheels, etc.)
+
+### Development Shell (`nix develop`)
+Cross-platform development environment defined in `lib/devshell.nix`:
+- **Python**: Python 3.13, uv (package manager), ruff, mypy, pytest
+- **Nix tools**: nixfmt-rfc-style, statix, deadnix
+- **Build tools**: gcc, pkg-config, ninja, meson
+- **Utilities**: git, curl, wget, htop, tree, pre-commit
+- Platform-specific libraries are automatically included (Linux: glibc, X11; macOS: system frameworks)
 
 ### Flake Inputs
 - **nixpkgs**: Main package repository (unstable channel)

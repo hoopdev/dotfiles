@@ -1,6 +1,49 @@
 { lib, pkgs, config, ... }:
 
 {
+  # Enable nix-ld for running unpatched dynamic binaries (e.g., uv, Python wheels)
+  programs.nix-ld = {
+    enable = true;
+    libraries = with pkgs; [
+      # Core libraries
+      stdenv.cc.cc.lib
+      zlib
+      glib
+      libffi
+      openssl
+
+      # Compression
+      xz
+      bzip2
+      zstd
+
+      # Terminal/CLI
+      ncurses
+      readline
+
+      # Database
+      sqlite
+
+      # Graphics/Fonts (for GUI apps)
+      freetype
+      fontconfig
+      expat
+      libGL
+      xorg.libX11
+      xorg.libXext
+      xorg.libXrender
+      xorg.libICE
+      xorg.libSM
+      xorg.libXcursor
+      xorg.libXrandr
+      xorg.libXi
+
+      # Misc
+      libxkbcommon
+      dbus
+    ];
+  };
+
   # 1Password
   programs._1password.enable = true;
   programs._1password-gui = {
