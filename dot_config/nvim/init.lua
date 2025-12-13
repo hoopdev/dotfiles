@@ -871,6 +871,30 @@ require("lazy").setup({
     },
   },
 
+  -- Markview.nvim for markdown preview/rendering
+  {
+    "OXY2DEV/markview.nvim",
+    lazy = false,
+    dependencies = {
+      "nvim-treesitter/nvim-treesitter",
+      "nvim-tree/nvim-web-devicons",
+    },
+    opts = {
+      modes = { "n", "no", "c" },
+      hybrid_modes = { "n" },
+      callbacks = {
+        on_enable = function(_, win)
+          vim.wo[win].conceallevel = 2
+          vim.wo[win].concealcursor = "c"
+        end,
+      },
+    },
+    keys = {
+      { "<leader>mt", "<cmd>Markview toggleAll<cr>", desc = "Toggle Markview" },
+      { "<leader>ms", "<cmd>Markview splitToggle<cr>", desc = "Toggle split preview" },
+    },
+  },
+
   -- Jupyter notebook autocommands and configuration
   {
     "benlubas/molten-nvim",
