@@ -124,9 +124,13 @@ alt-b = 'workspace 5'
 alt-a = 'focus-monitor left' # In your config, you can drop workspace bindings that you don't need
 alt-d = 'focus-monitor right'
 alt-f = 'fullscreen'
+alt-t = 'layout floating tiling'
+alt-e = 'balance-sizes'
+alt-q = 'close'
+alt-backspace = 'focus-back-and-forth'
 alt-m = 'macos-native-minimize'
-alt-s = 'focus-monitor up'
-alt-w = 'focus-monitor down'
+alt-s = 'focus-monitor down'
+alt-w = 'focus-monitor up'
 
 # See: https://nikitabobko.github.io/AeroSpace/commands#move-node-to-workspace
 alt-shift-z = 'move-node-to-workspace 1'
@@ -137,8 +141,8 @@ alt-shift-b = 'move-node-to-workspace 5'
 alt-shift-a = 'move-node-to-monitor left'
 alt-shift-d = 'move-node-to-monitor right'
 alt-shift-f = 'macos-native-fullscreen'
-alt-shift-s = 'move-node-to-monitor up'
-alt-shift-w = 'move-node-to-monitor down'
+alt-shift-s = 'move-node-to-monitor down'
+alt-shift-w = 'move-node-to-monitor up'
 
 # See: https://nikitabobko.github.io/AeroSpace/commands#workspace-back-and-forth
 alt-tab = 'workspace-back-and-forth'
@@ -147,6 +151,11 @@ alt-shift-tab = 'move-workspace-to-monitor --wrap-around next'
 
 # See: https://nikitabobko.github.io/AeroSpace/commands#mode
 alt-shift-semicolon = 'mode service'
+
+# See: https://nikitabobko.github.io/AeroSpace/guide#on-window-detected-callback
+[[on-window-detected]]
+if.app-id = 'com.apple.finder'
+run = 'layout floating'
 
 # 'service' binding mode declaration.
 # See: https://nikitabobko.github.io/AeroSpace/guide#binding-modes
