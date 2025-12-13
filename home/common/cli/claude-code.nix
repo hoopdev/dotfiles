@@ -1,8 +1,16 @@
-{ pkgs, config, ... }:
+{ pkgs, config, lib, ... }:
+let
+  isDarwin = pkgs.stdenv.isDarwin;
+  # macOS uses Google Chrome from Applications, Linux uses Chromium from nixpkgs
+  chromePath = if isDarwin
+    then "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    else "${pkgs.chromium}/bin/chromium";
+in
 {
   home.packages = with pkgs; [
     claude-code
-    chromium # For Playwright MCP
+  ] ++ lib.optionals (!isDarwin) [
+    chromium # For Playwright MCP (Linux only)
   ];
 
   # Claude Code settings.json (user-level settings)
@@ -62,7 +70,7 @@
           "-y"
           "@playwright/mcp@latest"
           "--executable-path"
-          "${pkgs.chromium}/bin/chromium"
+          chromePath
         ];
         env = {
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
