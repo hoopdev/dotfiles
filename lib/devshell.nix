@@ -4,9 +4,51 @@ let
   # Import common CLI tools from home-manager configuration
   commonCliTools = import ../home/common/cli/tools.nix { inherit pkgs; };
   commonAliases = import ../home/common/cli/shell/aliases.nix;
-  
+
   # Extract packages from home.packages
   cliPackages = commonCliTools.home.packages;
+
+  # Platform detection
+  isLinux = pkgs.stdenv.isLinux;
+  isDarwin = pkgs.stdenv.isDarwin;
+
+  # Platform-specific libraries
+  linuxLibraries = with pkgs; [
+    glibc
+    stdenv.cc.cc
+    stdenv.cc.cc.lib
+    libGL
+    xorg.libX11
+    xorg.libXext
+    xorg.libXrender
+    xorg.libICE
+    xorg.libSM
+  ];
+
+  darwinLibraries = with pkgs; [
+    # macOS uses system frameworks, minimal additional libs needed
+  ];
+
+  # Common libraries (cross-platform)
+  commonLibraries = with pkgs; [
+    zlib
+    glib
+    libffi
+    openssl
+    xz
+    bzip2
+    ncurses
+    readline
+    sqlite
+    freetype
+    fontconfig
+    expat
+  ];
+
+  # Combined libraries based on platform
+  libraries = commonLibraries
+    ++ lib.optionals isLinux linuxLibraries
+    ++ lib.optionals isDarwin darwinLibraries;
 in
 {
   # Common shell packages used across all development environments
@@ -14,7 +56,7 @@ in
     # Shell and prompt
     zsh
     starship
-    
+
     # Development utilities
     direnv
     nix-direnv
@@ -75,101 +117,65 @@ in
   shells = {
     # Unified default development shell with Python support
     default = { environment, devshell }:
-      let
-        isLinux = pkgs.stdenv.isLinux;
-        isDarwin = pkgs.stdenv.isDarwin;
-        libraries = with pkgs; [
-          # 基本的なライブラリ
-          glibc
-          stdenv.cc.cc
-          stdenv.cc.cc.lib  # libstdc++を含む
-          
-          # Python関連ライブラリ
-          zlib
-          glib
-          libffi
-          openssl
-          xz
-          bzip2
-          ncurses
-          readline
-          sqlite
-          
-          # グラフィックス・UI関連
-          libGL
-          xorg.libX11
-          xorg.libXext
-          xorg.libXrender
-          xorg.libICE
-          xorg.libSM
-          freetype
-          fontconfig
-          expat
-        ];
-      in
       devshell.mkShell {
-        environment = "🚀 Unified development environment with Python & Nix tools";
+        environment = "🚀 Development environment with Python & Nix tools";
         packages = with pkgs; [
           # Essential development tools
           git
           curl
           wget
-          
+
           # Text editors and utilities
           vim
           less
           tree
-          
+
           # Process management
           htop
           which
-          
-          # Nix development
-          nixpkgs-fmt
+
+          # Nix development (using RFC-style formatter)
+          nixfmt-rfc-style
           statix
           deadnix
-          
+
           # Python runtime
           python313
-          
+
           # Python package manager
           uv
-          
+
           # Development tools
-          ruff          # Fast Python linter and formatter
-          mypy          # Static type checker
-          pkgs.python3Packages.pytest        # Testing framework
+          ruff
+          mypy
+          python3Packages.pytest
           ninja
           meson
-          
+
           # Build tools
           gcc
           pkg-config
-          
+
           # Version control tools
           pre-commit
-        ] ++ libraries ++ pkgs.lib.optionals isLinux [
-          # Linux-specific packages for manylinux compatibility
+        ] ++ libraries ++ lib.optionals isLinux [
+          # Linux-specific packages
           nix-ld
-        ] ++ pkgs.lib.optionals isDarwin [
-          # macOS-specific packages
         ];
-        
+
         shellHook = ''
-          # LD_LIBRARY_PATHを設定
-          export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath libraries}:$LD_LIBRARY_PATH"
-          export NIX_LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath libraries}"
-          
+          # Set library paths (Linux only)
+          ${lib.optionalString isLinux ''
+            export LD_LIBRARY_PATH="${lib.makeLibraryPath libraries}:$LD_LIBRARY_PATH"
+            export NIX_LD_LIBRARY_PATH="${lib.makeLibraryPath libraries}"
+          ''}
+
           # Set up uv environment variables
           export UV_CACHE_DIR="$PWD/.uv-cache"
           export UV_PYTHON_PREFERENCE="managed"
-          
+
           # Create cache directory if it doesn't exist
           mkdir -p .uv-cache
-          
-          # デバッグ情報
-          echo "libstdc++ location:"
-          find ${pkgs.stdenv.cc.cc.lib}/lib -name "libstdc++.so*" 2>/dev/null | head -5
         '';
       };
   };
