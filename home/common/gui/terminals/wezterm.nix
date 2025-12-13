@@ -29,7 +29,7 @@ in
 
         use_fancy_tab_bar = false,
         hide_tab_bar_if_only_one_tab = true,
-        window_decorations = "NONE",
+        window_decorations = "RESIZE",
 
         front_end = "WebGpu",
         enable_wayland = ${if isLinux then "true" else "false"},
