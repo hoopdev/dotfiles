@@ -126,10 +126,6 @@
           hostname = "kt-wsl";
           system = "x86_64-linux";
         };
-        kt-ubuntu = mkNixosConfiguration {
-          hostname = "kt-ubuntu";
-          system = "x86_64-linux";
-        };
       };
 
       # Build darwin using flake
