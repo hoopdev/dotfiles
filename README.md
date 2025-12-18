@@ -49,6 +49,7 @@ cd ~/projects/myapp && nix develop ~/git/dotfiles
 | `kt-thinkpad` | ThinkPad (Hyprland) | `sudo nixos-rebuild switch --flake .#kt-thinkpad` |
 | `kt-prox-nix` | Proxmox VM | `sudo nixos-rebuild switch --flake .#kt-prox-nix` |
 | `kt-wsl` | WSL2 | `sudo nixos-rebuild switch --flake .#kt-wsl` |
+| `kt-ubuntu` | Ubuntu/VM (CLI only) | `sudo nixos-rebuild switch --flake .#kt-ubuntu` |
 
 ### macOS (nix-darwin)
 
@@ -57,6 +58,42 @@ cd ~/projects/myapp && nix develop ~/git/dotfiles
 | `kt-mac-studio` | Mac Studio | `darwin-rebuild switch --flake .#kt-mac-studio` |
 | `kt-mac-mini` | Mac Mini | `darwin-rebuild switch --flake .#kt-mac-mini` |
 | `kt-mba` | MacBook Air | `darwin-rebuild switch --flake .#kt-mba` |
+
+### Ubuntu/Linux (home-manager only)
+
+For non-NixOS Linux systems (Ubuntu, Debian, etc.), you can use home-manager standalone to manage your user environment without requiring root access or full system configuration.
+
+| Configuration | Description | Build Command | Apply Command |
+|---------------|-------------|---------------|---------------|
+| `ktaga@kt-ubuntu` | User environment for ktaga | `nix build .#homeConfigurations."ktaga@kt-ubuntu".activationPackage` | `./result/activate` |
+| `jovyan@kt-ubuntu` | User environment for jovyan | `nix build .#homeConfigurations."jovyan@kt-ubuntu".activationPackage` | `./result/activate` |
+
+**Quick Start:**
+
+```bash
+# 1. Install Nix (if not already installed)
+curl -L https://nixos.org/nix/install | sh
+
+# 2. Enable flakes
+mkdir -p ~/.config/nix
+echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+
+# 3. Clone and build
+git clone https://github.com/hoopdev/dotfiles.git
+cd dotfiles
+nix build .#homeConfigurations."$USER@kt-ubuntu".activationPackage --out-link result
+
+# 4. Apply configuration
+./result/activate
+```
+
+**What gets installed:**
+- Neovim (with nixvim configuration)
+- Git, GitHub CLI (gh)
+- Modern CLI tools (bat, zellij, eza, ripgrep, fd)
+- Shell environment (Zsh, Nushell, Starship prompt)
+- Nord color scheme
+- All dotfiles and configurations from `home/common/cli/`
 
 ## Development Environment (`nix develop`)
 
@@ -116,6 +153,7 @@ nix-collect-garbage -d
     ├── kt-thinkpad/       # ThinkPad
     ├── kt-prox-nix/       # Proxmox
     ├── kt-wsl/            # WSL
+    ├── kt-ubuntu/         # Ubuntu (home-manager only)
     ├── kt-mba/            # MacBook Air
     └── mac/               # Mac Studio/Mini shared
 ```

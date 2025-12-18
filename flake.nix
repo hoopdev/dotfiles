@@ -126,6 +126,10 @@
           hostname = "kt-wsl";
           system = "x86_64-linux";
         };
+        kt-ubuntu = mkNixosConfiguration {
+          hostname = "kt-ubuntu";
+          system = "x86_64-linux";
+        };
       };
 
       # Build darwin using flake
@@ -140,6 +144,36 @@
           hostname = "kt-mba";
           configPath = ./hosts/kt-mba/configuration.nix;
           homePath = ./hosts/kt-mba/home.nix;
+        };
+      };
+
+      # Standalone home-manager configurations (for non-NixOS systems)
+      homeConfigurations = {
+        "ktaga@kt-ubuntu" = home-manager.lib.homeManagerConfiguration {
+          pkgs = import nixpkgs {
+            system = "x86_64-linux";
+            config.allowUnfree = true;
+          };
+          modules = [
+            ./hosts/kt-ubuntu/home.nix
+          ];
+          extraSpecialArgs = {
+            username = "ktaga";
+            inherit inputs;
+          };
+        };
+        "jovyan@kt-ubuntu" = home-manager.lib.homeManagerConfiguration {
+          pkgs = import nixpkgs {
+            system = "x86_64-linux";
+            config.allowUnfree = true;
+          };
+          modules = [
+            ./hosts/kt-ubuntu/home.nix
+          ];
+          extraSpecialArgs = {
+            username = "jovyan";
+            inherit inputs;
+          };
         };
       };
 
