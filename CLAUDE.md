@@ -23,6 +23,17 @@ sudo nixos-rebuild switch --flake .#kt-wsl-nix
 sudo nixos-rebuild switch --flake .#kt-wsl
 ```
 
+### Standalone Home Manager (Ubuntu)
+```bash
+# Build and apply home-manager configuration for kt-ubuntu (non-NixOS)
+nix run home-manager/master -- switch --flake .#jovyan@kt-ubuntu
+# or for ktaga user:
+nix run home-manager/master -- switch --flake .#ktaga@kt-ubuntu
+
+# Update font cache after first install
+fc-cache -fv
+```
+
 ### macOS Systems
 ```bash
 # Build and apply macOS configuration for Mac Studio
@@ -79,6 +90,7 @@ nix develop
     ├── kt-prox-nix/       # Proxmox NixOS configuration
     ├── kt-thinkpad/       # ThinkPad NixOS configuration
     ├── kt-wsl/            # WSL NixOS configuration
+    ├── kt-ubuntu/         # Ubuntu standalone home-manager (non-NixOS)
     ├── kt-mba/            # MacBook Air configuration
     └── mac/               # macOS system configuration (Mac Studio, Mac Mini)
 ```
