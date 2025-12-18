@@ -3,11 +3,9 @@
 {
   imports = [
     ../../home/common/cli
-    ../../home/common/gui/terminals  # WezTerm configuration
     inputs.nix-colors.homeManagerModules.default
     inputs.nixvim.homeModules.nixvim
     ./starship.nix  # Ubuntu-specific Starship configuration
-    ./wezterm.nix   # Ubuntu-specific WezTerm configuration with Nerd Font
   ];
 
   colorScheme = inputs.nix-colors.colorSchemes.nord;

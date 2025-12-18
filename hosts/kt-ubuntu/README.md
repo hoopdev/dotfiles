@@ -3,9 +3,9 @@
 Standalone home-manager configuration for Ubuntu systems (non-NixOS).
 
 This configuration includes:
-- **WezTerm** terminal with Nerd Fonts pre-configured
 - **Starship** prompt with Ubuntu logo (󰕈) and icons
 - **Fonts** automatically installed (Nerd Fonts, Noto CJK, Emoji)
+- **Shell**: Zsh and Nushell with consistent configuration
 
 ## Prerequisites
 
@@ -37,9 +37,7 @@ Fonts are automatically installed by home-manager:
 - **Noto Color Emoji**: For emoji support
 - **Nerd Fonts**: FiraCode, JetBrainsMono, and Meslo for icons
 
-**WezTerm** is automatically configured with JetBrainsMono Nerd Font Mono.
-
-For other terminals, set font to:
+**Configure your terminal** to use a Nerd Font for proper icon display:
 - `JetBrainsMono Nerd Font Mono` (recommended)
 - `FiraCode Nerd Font Mono`
 - `MesloLGS Nerd Font Mono`
@@ -71,7 +69,6 @@ nix flake update
 
 ## Features
 
-- **Terminal**: WezTerm with JetBrainsMono Nerd Font Mono
 - **Shell**: Zsh and Nushell with Starship prompt
 - **Starship**: Custom prompt with Ubuntu logo (󰕈) and icons
 - **Editor**: Neovim (nixvim configuration)
@@ -100,37 +97,26 @@ nix flake update
 
 ### Starship not showing Ubuntu logo
 
-1. **Use WezTerm**: WezTerm is pre-configured with Nerd Fonts
-   ```bash
-   wezterm
-   ```
-
-2. **For other terminals**: Ensure Nerd Font is properly configured
-   - Set font to `JetBrainsMono Nerd Font Mono`
+1. **Configure terminal font**: Ensure your terminal uses a Nerd Font
+   - Set font to `JetBrainsMono Nerd Font Mono` (recommended)
+   - Or use `FiraCode Nerd Font Mono` or `MesloLGS Nerd Font Mono`
    - Restart terminal after font changes
 
-3. Test Unicode support:
+2. **Test Unicode support**:
    ```bash
    echo "󰕈"  # Should display Ubuntu logo
    ```
 
-### Using WezTerm in code-server
+3. **Recommended terminals with Nerd Font support**:
+   - **Alacritty**: Fast GPU-accelerated terminal
+   - **Kitty**: Feature-rich with image support
+   - **GNOME Terminal**: Default Ubuntu terminal
+   - **Konsole**: KDE terminal
+   - **Tilix**: Tiling terminal emulator
 
-If you're using code-server (VS Code in browser):
-
-1. **SSH with X11 forwarding**:
-   ```bash
-   ssh -X user@kt-ubuntu
-   wezterm
-   ```
-
-2. **Local terminal**: Connect via SSH and run WezTerm locally
-   ```bash
-   ssh user@kt-ubuntu
-   wezterm
-   ```
-
-3. WezTerm will display with proper Nerd Font icons and Ubuntu logo
+4. **For code-server/JupyterLab**:
+   The browser-based terminal may not support Nerd Fonts properly.
+   Use a native terminal application for best results.
 
 ## Notes
 
