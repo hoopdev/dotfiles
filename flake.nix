@@ -114,8 +114,8 @@
     {
       # Build nixos using flake
       nixosConfigurations = {
-        kt-prox-nix = mkNixosConfiguration {
-          hostname = "kt-prox-nix";
+        kt-proxmox = mkNixosConfiguration {
+          hostname = "kt-proxmox";
           system = "x86_64-linux";
         };
         kt-thinkpad = mkNixosConfiguration {
