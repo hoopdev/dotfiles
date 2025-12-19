@@ -14,12 +14,9 @@ This is a dotfiles repository that manages cross-platform system configurations 
 sudo nixos-rebuild switch --flake .#kt-thinkpad
 
 # Build and apply NixOS configuration for Proxmox
-sudo nixos-rebuild switch --flake .#kt-prox-nix
+sudo nixos-rebuild switch --flake .#kt-proxmox
 
 # Build and apply WSL NixOS configuration
-sudo nixos-rebuild switch --flake .#kt-wsl-nix
-
-# Build and apply WSL configuration
 sudo nixos-rebuild switch --flake .#kt-wsl
 ```
 
@@ -87,7 +84,7 @@ nix develop
 │   ├── mac/                # macOS-specific home configurations
 │   └── nixos/              # NixOS-specific home configurations
 └── hosts/                  # Host-specific system configurations
-    ├── kt-prox-nix/       # Proxmox NixOS configuration
+    ├── kt-proxmox/        # Proxmox NixOS configuration
     ├── kt-thinkpad/       # ThinkPad NixOS configuration
     ├── kt-wsl/            # WSL NixOS configuration
     ├── kt-ubuntu/         # Ubuntu standalone home-manager (non-NixOS)
