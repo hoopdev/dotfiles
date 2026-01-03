@@ -3,7 +3,7 @@
 {
   imports = [
     ../../home/mac
-    inputs.nix-colors.homeManagerModules.default
+    # nix-colors disabled - Stylix is imported via home/common
   ];
 
   home = {

@@ -48,8 +48,9 @@
         gaps_in = 5;
         gaps_out = 5;
         border_size = 2;
-        "col.active_border" = "rgba(88c0d0ff) rgba(81a1c1ff) 45deg";
-        "col.inactive_border" = "rgba(4c566aaa)";
+        # Border colors managed by Stylix
+        # "col.active_border" = "rgba(88c0d0ff) rgba(81a1c1ff) 45deg";
+        # "col.inactive_border" = "rgba(4c566aaa)";
         resize_on_border = true;
       };
       decoration = {
@@ -71,8 +72,9 @@
           enabled = true;
           range = 20;
           render_power = 3;
-          color = "rgba(1a1a1aee)";
-          color_inactive = "rgba(1a1a1a99)";
+          # Shadow colors managed by Stylix
+          # color = "rgba(1a1a1aee)";
+          # color_inactive = "rgba(1a1a1a99)";
         };
       };
       animations = {

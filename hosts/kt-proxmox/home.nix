@@ -36,11 +36,8 @@
   imports = [
     ../../home/common/cli
     ../../home/nixos/cli
-    inputs.nix-colors.homeManagerModules.default
     inputs.nixvim.homeModules.nixvim
   ];
-
-  colorScheme = inputs.nix-colors.colorSchemes.nord;
 
   # Disable zellij auto-start on zsh for kt-prox-nix
   programs.zellij.enableZshIntegration = lib.mkForce false;

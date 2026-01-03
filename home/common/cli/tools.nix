@@ -23,6 +23,9 @@
     gotop
     yazi
     ripgrep
+    rclone
+    rsync
+    syncthing
     hackgen-nf-font
     nixfmt-rfc-style
     quarto
@@ -30,6 +33,9 @@
     _1password-cli
     lua-language-server
   ];
+  services.syncthing = {
+    enable = true;
+  };
   programs.zoxide = {
     enable = true;
     package = pkgs.zoxide;

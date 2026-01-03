@@ -3,12 +3,9 @@
 {
   imports = [
     ../../home/common/cli
-    inputs.nix-colors.homeManagerModules.default
     inputs.nixvim.homeModules.nixvim
     ./starship.nix  # Ubuntu-specific Starship configuration
   ];
-
-  colorScheme = inputs.nix-colors.colorSchemes.nord;
 
   home = {
     inherit username;

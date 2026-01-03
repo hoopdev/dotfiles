@@ -1,4 +1,8 @@
 { config, lib, ... }:
+let
+  # Stylix colors (base16 palette)
+  colors = config.lib.stylix.colors;
+in
 {
   programs.starship = {
     enable = true;
@@ -7,11 +11,11 @@
 
     settings = lib.mkForce {
       # Ubuntu-specific format with Ubuntu logo
-      format = "[░▒▓](#${config.colorScheme.palette.base06})[ 󰕈 ](bg:#${config.colorScheme.palette.base06} fg:#${config.colorScheme.palette.base00})[](bg:#${config.colorScheme.palette.base0A} fg:#${config.colorScheme.palette.base06})$directory[](fg:#${config.colorScheme.palette.base0A} bg:#${config.colorScheme.palette.base0B})$git_branch$git_status[](fg:#${config.colorScheme.palette.base0B} bg:#${config.colorScheme.palette.base0C})$time[ ](fg:#${config.colorScheme.palette.base0C})$character";
+      format = "[░▒▓](#${colors.base06})[ 󰕈 ](bg:#${colors.base06} fg:#${colors.base00})[](bg:#${colors.base0A} fg:#${colors.base06})$directory[](fg:#${colors.base0A} bg:#${colors.base0B})$git_branch$git_status[](fg:#${colors.base0B} bg:#${colors.base0C})$time[ ](fg:#${colors.base0C})$character";
 
       directory = {
         format = "[ $path ]($style)";
-        style = "fg:#${config.colorScheme.palette.base01} bg:#${config.colorScheme.palette.base0A}";
+        style = "fg:#${colors.base01} bg:#${colors.base0A}";
         truncation_length = 3;
         truncation_symbol = "…/";
         substitutions = {
@@ -23,20 +27,20 @@
       };
 
       git_branch = {
-        format = "[[ $symbol $branch ](fg:#${config.colorScheme.palette.base01} bg:#${config.colorScheme.palette.base0B})]($style)";
-        style = "bg:#${config.colorScheme.palette.base04}";
+        format = "[[ $symbol $branch ](fg:#${colors.base01} bg:#${colors.base0B})]($style)";
+        style = "bg:#${colors.base04}";
         symbol = "";
       };
 
       git_status = {
-        format = "[[($all_status$ahead_behind )](fg:#${config.colorScheme.palette.base01} bg:#${config.colorScheme.palette.base0B})]($style)";
-        style = "bg:#${config.colorScheme.palette.base04}";
+        format = "[[($all_status$ahead_behind )](fg:#${colors.base01} bg:#${colors.base0B})]($style)";
+        style = "bg:#${colors.base04}";
       };
 
       time = {
         disabled = false;
-        format = "[[  $time ](fg:#${config.colorScheme.palette.base01} bg:#${config.colorScheme.palette.base0C})]($style)";
-        style = "bg:#${config.colorScheme.palette.base06}";
+        format = "[[  $time ](fg:#${colors.base01} bg:#${colors.base0C})]($style)";
+        style = "bg:#${colors.base06}";
         time_format = "%R";
       };
     };

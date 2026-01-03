@@ -1,6 +1,7 @@
 { pkgs, config, ... }:
 let
-  colors = config.colorScheme.palette;
+  # Stylix colors (base16 palette)
+  colors = config.lib.stylix.colors;
 in
 {
   programs.zsh = {
