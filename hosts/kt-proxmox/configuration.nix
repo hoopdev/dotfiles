@@ -17,7 +17,7 @@
   boot.loader.grub.device = "/dev/sda";
   boot.loader.grub.useOSProber = true;
 
-  networking.hostName = "kt-prox-nix";
+  networking.hostName = "kt-proxmox";
 
   # Enable networking
   networking.networkmanager.enable = true;

@@ -2,7 +2,8 @@
 
 {
   imports = [
-    inputs.nix-colors.homeManagerModules.default
+    # nix-colors disabled - using Stylix for theming instead
+    # inputs.nix-colors.homeManagerModules.default
     inputs.nixvim.homeModules.nixvim
     ./cli
     ./gui
@@ -21,5 +22,6 @@
 
   programs.home-manager.enable = true;
 
-  colorScheme = inputs.nix-colors.colorSchemes.nord;
+  # nix-colors disabled - Stylix handles Nord theming via lib/stylix.nix
+  # colorScheme = inputs.nix-colors.colorSchemes.nord;
 }

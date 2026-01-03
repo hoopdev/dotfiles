@@ -13,6 +13,10 @@
     };
     nixos-hardware.url = "github:NixOS/nixos-hardware";
     nix-colors.url = "github:misterio77/nix-colors";
+    stylix = {
+      url = "github:nix-community/stylix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     wezterm = {
       url = "github:wez/wezterm?dir=nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -39,6 +43,7 @@
     hyprland,
     xremap,
     hyprpanel,
+    stylix,
     ...
   }: let
       # Default username for all configurations
@@ -85,6 +90,8 @@
           inherit system;
           modules = [
             ./hosts/${hostname}/configuration.nix
+            stylix.nixosModules.stylix
+            ./lib/stylix-nixos.nix
             home-manager.nixosModules.home-manager
             (mkHomeConfiguration {
               inherit username hostname;
@@ -101,6 +108,8 @@
           system = "aarch64-darwin";
           modules = [
             configPath
+            stylix.darwinModules.stylix
+            ./lib/stylix-darwin.nix
             home-manager.darwinModules.home-manager
             (mkHomeConfiguration {
               inherit username hostname;
@@ -151,6 +160,8 @@
             config.allowUnfree = true;
           };
           modules = [
+            stylix.homeModules.stylix
+            ./lib/stylix.nix
             ./hosts/kt-ubuntu/home.nix
           ];
           extraSpecialArgs = {
@@ -164,6 +175,8 @@
             config.allowUnfree = true;
           };
           modules = [
+            stylix.homeModules.stylix
+            ./lib/stylix.nix
             ./hosts/kt-ubuntu/home.nix
           ];
           extraSpecialArgs = {
