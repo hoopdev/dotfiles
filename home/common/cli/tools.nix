@@ -47,7 +47,7 @@
     package = pkgs.zellij;
     enableZshIntegration = false;
     settings = {
-      theme = "nord";
+      # Theme is managed by Stylix (Shonan theme)
       copy_command = "pbcopy";
     };
   };
