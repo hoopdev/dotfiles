@@ -13,8 +13,8 @@ in
     extraConfig = ''
       local wezterm = require("wezterm")
 
+      -- Color scheme is managed by Stylix (Shonan theme)
       return {
-        color_scheme = "nord",
         window_background_opacity = 0.9,
 
         font = wezterm.font("HackGen Console NF", { weight = "Regular", stretch = "Normal", style = "Normal" }),

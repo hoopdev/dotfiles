@@ -9,8 +9,8 @@
     # Wallpaper image (required by Stylix)
     image = ../wallpaper/wallpaper_enoshima.jpg;
 
-    # Use Nord color scheme (matching previous nix-colors setup)
-    base16Scheme = "${pkgs.base16-schemes}/share/themes/nord.yaml";
+    # Use Shonan color scheme (custom blend of Nord and Tokyo Night)
+    base16Scheme = ./shonan.yaml;
 
     # Dark theme polarity
     polarity = "dark";

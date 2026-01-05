@@ -6,5 +6,6 @@
     ./development.nix
     ./neovim.nix
     ./claude-code.nix
+    ./opencode.nix
   ];
 }

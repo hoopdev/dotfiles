@@ -1,4 +1,4 @@
--- Optimized Neovim configuration with Nord theme and proper lazy loading
+-- Optimized Neovim configuration with Stylix theming
 
 -- Basic settings
 vim.opt.tabstop = 4
@@ -13,26 +13,6 @@ vim.opt.cursorline = true
 vim.opt.termguicolors = true
 vim.g.mapleader = " "
 vim.g.maplocalleader = "\\"
-
--- Nord color palette for consistency
-local nord = {
-  nord0 = "#2e3440",   -- Polar Night
-  nord1 = "#3b4252",
-  nord2 = "#434c5e",
-  nord3 = "#4c566a",
-  nord4 = "#d8dee9",   -- Snow Storm
-  nord5 = "#e5e9f0",
-  nord6 = "#eceff4",
-  nord7 = "#8fbcbb",   -- Frost
-  nord8 = "#88c0d0",
-  nord9 = "#81a1c1",
-  nord10 = "#5e81ac",
-  nord11 = "#bf616a",  -- Aurora
-  nord12 = "#d08770",
-  nord13 = "#ebcb8b",
-  nord14 = "#a3be8c",
-  nord15 = "#b48ead",
-}
 
 -- Bootstrap lazy.nvim
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
@@ -57,23 +37,10 @@ require("lazy").setup({
     },
   },
 
-  -- Nord colorscheme - load immediately with high priority
-  {
-    "shaunsingh/nord.nvim",
-    lazy = false,
-    priority = 1000,
-    config = function()
-      vim.g.nord_contrast = true
-      vim.g.nord_borders = false
-      vim.g.nord_disable_background = false
-      vim.g.nord_italic = false
-      vim.g.nord_uniform_diff_background = true
-      vim.g.nord_bold = false
-      require('nord').set()
-    end,
-  },
+  -- Colorscheme is managed by Stylix (base16 Shonan theme)
+  -- No explicit colorscheme plugin needed - Stylix injects colors automatically
 
-  -- File explorer with Nord theme
+  -- File explorer
   {
     "nvim-neo-tree/neo-tree.nvim",
     cmd = "Neotree",
@@ -159,7 +126,7 @@ require("lazy").setup({
     },
   },
 
-  -- Fuzzy finder with Nord theme
+  -- Fuzzy finder
   {
     "nvim-telescope/telescope.nvim",
     keys = {
@@ -255,7 +222,7 @@ require("lazy").setup({
     end,
   },
 
-  -- Status line with Nord theme
+  -- Status line (theme managed by Stylix)
   {
     "nvim-lualine/lualine.nvim",
     event = "VeryLazy",
@@ -263,7 +230,7 @@ require("lazy").setup({
     config = function()
       require('lualine').setup({
         options = {
-          theme = 'nord',
+          theme = 'auto',
           component_separators = { left = '', right = ''},
           section_separators = { left = '', right = ''},
           disabled_filetypes = {
@@ -303,7 +270,7 @@ require("lazy").setup({
     end,
   },
 
-  -- Completion with Nord-compatible styling
+  -- Completion
   {
     "hrsh7th/nvim-cmp",
     event = "InsertEnter",
@@ -432,7 +399,7 @@ require("lazy").setup({
     end,
   },
 
-  -- Git integration with Nord-compatible signs
+  -- Git integration
   {
     "lewis6991/gitsigns.nvim",
     event = { "BufReadPost", "BufNewFile" },
@@ -498,7 +465,7 @@ require("lazy").setup({
     },
   },
 
-  -- Treesitter with Nord-compatible highlighting
+  -- Treesitter syntax highlighting
   {
     "nvim-treesitter/nvim-treesitter",
     event = { "BufReadPost", "BufNewFile" },
@@ -532,6 +499,8 @@ require("lazy").setup({
     dependencies = { "nvim-tree/nvim-web-devicons" },
     opts = {
       bigfile = { enabled = true },
+      input = { enabled = true },  -- Required for opencode.nvim
+      terminal = { enabled = true },  -- Required for opencode.nvim
       dashboard = {
         enabled = true,
         preset = {
@@ -631,6 +600,39 @@ require("lazy").setup({
       require("claudecode").setup({
         -- Configuration options (if any)
       })
+    end,
+  },
+
+  -- OpenCode integration (AI assistant)
+  {
+    "NickvanDyke/opencode.nvim",
+    dependencies = {
+      -- snacks.nvim is already configured above
+      "folke/snacks.nvim",
+    },
+    config = function()
+      ---@type opencode.Opts
+      vim.g.opencode_opts = {
+        -- Configuration options
+      }
+
+      -- Required for opts.events.reload
+      vim.o.autoread = true
+
+      -- Keymaps for opencode
+      vim.keymap.set({ "n", "x" }, "<C-a>", function() require("opencode").ask("@this: ", { submit = true }) end, { desc = "Ask opencode" })
+      vim.keymap.set({ "n", "x" }, "<C-x>", function() require("opencode").select() end, { desc = "Execute opencode action…" })
+      vim.keymap.set({ "n", "t" }, "<C-.>", function() require("opencode").toggle() end, { desc = "Toggle opencode" })
+
+      vim.keymap.set({ "n", "x" }, "go", function() return require("opencode").operator("@this ") end, { expr = true, desc = "Add range to opencode" })
+      vim.keymap.set("n", "goo", function() return require("opencode").operator("@this ") .. "_" end, { expr = true, desc = "Add line to opencode" })
+
+      vim.keymap.set("n", "<S-C-u>", function() require("opencode").command("session.half.page.up") end, { desc = "opencode half page up" })
+      vim.keymap.set("n", "<S-C-d>", function() require("opencode").command("session.half.page.down") end, { desc = "opencode half page down" })
+
+      -- Remap increment/decrement since we use <C-a> and <C-x> for opencode
+      vim.keymap.set("n", "+", "<C-a>", { desc = "Increment", noremap = true })
+      vim.keymap.set("n", "-", "<C-x>", { desc = "Decrement", noremap = true })
     end,
   },
 
