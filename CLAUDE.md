@@ -112,7 +112,7 @@ nix develop
 ### Development Shell (`nix develop`)
 Cross-platform development environment defined in `lib/devshell.nix`:
 - **Python**: Python 3.13, uv (package manager), ruff, mypy, pytest
-- **Nix tools**: nixfmt-rfc-style, statix, deadnix
+- **Nix tools**: nixfmt, statix, deadnix
 - **Build tools**: gcc, pkg-config, ninja, meson
 - **Utilities**: git, curl, wget, htop, tree, pre-commit
 - Platform-specific libraries are automatically included (Linux: glibc, X11; macOS: system frameworks)

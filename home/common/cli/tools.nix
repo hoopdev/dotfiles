@@ -14,6 +14,7 @@
     httpie
     imagemagick
     jq
+    just
     zoxide
     unar
     unrar
@@ -27,7 +28,7 @@
     rsync
     syncthing
     hackgen-nf-font
-    nixfmt-rfc-style
+    nixfmt
     quarto
     fastfetch
     _1password-cli
