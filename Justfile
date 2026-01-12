@@ -25,6 +25,8 @@ lint:
 switch host="":
     #!/usr/bin/env bash
     TARGET_HOST="{{host}}"
+    # Clean up host if passed as host=value (e.g. accidental positional arg)
+    TARGET_HOST=${TARGET_HOST#host=}
     if [ -z "$TARGET_HOST" ]; then
         TARGET_HOST=$(hostname | cut -d. -f1)
     fi
