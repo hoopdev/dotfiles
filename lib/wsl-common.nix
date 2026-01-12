@@ -1,4 +1,11 @@
-{ lib, pkgs, inputs, username ? "ktaga", enableDockerGroup ? false, ... }:
+{
+  lib,
+  pkgs,
+  inputs,
+  username ? "ktaga",
+  enableDockerGroup ? false,
+  ...
+}:
 
 {
   # Import NixOS-WSL modules
@@ -41,7 +48,8 @@
     shell = pkgs.zsh;
     extraGroups = [
       "wheel"
-    ] ++ lib.optionals enableDockerGroup [ "docker" ];
+    ]
+    ++ lib.optionals enableDockerGroup [ "docker" ];
   };
 
   # State version

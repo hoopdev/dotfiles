@@ -16,6 +16,9 @@
 {
   imports = [
     ../../lib/nixos-common.nix
-    (import ../../lib/wsl-common.nix { inherit lib pkgs inputs; enableDockerGroup = true; })
+    (import ../../lib/wsl-common.nix {
+      inherit lib pkgs inputs;
+      enableDockerGroup = true;
+    })
   ];
 }

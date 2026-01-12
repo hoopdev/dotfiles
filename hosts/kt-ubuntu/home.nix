@@ -1,10 +1,16 @@
-{ lib, pkgs, username, inputs, ... }:
+{
+  lib,
+  pkgs,
+  username,
+  inputs,
+  ...
+}:
 
 {
   imports = [
     ../../home/common/cli
     inputs.nixvim.homeModules.nixvim
-    ./starship.nix  # Ubuntu-specific Starship configuration
+    ./starship.nix # Ubuntu-specific Starship configuration
   ];
 
   home = {
