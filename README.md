@@ -104,9 +104,9 @@ A unified development environment is available via `nix develop`.
 | Category | Tools |
 |----------|-------|
 | **Python** | Python 3.13, uv, ruff, mypy, pytest |
-| **Nix** | nixfmt-rfc-style, statix, deadnix |
+| **Nix** | nixfmt, statix, deadnix |
 | **Build** | gcc, pkg-config, ninja, meson |
-| **Utilities** | git, curl, wget, htop, tree, pre-commit |
+| **Utilities** | git, curl, wget, htop, tree, pre-commit, just |
 | **Shell** | zsh, starship, direnv, zoxide |
 
 ### Features
@@ -116,20 +116,34 @@ A unified development environment is available via `nix develop`.
 - **Common Aliases**: Auto-loaded from `home/common/cli/shell/aliases.nix`
 - **Starship Prompt**: Unified shell prompt across environments
 
-## Flake Management Commands
+## Maintenance & Automation
 
+This project uses `just` as a task runner to simplify common operations.
+
+### Common Commands
+
+| Command | Description |
+|---------|-------------|
+| `just` | List all available recipes |
+| `just update` | Update all flake inputs |
+| `just check` | Check flake for errors |
+| `just fmt` | Format all .nix files using nixfmt |
+| `just lint` | Run statix and deadnix linters |
+| `just switch` | Auto-detect OS and switch configuration |
+| `just clean` | Run garbage collection |
+| `just pre-commit` | Run all pre-commit hooks |
+
+### CI/CD
+
+GitHub Actions are configured to automatically:
+- Check flake validity (`nix flake check`)
+- Verify code formatting (`nixfmt`)
+
+To run these checks locally before pushing:
 ```bash
-# Update all flake inputs
-nix flake update
-
-# Check flake configuration
-nix flake check
-
-# Show flake outputs
-nix flake show
-
-# Garbage collection (manual)
-nix-collect-garbage -d
+just check
+just fmt
+just pre-commit
 ```
 
 ## Directory Structure
