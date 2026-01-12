@@ -18,8 +18,8 @@ fmt:
 
 # Lint nix files
 lint:
-    statix check .
-    deadnix .
+    nix develop . --command statix check .
+    nix develop . --command deadnix .
 
 # Switch configuration (auto-detects OS and hostname)
 switch host="":

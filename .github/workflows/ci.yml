@@ -17,4 +17,4 @@ jobs:
     - name: Check Flake
       run: nix flake check
     - name: Check Formatting
-      run: nix run nixpkgs#nixfmt -- --check .
+      run: nix run nixpkgs#nixfmt-tree -- --ci .

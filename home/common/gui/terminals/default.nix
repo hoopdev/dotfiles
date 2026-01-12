@@ -3,4 +3,3 @@
     ./wezterm.nix
   ];
 }
-

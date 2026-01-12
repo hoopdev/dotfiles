@@ -31,52 +31,67 @@
     hyprpanel.url = "github:Jas-SinghFSU/HyprPanel";
   };
 
-  outputs = inputs@{
-    self,
-    nixpkgs,
-    nix-darwin,
-    home-manager,
-    nixos-wsl,
-    nixos-hardware,
-    wezterm,
-    nixvim,
-    hyprland,
-    xremap,
-    hyprpanel,
-    stylix,
-    ...
-  }: let
+  outputs =
+    inputs@{
+      self,
+      nixpkgs,
+      nix-darwin,
+      home-manager,
+      nixos-wsl,
+      nixos-hardware,
+      wezterm,
+      nixvim,
+      hyprland,
+      xremap,
+      hyprpanel,
+      stylix,
+      ...
+    }:
+    let
       # Default username for all configurations
       defaultUsername = "ktaga";
 
-      mkHomeConfiguration = { username ? defaultUsername, hostname, hostPath, isNixOS ? false }: {
-        home-manager = {
-          useGlobalPkgs = true;
-          useUserPackages = true;
-          users.${username} = import hostPath;
-          backupFileExtension = "backup";
-          extraSpecialArgs = {
-            inherit username inputs;
+      mkHomeConfiguration =
+        {
+          username ? defaultUsername,
+          hostname,
+          hostPath,
+          isNixOS ? false,
+        }:
+        {
+          home-manager = {
+            useGlobalPkgs = true;
+            useUserPackages = true;
+            users.${username} = import hostPath;
+            backupFileExtension = "backup";
+            extraSpecialArgs = {
+              inherit username inputs;
+            };
           };
-        };
-        networking.hostName = hostname;
-        users.users.${username}.home = if isNixOS then "/home/${username}" else "/Users/${username}";
+          networking.hostName = hostname;
+          users.users.${username}.home = if isNixOS then "/home/${username}" else "/Users/${username}";
 
-        # Automatic garbage collection settings
-        nix = {
-          gc = {
-            automatic = true;
-            options = "--delete-older-than 7d";
-          } // (if isNixOS then {
-            dates = "weekly";
-            persistent = true;
-          } else {});
-          settings = {
-            max-free = 10737418240; # 10GB
-            min-free = 536870912;   # 512MB
+          # Automatic garbage collection settings
+          nix = {
+            gc = {
+              automatic = true;
+              options = "--delete-older-than 7d";
+            }
+            // (
+              if isNixOS then
+                {
+                  dates = "weekly";
+                  persistent = true;
+                }
+              else
+                { }
+            );
+            settings = {
+              max-free = 10737418240; # 10GB
+              min-free = 536870912; # 512MB
+            };
           };
         };
-      };
 
       # Common specialArgs
       commonArgs = {
@@ -85,7 +100,12 @@
       };
 
       # Function for NixOS configuration
-      mkNixosConfiguration = { hostname, username ? defaultUsername, system }:
+      mkNixosConfiguration =
+        {
+          hostname,
+          username ? defaultUsername,
+          system,
+        }:
         nixpkgs.lib.nixosSystem {
           inherit system;
           modules = [
@@ -103,7 +123,13 @@
         };
 
       # Function for macOS configuration
-      mkDarwinConfiguration = { hostname, username ? defaultUsername, configPath ? ./hosts/mac/configuration.nix, homePath ? ./hosts/mac/home.nix }:
+      mkDarwinConfiguration =
+        {
+          hostname,
+          username ? defaultUsername,
+          configPath ? ./hosts/mac/configuration.nix,
+          homePath ? ./hosts/mac/home.nix,
+        }:
         nix-darwin.lib.darwinSystem {
           system = "aarch64-darwin";
           modules = [
@@ -187,16 +213,23 @@
       };
 
       # Development shells
-      devShells = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-darwin" ] (system:
+      devShells = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-darwin" ] (
+        system:
         let
           pkgs = import nixpkgs {
             inherit system;
             config.allowUnfree = true;
           };
-          devshell = import ./lib/devshell.nix { inherit pkgs; lib = nixpkgs.lib; };
+          devshell = import ./lib/devshell.nix {
+            inherit pkgs;
+            lib = nixpkgs.lib;
+          };
         in
         {
-          default = devshell.shells.default { inherit devshell; environment = system; };
+          default = devshell.shells.default {
+            inherit devshell;
+            environment = system;
+          };
         }
       );
     };

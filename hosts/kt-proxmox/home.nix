@@ -13,9 +13,8 @@
       EDITOR = "nvim";
       NIXPKGS_ALLOW_UNFREE = 1;
     };
-    sessionPath =
-      [
-      ];
+    sessionPath = [
+    ];
   };
 
   xdg = {

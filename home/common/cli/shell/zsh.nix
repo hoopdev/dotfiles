@@ -16,7 +16,10 @@ in
     };
     syntaxHighlighting = {
       enable = true;
-      highlighters = [ "main" "brackets" ];
+      highlighters = [
+        "main"
+        "brackets"
+      ];
       styles = {
         # Commands and aliases
         command = "fg=#${colors.base0B}";

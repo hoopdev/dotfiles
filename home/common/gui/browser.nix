@@ -2,7 +2,6 @@
 {
   home.packages = with pkgs; [
   ];
-  programs =
-    {
-    };
+  programs = {
+  };
 }

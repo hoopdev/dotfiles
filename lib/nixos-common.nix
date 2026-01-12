@@ -1,4 +1,9 @@
-{ lib, pkgs, config, ... }:
+{
+  lib,
+  pkgs,
+  config,
+  ...
+}:
 
 {
   # Enable nix-ld for running unpatched dynamic binaries (e.g., uv, Python wheels)

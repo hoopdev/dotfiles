@@ -1,15 +1,21 @@
-{ pkgs, config, lib, ... }:
+{
+  pkgs,
+  config,
+  lib,
+  ...
+}:
 let
   initLuaSource = ./init.lua;
   dotfilesDir = "${config.home.homeDirectory}/git/dotfiles";
 
   # Obsidian vault paths - can be overridden per host
-  obsidianVaults = config.programs.nixvim.obsidianVaults or [
-    {
-      name = "Main";
-      path = "${config.home.homeDirectory}/Obsidian/Main";
-    }
-  ];
+  obsidianVaults =
+    config.programs.nixvim.obsidianVaults or [
+      {
+        name = "Main";
+        path = "${config.home.homeDirectory}/Obsidian/Main";
+      }
+    ];
 
   # Generate Lua code for obsidian vaults
   vaultsLua = lib.concatMapStringsSep ",\n    " (vault: ''
@@ -40,14 +46,16 @@ in
       vim.g.obsidian_vaults = {
         ${vaultsLua}
       }
-    '' + builtins.readFile initLuaSource;
+    ''
+    + builtins.readFile initLuaSource;
 
     # Python packages for Neovim plugins
-    extraPython3Packages = ps: with ps; [
-      jupyter-client
-      jupytext
-      pynvim
-    ];
+    extraPython3Packages =
+      ps: with ps; [
+        jupyter-client
+        jupytext
+        pynvim
+      ];
 
     # Add lazy.nvim plugin to be available for bootstrapping
     extraPlugins = with pkgs.vimPlugins; [
@@ -73,7 +81,7 @@ in
   };
 
   # Copy init.lua to chezmoi dotfiles directory on activation
-  config.home.activation.syncNeovimConfig = config.lib.dag.entryAfter ["writeBoundary"] ''
+  config.home.activation.syncNeovimConfig = config.lib.dag.entryAfter [ "writeBoundary" ] ''
     if [ -d "${dotfilesDir}" ]; then
       $DRY_RUN_CMD mkdir -p "${dotfilesDir}/dot_config/nvim"
       $DRY_RUN_CMD cp -f ${initLuaSource} "${dotfilesDir}/dot_config/nvim/init.lua"

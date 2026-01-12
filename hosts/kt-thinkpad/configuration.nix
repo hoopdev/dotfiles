@@ -5,19 +5,18 @@
 { inputs, pkgs, ... }:
 
 {
-  imports =
-    [
-      # Include the results of the hardware scan.
-      ./hardware-configuration.nix
-      inputs.xremap.nixosModules.default
-      ../../lib/nixos-common.nix
-      ../../lib/japanese-locale.nix
-    ]
-    ++ (with inputs.nixos-hardware.nixosModules; [
-      lenovo-thinkpad
-      common-cpu-intel
-      common-pc-ssd
-    ]);
+  imports = [
+    # Include the results of the hardware scan.
+    ./hardware-configuration.nix
+    inputs.xremap.nixosModules.default
+    ../../lib/nixos-common.nix
+    ../../lib/japanese-locale.nix
+  ]
+  ++ (with inputs.nixos-hardware.nixosModules; [
+    lenovo-thinkpad
+    common-cpu-intel
+    common-pc-ssd
+  ]);
 
   services.xremap = {
     enable = true;
@@ -33,9 +32,8 @@
           };
         }
       ];
-      keymap =
-        [
-        ];
+      keymap = [
+      ];
     };
   };
 
