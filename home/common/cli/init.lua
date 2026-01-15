@@ -471,9 +471,7 @@ require("lazy").setup({
     lazy = false,
     build = ":TSUpdate",
     config = function()
-      local configs = require("nvim-treesitter.configs")
-
-      configs.setup({
+      require("nvim-treesitter").setup({
         ensure_installed = {
           "lua", "vim", "vimdoc", "query",
           "python", "javascript", "typescript", "tsx",
@@ -487,7 +485,7 @@ require("lazy").setup({
       })
 
       vim.opt.foldmethod = "expr"
-      vim.opt.foldexpr = "nvim_treesitter#foldexpr()"
+      vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
       vim.opt.foldenable = false
     end,
   },
@@ -664,7 +662,7 @@ require("lazy").setup({
       vim.g.molten_wrap_output = true
       vim.g.molten_virt_text_output = true
       vim.g.molten_virt_lines_off_by_1 = true
-      vim.g.molten_image_provider = "wezterm"
+      vim.g.molten_image_provider = vim.fn.executable("wezterm") == 1 and "wezterm" or "none"
       vim.g.molten_split_direction = "right"
       vim.g.molten_split_size = 40
     end,
@@ -725,9 +723,10 @@ require("lazy").setup({
     },
   },
 
-  -- WezTerm integration
+  -- WezTerm integration (only load if wezterm is installed)
   {
     "willothy/wezterm.nvim",
+    cond = vim.fn.executable("wezterm") == 1,
     config = true,
   },
 
