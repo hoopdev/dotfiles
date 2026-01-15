@@ -34,6 +34,9 @@
 
   programs.home-manager.enable = true;
 
+  # Disable dconf - not needed in Docker/container environments
+  dconf.enable = false;
+
   # Create ~/.zshrc to source home-manager's zsh configuration
   home.file.".zshrc".text = ''
     # Source home-manager's zsh configuration
