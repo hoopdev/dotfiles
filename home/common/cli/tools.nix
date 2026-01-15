@@ -33,6 +33,9 @@
     fastfetch
     _1password-cli
     lua-language-server
+    tree-sitter
+    lsof
+    trash-cli
   ];
   services.syncthing = {
     enable = true;
