@@ -50,6 +50,7 @@
       "claude"
       "signal"
       "alt-tab"
+      "discord"
     ];
   };
 
