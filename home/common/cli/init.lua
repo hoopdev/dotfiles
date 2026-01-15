@@ -471,42 +471,24 @@ require("lazy").setup({
     lazy = false,
     build = ":TSUpdate",
     config = function()
-      -- New nvim-treesitter 1.0+ setup (requires Neovim 0.11+)
-      require("nvim-treesitter").setup({
-        install_dir = vim.fn.stdpath("data") .. "/site",
+      local configs = require("nvim-treesitter.configs")
+
+      configs.setup({
+        ensure_installed = {
+          "lua", "vim", "vimdoc", "query",
+          "python", "javascript", "typescript", "tsx",
+          "rust", "go", "c", "cpp",
+          "json", "yaml", "toml", "markdown", "markdown_inline",
+          "bash", "nix", "html", "css",
+        },
+        highlight = { enable = true },
+        indent = { enable = true },
+        auto_install = true,
       })
 
-      -- Install common parsers
-      require("nvim-treesitter").install({
-        "lua", "vim", "vimdoc", "query",
-        "python", "javascript", "typescript", "tsx",
-        "rust", "go", "c", "cpp",
-        "json", "yaml", "toml", "markdown", "markdown_inline",
-        "bash", "nix", "html", "css",
-      })
-
-      -- Enable treesitter highlighting via Neovim's built-in API
-      vim.api.nvim_create_autocmd("FileType", {
-        callback = function()
-          pcall(vim.treesitter.start)
-        end,
-      })
-
-      -- Enable treesitter-based folding
-      vim.api.nvim_create_autocmd("FileType", {
-        callback = function()
-          vim.wo[0][0].foldexpr = "v:lua.vim.treesitter.foldexpr()"
-          vim.wo[0][0].foldmethod = "expr"
-          vim.wo[0][0].foldenable = false -- Start with folds open
-        end,
-      })
-
-      -- Enable treesitter-based indentation
-      vim.api.nvim_create_autocmd("FileType", {
-        callback = function()
-          vim.bo.indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
-        end,
-      })
+      vim.opt.foldmethod = "expr"
+      vim.opt.foldexpr = "nvim_treesitter#foldexpr()"
+      vim.opt.foldenable = false
     end,
   },
 

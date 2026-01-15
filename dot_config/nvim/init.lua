@@ -465,29 +465,31 @@ require("lazy").setup({
     },
   },
 
-  -- Treesitter syntax highlighting
+  -- Treesitter syntax highlighting (new API for nvim-treesitter 1.0+ / Neovim 0.11+)
   {
     "nvim-treesitter/nvim-treesitter",
-    event = { "BufReadPost", "BufNewFile" },
+    lazy = false,
     build = ":TSUpdate",
-    main = "nvim-treesitter.configs",
-    opts = {
-      auto_install = true,
-      highlight = {
-        enable = true,
-        additional_vim_regex_highlighting = false,
-      },
-      indent = { enable = true },
-      incremental_selection = {
-        enable = true,
-        keymaps = {
-          init_selection = "gnn",
-          node_incremental = "grn",
-          scope_incremental = "grc",
-          node_decremental = "grm",
+    config = function()
+      local configs = require("nvim-treesitter.configs")
+
+      configs.setup({
+        ensure_installed = {
+          "lua", "vim", "vimdoc", "query",
+          "python", "javascript", "typescript", "tsx",
+          "rust", "go", "c", "cpp",
+          "json", "yaml", "toml", "markdown", "markdown_inline",
+          "bash", "nix", "html", "css",
         },
-      },
-    },
+        highlight = { enable = true },
+        indent = { enable = true },
+        auto_install = true,
+      })
+
+      vim.opt.foldmethod = "expr"
+      vim.opt.foldexpr = "nvim_treesitter#foldexpr()"
+      vim.opt.foldenable = false
+    end,
   },
 
   -- Snacks.nvim - Collection of useful utilities
