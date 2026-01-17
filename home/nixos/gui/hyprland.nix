@@ -37,6 +37,12 @@
         "GDK_SCALE,2"
         "XCURSOR_SIZE,32"
         "GTK_THEME,Nordic"
+        # IME (Fcitx5) support
+        "GTK_IM_MODULE,fcitx"
+        "QT_IM_MODULE,fcitx"
+        "XMODIFIERS,@im=fcitx"
+        "INPUT_METHOD,fcitx"
+        "GLFW_IM_MODULE,ibus"
       ];
       xwayland = {
         force_zero_scaling = true;
