@@ -2,10 +2,10 @@
 {
   home.packages = with pkgs; [
     hyprpicker
-    hypridle
     hyprpaper
-    hyprlock
     wl-clipboard
+    cliphist
+    grimblast
     brightnessctl
     playerctl
     pamixer
@@ -31,6 +31,7 @@
         "hyprpanel"
         "fcitx5 -d --replace"
         "swayosd-server"
+        "wl-paste --watch cliphist store"
       ];
       monitor = [ "eDP-1, 2160x1440@60, 0x0, 1" ];
       env = [
@@ -49,6 +50,22 @@
       };
       misc = {
         disable_hyprland_logo = true;
+      };
+      input = {
+        # Enable all pointer devices
+        sensitivity = 0;
+        accel_profile = "flat";
+        touchpad = {
+          natural_scroll = true;
+          tap-to-click = true;
+          clickfinger_behavior = true;
+        };
+      };
+      # Explicitly configure TrackPoint on keyboard (USB device)
+      device = {
+        name = "synaptics-tm3203-003";
+        sensitivity = 0;
+        accel_profile = "flat";
       };
       general = {
         gaps_in = 5;
@@ -116,7 +133,10 @@
       bind = [
         "$mod, V, exec, vivaldi"
         "$mod, C, exec, wezterm"
+        "$mod, L, exec, hyprlock"
         "$mod, SPACE, exec, wofi --show drun"
+        "$mod, Escape, exec, wlogout"
+        "$mod SHIFT, V, exec, cliphist list | wofi -d | cliphist decode | wl-copy"
         "$mod SHIFT, M, exit"
         ", XF86AudioMute, exec, swayosd-client --output-volume mute-toggle"
         ", XF86AudioRaiseVolume, exec, swayosd-client --output-volume raise"

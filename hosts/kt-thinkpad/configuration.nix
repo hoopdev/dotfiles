@@ -51,15 +51,52 @@
     };
   };
 
+  # Reduce console log level to prevent logs from appearing on login screen
+  boot.consoleLogLevel = 0;
+  boot.initrd.verbose = false;
+  boot.kernelParams = [
+    "quiet"
+    "udev.log_level=3"
+  ];
+
+  # TrackPoint support for keyboard's TrackPoint via RMI4
+  hardware.trackpoint.enable = true;
+
+  # udev rule to bind psmouse to RMI4 PS/2 pass-through (TrackPoint on keyboard)
+  services.udev.extraRules = ''
+    ACTION=="add", SUBSYSTEM=="serio", ATTR{description}=="RMI4 PS/2 pass-through", ATTR{drvctl}="psmouse"
+  '';
+
   # Enable networking
   networking.networkmanager.enable = true;
 
-  # Enable the X11 windowing system.
+  # Enable X11 for XWayland support
   services.xserver.enable = true;
 
-  # Enable the GNOME Desktop Environment.
-  services.displayManager.gdm.enable = true;
-  services.desktopManager.gnome.enable = true;
+  # Enable libinput for touchpad/trackpoint
+  services.libinput = {
+    enable = true;
+    touchpad = {
+      naturalScrolling = true;
+      tapping = true;
+      clickMethod = "clickfinger";
+    };
+  };
+
+  # greetd + tuigreet for TUI login
+  services.greetd = {
+    enable = true;
+    settings = {
+      default_session = {
+        command = "${pkgs.tuigreet}/bin/tuigreet --time --remember --cmd Hyprland";
+        user = "greeter";
+      };
+    };
+  };
+
+  # Suppress getty on tty1 since we use greetd
+  systemd.services."getty@tty1".enable = false;
+  systemd.services."autovt@tty1".enable = false;
 
   # Configure keymap in X11
   services.xserver.xkb = {
@@ -82,6 +119,15 @@
 
   services.tailscale.enable = true;
 
+  # Bluetooth support
+  hardware.bluetooth = {
+    enable = true;
+    powerOnBoot = true;
+  };
+
+  # UPower for battery monitoring (required by HyprPanel)
+  services.upower.enable = true;
+
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.ktaga = {
     isNormalUser = true;
@@ -91,6 +137,7 @@
       "wheel"
       "audio"
       "video"
+      "input"
     ];
     shell = pkgs.zsh;
     packages = with pkgs; [
@@ -107,10 +154,13 @@
     };
   };
 
-  # xdg-desktop-portal for dark mode detection
+  # xdg-desktop-portal for screen sharing and dark mode detection
   xdg.portal = {
     enable = true;
-    extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
+    extraPortals = [
+      pkgs.xdg-desktop-portal-gtk
+      pkgs.xdg-desktop-portal-hyprland
+    ];
   };
 
   environment.systemPackages = with pkgs; [ ];
