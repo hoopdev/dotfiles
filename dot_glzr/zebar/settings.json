@@ -1,8 +1,9 @@
 {
+  "$schema": null,
   "startupConfigs": [
     {
-      "pack": "starter",
-      "widget": "with-glazewm",
+      "pack": "blaiyz.neosoft-zebar",
+      "widget": "default",
       "preset": "default"
     }
   ]
