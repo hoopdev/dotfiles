@@ -1,11 +1,8 @@
 general:
-  # Commands to run when the WM has started. This is useful for running a
-  # script or launching another application.
-  # Example: The below command launches Zebar.
+  # Commands to run when the WM has started.
   startup_commands: ['shell-exec zebar']
 
   # Commands to run just before the WM is shutdown.
-  # Example: The below command kills Zebar.
   shutdown_commands: ['shell-exec taskkill /IM zebar.exe /F']
 
   # Commands to run after the WM config is reloaded.
@@ -19,13 +16,17 @@ general:
   toggle_workspace_on_refocus: false
 
   cursor_jump:
-    # Whether to automatically move the cursor on the specified trigger.
     enabled: true
-
-    # Trigger for cursor jump:
-    # - 'monitor_focus': Jump when focus changes between monitors.
-    # - 'window_focus': Jump when focus changes between windows.
+    # 'monitor_focus' or 'window_focus'
     trigger: 'monitor_focus'
+
+  # How windows are hidden when switching workspaces.
+  # - 'cloak': Recommended, smoother transitions without animation.
+  # - 'hide': Traditional hide method.
+  hide_method: 'cloak'
+
+  # Whether to show all windows in the taskbar or only the current workspace.
+  show_all_in_taskbar: false
 
 gaps:
   # Whether to scale the gaps with the DPI of the monitor.
@@ -36,42 +37,40 @@ gaps:
 
   # Gap between windows and the screen edge.
   outer_gap:
-    top: '45px'
+    top: '5px'
     right: '5px'
     bottom: '5px'
     left: '5px'
 
 window_effects:
-  # Visual effects to apply to the focused window.
+  # Visual effects for the focused window.
+  # ** Border and corner_style are exclusive to Windows 11.
   focused_window:
-    # Highlight the window with a colored border.
-    # ** Exclusive to Windows 11 due to API limitations.
     border:
       enabled: true
-      color: '#8dbcff'
-
-    # Remove the title bar from the window's frame. Note that this can
-    # cause rendering issues for some applications.
+      color: '#88c0d0'  # Nord frost
     hide_title_bar:
       enabled: false
-
-    # Change the corner style of the window's frame.
-    # ** Exclusive to Windows 11 due to API limitations.
     corner_style:
+      enabled: true
+      style: 'rounded'  # 'square', 'rounded', 'small_rounded'
+    transparency:
       enabled: false
-      # Allowed values: 'square', 'rounded', 'small_rounded'.
-      style: 'square'
+      opacity: '100%'
 
-  # Visual effects to apply to non-focused windows.
+  # Visual effects for non-focused windows.
   other_windows:
     border:
       enabled: true
-      color: '#a1a1a1'
+      color: '#4c566a'  # Nord polar night
     hide_title_bar:
       enabled: false
     corner_style:
+      enabled: true
+      style: 'rounded'
+    transparency:
       enabled: false
-      style: 'square'
+      opacity: '100%'
 
 window_behavior:
   # New windows are created in this state whenever possible.
@@ -109,25 +108,61 @@ workspaces:
   - name: '9'
 
 window_rules:
+  # Ignore rules - these windows are not managed by GlazeWM.
   - commands: ['ignore']
     match:
-      # Ignores any Zebar windows.
+      # Zebar status bar
       - window_process: { equals: 'zebar' }
 
-      # Ignores picture-in-picture windows for browsers.
+      # Picture-in-picture windows
       - window_title: { regex: '[Pp]icture.in.[Pp]icture' }
         window_class: { regex: 'Chrome_WidgetWin_1|MozillaDialogClass' }
 
-      # Ignore rules for various 3rd-party apps.
+      # PowerToys
       - window_process: { equals: 'PowerToys' }
         window_class: { regex: 'HwndWrapper\[PowerToys\.PowerAccent.*?\]' }
       - window_process: { equals: 'PowerToys' }
         window_title: { regex: '.*? - Peek' }
+
+      # Windows 11 Command Palette
+      - window_title: { equals: 'Command Palette' }
+        window_class: { equals: 'WinUIDesktopWin32WindowClass' }
+
+      # Lively Wallpaper
       - window_process: { equals: 'Lively' }
         window_class: { regex: 'HwndWrapper' }
 
+      # Microsoft Office helper windows
+      - window_process: { equals: 'EXCEL' }
+        window_class: { not_regex: 'XLMAIN' }
+      - window_process: { equals: 'WINWORD' }
+        window_class: { not_regex: 'OpusApp' }
+      - window_process: { equals: 'POWERPNT' }
+        window_class: { not_regex: 'PPTFrameClass' }
+
+  # Floating rules - these windows open as floating by default.
+  - commands: ['set-floating --centered']
+    match:
+      # System Settings
+      - window_process: { equals: 'SystemSettings' }
+
+      # Common dialog windows
+      - window_title: { regex: '(Settings|Preferences|Options|Properties)$' }
+
+      # Windows dialogs
+      - window_class: { equals: '#32770' }  # Common dialog class
+
+      # 1Password
+      - window_process: { equals: '1Password' }
+
+      # Flow Launcher
+      - window_process: { equals: 'Flow.Launcher' }
+
+      # Calculator
+      - window_process: { equals: 'CalculatorApp' }
+
 binding_modes:
-  # When enabled, the focused window can be resized via arrow keys or HJKL.
+  # Resize mode - fine-grained window resizing with hjkl or arrow keys.
   - name: 'resize'
     keybindings:
       - commands: ['resize --width -2%']
@@ -138,109 +173,83 @@ binding_modes:
         bindings: ['k', 'up']
       - commands: ['resize --height -2%']
         bindings: ['j', 'down']
-      # Press enter/escape to return to default keybindings.
       - commands: ['wm-disable-binding-mode --name resize']
         bindings: ['escape', 'enter']
 
-  # When enabled, all keybindings are disabled except for alt+shift+p which
-  # returns to default keybindings.
-  - name: 'pause'
-    keybindings:
-      - commands: ['wm-disable-binding-mode --name pause']
-        bindings: ['alt+shift+p']
-
 keybindings:
-  # Shift focus in a given direction (same as aerospace).
+  # Focus in a given direction (hjkl + arrow keys).
   - commands: ['focus --direction left']
-    bindings: ['alt+h']
+    bindings: ['alt+h', 'alt+left']
   - commands: ['focus --direction right']
-    bindings: ['alt+l']
+    bindings: ['alt+l', 'alt+right']
   - commands: ['focus --direction up']
-    bindings: ['alt+k']
+    bindings: ['alt+k', 'alt+up']
   - commands: ['focus --direction down']
-    bindings: ['alt+j']
+    bindings: ['alt+j', 'alt+down']
 
-  # Move focused window in a given direction (same as aerospace).
+  # Move focused window (hjkl + arrow keys).
   - commands: ['move --direction left']
-    bindings: ['alt+shift+h']
+    bindings: ['alt+shift+h', 'alt+shift+left']
   - commands: ['move --direction right']
-    bindings: ['alt+shift+l']
+    bindings: ['alt+shift+l', 'alt+shift+right']
   - commands: ['move --direction up']
-    bindings: ['alt+shift+k']
+    bindings: ['alt+shift+k', 'alt+shift+up']
   - commands: ['move --direction down']
-    bindings: ['alt+shift+j']
+    bindings: ['alt+shift+j', 'alt+shift+down']
 
-  # Resize focused window (same as aerospace: alt+shift+minus/equal).
+  # Resize focused window.
   - commands: ['resize --width -2%', 'resize --height -2%']
     bindings: ['alt+shift+minus']
   - commands: ['resize --width +2%', 'resize --height +2%']
     bindings: ['alt+shift+equal']
 
-  # Resize mode for fine-grained resizing.
+  # Enter resize mode for fine-grained control.
   - commands: ['wm-enable-binding-mode --name resize']
     bindings: ['alt+r']
 
-  # Disables all keybindings until alt+shift+p is pressed again.
-  - commands: ['wm-enable-binding-mode --name pause']
+  # Pause all keybindings (toggle).
+  - commands: ['wm-toggle-pause']
     bindings: ['alt+shift+p']
 
-  # Layout toggle (same as aerospace: alt+slash).
+  # Layout direction controls.
   - commands: ['toggle-tiling-direction']
-    bindings: ['alt+slash']
-
-  # Explicit tiling direction (GlazeWM extension).
+    bindings: ['alt+semicolon']
   - commands: ['set-tiling-direction horizontal']
-    bindings: ['alt+comma']
+    bindings: ['alt+ctrl+comma']
   - commands: ['set-tiling-direction vertical']
-    bindings: ['alt+period']
+    bindings: ['alt+ctrl+period']
 
-  # Toggle floating/tiling (same as aerospace: alt+t).
+  # Window state toggles.
   - commands: ['toggle-floating --centered']
+    bindings: ['alt+shift+space']
+  - commands: ['toggle-tiling']
     bindings: ['alt+t']
-
-  # Change the focused window to be fullscreen (same as aerospace: alt+f).
   - commands: ['toggle-fullscreen']
     bindings: ['alt+f']
-
-  # Minimize focused window (same as aerospace: alt+m).
   - commands: ['toggle-minimized']
     bindings: ['alt+m']
 
-  # Close focused window (same as aerospace: alt+q).
+  # Close focused window.
   - commands: ['close']
     bindings: ['alt+q']
 
-  # Balance window sizes (same as aerospace: alt+e).
+  # WM controls.
   - commands: ['wm-redraw']
-    bindings: ['alt+e']
-
-  # Kill GlazeWM process safely.
-  - commands: ['wm-exit']
     bindings: ['alt+shift+e']
-
-  # Re-evaluate configuration file (service mode esc in aerospace).
   - commands: ['wm-reload-config']
-    bindings: ['alt+shift+semicolon']
+    bindings: ['alt+shift+r']
+  - commands: ['wm-exit']
+    bindings: ['alt+shift+ctrl+e']
 
-  # Focus back and forth (same as aerospace: alt+backspace).
-  - commands: ['focus --recent-workspace']
-    bindings: ['alt+backspace']
-
-  # Workspace back and forth (same as aerospace: alt+tab).
+  # Workspace navigation.
   - commands: ['focus --recent-workspace']
     bindings: ['alt+tab']
-
-  # Cycle focus between active workspaces (across monitors).
   - commands: ['focus --next-active-workspace']
     bindings: ['alt+d']
   - commands: ['focus --prev-active-workspace']
     bindings: ['alt+a']
-  - commands: ['focus --next-active-workspace']
-    bindings: ['alt+w']
-  - commands: ['focus --prev-active-workspace']
-    bindings: ['alt+s']
 
-  # Change focus to a workspace (same as aerospace: alt+z/x/c/v/b for 1-5).
+  # Focus workspace by number (aerospace style: alt+z/x/c/v/b for 1-5).
   - commands: ['focus --workspace 1']
     bindings: ['alt+z']
   - commands: ['focus --workspace 2']
@@ -252,7 +261,7 @@ keybindings:
   - commands: ['focus --workspace 5']
     bindings: ['alt+b']
 
-  # Move focused window to a workspace (same as aerospace: alt+shift+z/x/c/v/b).
+  # Move window to workspace and follow.
   - commands: ['move --workspace 1', 'focus --workspace 1']
     bindings: ['alt+shift+z']
   - commands: ['move --workspace 2', 'focus --workspace 2']
@@ -264,16 +273,14 @@ keybindings:
   - commands: ['move --workspace 5', 'focus --workspace 5']
     bindings: ['alt+shift+b']
 
-  # Move window to monitor (same as aerospace: alt+shift+a/d/s/w).
+  # Move workspace between monitors.
   - commands: ['move-workspace --direction left']
-    bindings: ['alt+shift+a']
+    bindings: ['alt+ctrl+h', 'alt+ctrl+left']
   - commands: ['move-workspace --direction right']
-    bindings: ['alt+shift+d']
-  - commands: ['move-workspace --direction down']
-    bindings: ['alt+shift+s']
+    bindings: ['alt+ctrl+l', 'alt+ctrl+right']
   - commands: ['move-workspace --direction up']
-    bindings: ['alt+shift+w']
-
-  # Move workspace to next monitor (same as aerospace: alt+shift+tab).
+    bindings: ['alt+ctrl+k', 'alt+ctrl+up']
+  - commands: ['move-workspace --direction down']
+    bindings: ['alt+ctrl+j', 'alt+ctrl+down']
   - commands: ['move-workspace --direction right']
     bindings: ['alt+shift+tab']
