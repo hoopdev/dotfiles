@@ -14,12 +14,11 @@ let
       "${pkgs.chromium}/bin/chromium";
 in
 {
+  # Claude Code本体はHomebrewでインストール（最新版を使うため）:
+  # brew install claude-code
   home.packages =
     with pkgs;
-    [
-      claude-code
-    ]
-    ++ lib.optionals (!isDarwin) [
+    lib.optionals (!isDarwin) [
       chromium # For Playwright MCP (Linux only)
     ];
 
