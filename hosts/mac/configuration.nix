@@ -29,6 +29,7 @@
       "node"
     ];
     casks = [
+      "claude-code"
       "vivaldi"
       "1password"
       "notion"
