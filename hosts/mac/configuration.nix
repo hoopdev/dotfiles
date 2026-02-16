@@ -22,6 +22,9 @@
       # WindowsApp = 1295203466;
       # Line = 539883307;
     };
+    taps = [
+      "coder/coder"
+    ];
     brews = [
       "coder"
       "displayplacer"
