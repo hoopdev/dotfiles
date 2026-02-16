@@ -7,5 +7,9 @@
       "WebFetch(domain:deepwiki.com)",
       "WebFetch(domain:esm.sh)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "gemini-cli"
+  ],
+  "enableAllProjectMcpServers": true
 }

@@ -23,6 +23,7 @@
       # Line = 539883307;
     };
     brews = [
+      "displayplacer"
       "ffmpeg"
       "rsync"
       "libiconv"
