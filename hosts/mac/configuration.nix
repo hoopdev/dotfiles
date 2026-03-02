@@ -52,10 +52,10 @@
       "blender"
       "tailscale-app"
       "bambu-studio"
-      "ollama-app"
       "claude"
       "signal"
       "alt-tab"
+	  "codex"
       "discord"
     ];
   };
