@@ -57,6 +57,7 @@
       "alt-tab"
 	  "codex"
       "discord"
+      "obsidian"
       "zed"
     ];
   };
