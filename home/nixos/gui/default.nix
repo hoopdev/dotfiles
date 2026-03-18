@@ -1,3 +1,4 @@
+{ pkgs, ... }:
 {
   imports = [
     ./browser.nix
@@ -8,5 +9,9 @@
     ./wofi.nix
     ./gtk.nix
     ./swayosd.nix
+  ];
+
+  home.packages = with pkgs; [
+    obsidian
   ];
 }
