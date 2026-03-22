@@ -20,7 +20,6 @@
     stateVersion = "24.05";
 
     sessionVariables = {
-      EDITOR = "nvim";
       NIXPKGS_ALLOW_UNFREE = "1";
     } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
       NPM_CONFIG_PREFIX = "$HOME/.npm-global";
