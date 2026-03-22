@@ -61,7 +61,6 @@
 	  "codex"
       "discord"
       "obsidian"
-      "zed"
     ];
   };
 
