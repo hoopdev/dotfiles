@@ -37,44 +37,9 @@ in
     ''
   );
 
-  # Claude Code settings.json (user-level settings)
-  home.file.".claude/settings.json".text = builtins.toJSON {
-    # Permission rules for frequently used tools
-    permissions = {
-      allow = [
-        "Bash(git:*)"
-        "Bash(nix:*)"
-        "Bash(nixos-rebuild:*)"
-        "Bash(darwin-rebuild:*)"
-        "Bash(home-manager:*)"
-        "Bash(npm:*)"
-        "Bash(pnpm:*)"
-        "Bash(cargo:*)"
-        "Bash(python:*)"
-        "Bash(uv:*)"
-        "Bash(ls:*)"
-        "Bash(readlink:*)"
-        "Bash(wezterm:*)"
-        "Bash(grep:*)"
-        "Bash(cat:*)"
-        "Read"
-        "Write"
-        "Edit"
-        "Glob"
-        "Grep"
-        "WebSearch"
-      ];
-      deny = [ ];
-    };
-
-    # Preferred settings
-    theme = "dark-daltonized";
-    autoUpdates = !isDarwin; # macOS: Homebrew管理, Linux: 自動更新で最新を維持
-
-    # MCP server enable/disable settings
-    # enableAllProjectMcpServers = true;
-    # enabledMcpjsonServers = [ "server-name" ];
-  };
+  # Claude Code settings.json — Nix管理しない
+  # Claude Codeがpermissions・プラグイン設定を頻繁に書き換えるため、各マシンで独立管理。
+  # settings.local.json と合わせて手動で管理する。
 
   # Global MCP servers configuration
   # Note: claude mcp add で追加したサーバーは ~/.claude.json に保存される

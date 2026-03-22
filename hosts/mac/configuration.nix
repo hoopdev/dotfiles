@@ -24,6 +24,7 @@
     };
     taps = [
       "coder/coder"
+      "oven-sh/bun"
     ];
     brews = [
       "coder"
@@ -32,6 +33,7 @@
       "rsync"
       "libiconv"
       "node"
+      "oven-sh/bun/bun"
     ];
     casks = [
       "claude-code"

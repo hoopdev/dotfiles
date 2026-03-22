@@ -5,11 +5,12 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebSearch",
       "WebFetch(domain:deepwiki.com)",
-      "WebFetch(domain:esm.sh)"
+      "WebFetch(domain:esm.sh)",
+      "mcp__plugin_telegram_telegram__reply"
     ]
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "gemini-cli"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
