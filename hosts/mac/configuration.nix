@@ -34,6 +34,7 @@
       "libiconv"
       "node"
       "oven-sh/bun/bun"
+      "syncthing"
     ];
     casks = [
       "claude-code"
