@@ -32,6 +32,8 @@
     fastfetch
     _1password-cli
     lua-language-server
+    pyright
+    ruff
     tree-sitter
     lsof
     trash-cli
