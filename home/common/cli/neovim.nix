@@ -12,8 +12,12 @@ let
   obsidianVaults =
     config.programs.nixvim.obsidianVaults or [
       {
-        name = "Main";
-        path = "${config.home.homeDirectory}/Obsidian/Main";
+        name = "Private";
+        path = "${config.home.homeDirectory}/Library/Mobile Documents/iCloud~md~obsidian/Documents/Private";
+      }
+      {
+        name = "Work";
+        path = "${config.home.homeDirectory}/Library/Mobile Documents/iCloud~md~obsidian/Documents/Work";
       }
     ];
 
@@ -30,8 +34,12 @@ in
     type = lib.types.listOf (lib.types.attrsOf lib.types.str);
     default = [
       {
-        name = "Main";
-        path = "${config.home.homeDirectory}/Obsidian/Main";
+        name = "Private";
+        path = "${config.home.homeDirectory}/Library/Mobile Documents/iCloud~md~obsidian/Documents/Private";
+      }
+      {
+        name = "Work";
+        path = "${config.home.homeDirectory}/Library/Mobile Documents/iCloud~md~obsidian/Documents/Work";
       }
     ];
     description = "List of Obsidian vault configurations";
