@@ -14,7 +14,6 @@
     httpie
     imagemagick
     jq
-    just
     zoxide
     unar
     unrar
