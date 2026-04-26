@@ -29,7 +29,7 @@ in
 
         use_fancy_tab_bar = false,
         hide_tab_bar_if_only_one_tab = true,
-        window_decorations = "RESIZE",
+        window_decorations = "${if isDarwin then "TITLE | RESIZE" else "RESIZE"}",
 
         front_end = "WebGpu",
         enable_wayland = ${if isLinux then "true" else "false"},
