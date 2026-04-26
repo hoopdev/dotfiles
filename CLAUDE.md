@@ -10,22 +10,23 @@ This is a dotfiles repository that manages cross-platform system configurations 
 
 ### NixOS Systems
 ```bash
-# Build and apply NixOS configuration for ThinkPad
+# Preferred (nh):
+nh os switch . -H kt-thinkpad
+nh os switch . -H kt-proxmox
+nh os switch . -H kt-wsl
+
+# Raw fallback (e.g. before nh is installed on a fresh host):
 sudo nixos-rebuild switch --flake .#kt-thinkpad
-
-# Build and apply NixOS configuration for Proxmox
-sudo nixos-rebuild switch --flake .#kt-proxmox
-
-# Build and apply WSL NixOS configuration
-sudo nixos-rebuild switch --flake .#kt-wsl
 ```
 
 ### Standalone Home Manager (Ubuntu)
 ```bash
-# Build and apply home-manager configuration for kt-ubuntu (non-NixOS)
+# Preferred (nh):
+nh home switch . -c jovyan@kt-ubuntu
+nh home switch . -c ktaga@kt-ubuntu
+
+# Raw fallback:
 nix run home-manager/master -- switch --flake .#jovyan@kt-ubuntu
-# or for ktaga user:
-nix run home-manager/master -- switch --flake .#ktaga@kt-ubuntu
 
 # Update font cache after first install
 fc-cache -fv
@@ -33,14 +34,18 @@ fc-cache -fv
 
 ### macOS Systems
 ```bash
-# Build and apply macOS configuration for Mac Studio
+# Preferred (nh):
+nh darwin switch . -H kt-mac-studio
+nh darwin switch . -H kt-mac-mini
+nh darwin switch . -H kt-mba
+
+# Raw fallback:
 darwin-rebuild switch --flake .#kt-mac-studio
+```
 
-# Build and apply macOS configuration for Mac Mini
-darwin-rebuild switch --flake .#kt-mac-mini
-
-# Build and apply macOS configuration for MacBook Air
-darwin-rebuild switch --flake .#kt-mba
+### Bootstrap (fresh host, no `nh` yet)
+```bash
+nix run nixpkgs#nh -- darwin switch . -H kt-mac-studio   # or `os` / `home`
 ```
 
 ### Development Commands
@@ -54,8 +59,10 @@ nix flake check
 # Show flake outputs
 nix flake show
 
-# Garbage collection (automatic, but can be run manually)
-nix-collect-garbage -d
+# Garbage collection (manual). System roots GCed weekly via `nix.gc` in flake.nix;
+# user/HM roots GCed weekly via `programs.nh.clean`.
+nh clean all --keep 5 --keep-since 7d   # both user + system (sudo prompt)
+nh clean user --keep 5 --keep-since 7d  # user-only, no sudo
 
 # Development shell (Python, Nix tools, uv)
 nix develop
