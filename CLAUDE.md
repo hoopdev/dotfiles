@@ -1,142 +1,42 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Nix Flakes dotfiles. NixOS / macOS (nix-darwin) / standalone home-manager.
 
-## Repository Overview
+## Commands
 
-This is a dotfiles repository that manages cross-platform system configurations using Nix Flakes and Chezmoi. The repository supports NixOS, macOS (via nix-darwin), and Windows environments with a unified approach to dotfile management.
-
-## Key Commands
-
-### NixOS Systems
 ```bash
-# Preferred (nh):
-nh os switch . -H kt-thinkpad
-nh os switch . -H kt-proxmox
-nh os switch . -H kt-wsl
+# Apply (nh preferred; raw fallback: sudo nixos-rebuild switch --flake .#<host>)
+nh os switch . -H <host>          # NixOS: kt-thinkpad, kt-proxmox, kt-wsl
+nh darwin switch . -H <host>      # macOS: kt-mac-studio, kt-mac-mini, kt-mba
+nh home switch . -c <user>@<host> # home-manager: ktaga@kt-ubuntu, jovyan@kt-ubuntu
 
-# Raw fallback (e.g. before nh is installed on a fresh host):
-sudo nixos-rebuild switch --flake .#kt-thinkpad
+# Bootstrap (fresh host, no nh yet)
+nix run nixpkgs#nh -- darwin switch . -H kt-mac-studio
+
+# Maintenance
+nix flake update                              # Update inputs
+nix flake check                               # Validate
+nh clean all --keep 5 --keep-since 7d         # GC (user + system)
+nix develop                                   # Dev shell
 ```
 
-### Standalone Home Manager (Ubuntu)
-```bash
-# Preferred (nh):
-nh home switch . -c jovyan@kt-ubuntu
-nh home switch . -c ktaga@kt-ubuntu
+## Code Style
 
-# Raw fallback:
-nix run home-manager/master -- switch --flake .#jovyan@kt-ubuntu
-
-# Update font cache after first install
-fc-cache -fv
-```
-
-### macOS Systems
-```bash
-# Preferred (nh):
-nh darwin switch . -H kt-mac-studio
-nh darwin switch . -H kt-mac-mini
-nh darwin switch . -H kt-mba
-
-# Raw fallback:
-darwin-rebuild switch --flake .#kt-mac-studio
-```
-
-### Bootstrap (fresh host, no `nh` yet)
-```bash
-nix run nixpkgs#nh -- darwin switch . -H kt-mac-studio   # or `os` / `home`
-```
-
-### Development Commands
-```bash
-# Update all flake inputs
-nix flake update
-
-# Check flake configuration
-nix flake check
-
-# Show flake outputs
-nix flake show
-
-# Garbage collection (manual). System roots GCed weekly via `nix.gc` in flake.nix;
-# user/HM roots GCed weekly via `programs.nh.clean`.
-nh clean all --keep 5 --keep-since 7d   # both user + system (sudo prompt)
-nh clean user --keep 5 --keep-since 7d  # user-only, no sudo
-
-# Development shell (Python, Nix tools, uv)
-nix develop
-```
+- Nix Flakes syntax; format with `nixfmt`, lint with `statix` and `deadnix`
+- Packages are added via Nix, not `brew install` / `apt-get`
+- Theming via Stylix — color changes go in `lib/shonan.yaml`, not per-app configs
 
 ## Architecture
 
-### Flake-Based Configuration
-- **flake.nix**: Main entry point defining system configurations, inputs, and outputs
-- Uses unstable nixpkgs channel for latest packages
-- Integrates home-manager for user environment management
-- Platform-specific builds with shared configurations
+- `home/common/` — cross-platform shared configs (edit here for universal tools)
+- `home/mac/`, `home/nixos/` — platform-specific overlays
+- `hosts/` — per-machine definitions
+- `lib/` — shared modules (devshell, theming, locale, users)
+- Details: @docs/architecture.md
 
-### Directory Structure
-```
-├── flake.nix                 # Main Nix Flake configuration
-├── lib/                      # Shared Nix modules
-│   ├── devshell.nix         # Development shell configuration
-│   ├── nixos-common.nix     # Common NixOS settings (nix-ld, 1Password, etc.)
-│   ├── japanese-locale.nix  # Japanese locale settings
-│   └── wsl-common.nix       # WSL-specific settings
-├── home/                     # Home-manager configurations
-│   ├── common/              # Shared configurations across platforms
-│   │   ├── cli/            # Command-line tools (git, neovim, shells)
-│   │   └── gui/            # GUI applications and terminals
-│   ├── mac/                # macOS-specific home configurations
-│   └── nixos/              # NixOS-specific home configurations
-└── hosts/                  # Host-specific system configurations
-    ├── kt-proxmox/        # Proxmox NixOS configuration
-    ├── kt-thinkpad/       # ThinkPad NixOS configuration
-    ├── kt-wsl/            # WSL NixOS configuration
-    ├── kt-ubuntu/         # Ubuntu standalone home-manager (non-NixOS)
-    ├── kt-mba/            # MacBook Air configuration
-    └── mac/               # macOS system configuration (Mac Studio, Mac Mini)
-```
+## Cautions
 
-### Configuration Philosophy
-- **Shared Common Base**: Core configurations in `home/common/` used across all platforms
-- **Platform-Specific Overlays**: Platform-specific configurations extend the common base
-- **Host-Specific Settings**: Individual machine configurations in `hosts/` directories
-- **Reproducible Builds**: Flake.lock ensures consistent package versions across rebuilds
-
-### Key Components
-- **Home-manager**: User environment and dotfile management
-- **Nix-darwin**: macOS system-level configuration management
-- **NixOS-WSL**: Windows Subsystem for Linux integration
-- **Hardware-specific modules**: Lenovo ThinkPad optimizations via nixos-hardware
-- **Development tools**: Neovim (via nixvim), Git, shell configurations (Nushell, Zsh)
-- **Window managers**: Hyprland for NixOS, AeroSpace for macOS
-- **Terminal**: WezTerm with consistent configuration across platforms
-- **System optimizations**: DS_Store prevention, Touch ID for sudo, keyboard remapping
-- **nix-ld**: Enabled on NixOS for running unpatched binaries (uv, Python wheels, etc.)
-
-### Development Shell (`nix develop`)
-Cross-platform development environment defined in `lib/devshell.nix`:
-- **Python**: Python 3.13, uv (package manager), ruff, mypy, pytest
-- **Nix tools**: nixfmt, statix, deadnix
-- **Build tools**: gcc, pkg-config, ninja, meson
-- **Utilities**: git, curl, wget, htop, tree, pre-commit
-- Platform-specific libraries are automatically included (Linux: glibc, X11; macOS: system frameworks)
-
-### Flake Inputs
-- **nixpkgs**: Main package repository (unstable channel)
-- **home-manager**: User environment management
-- **nix-darwin**: macOS system configuration
-- **nixos-hardware**: Hardware-specific optimizations
-- **hyprland**: Wayland compositor for NixOS
-- **wezterm**: Terminal emulator with Nix packaging
-- **nixvim**: Neovim configuration in Nix
-- **nix-colors**: Color scheme management
-
-### User Configuration
-- Primary user: `ktaga`
-- Editor: `nvim` (Neovim)
-- Shell: Nushell and Zsh support
-- Color scheme: Nord (via nix-colors)
-- Automatic garbage collection enabled (7-day retention)
+- Determine target platform (NixOS vs macOS) before suggesting system-level changes
+- `flake.nix` / `flake.lock` changes affect all hosts — verify carefully
+- Chezmoi syncs some configs (nvim, wezterm) for non-Nix environments; don't remove those hooks
+- GC runs weekly automatically (`nix.gc` + `programs.nh.clean`); manual GC rarely needed

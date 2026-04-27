@@ -46,14 +46,17 @@ Fonts are automatically installed by home-manager:
 
 ### Apply Configuration
 
-For user `jovyan`:
 ```bash
-nix run home-manager/master -- switch --flake .#jovyan@kt-ubuntu
-```
+# Preferred (nh):
+nh home switch . -c jovyan@kt-ubuntu
+nh home switch . -c ktaga@kt-ubuntu
 
-For user `ktaga`:
-```bash
+# Raw fallback (e.g. before nh is installed):
+nix run home-manager/master -- switch --flake .#jovyan@kt-ubuntu
 nix run home-manager/master -- switch --flake .#ktaga@kt-ubuntu
+
+# Bootstrap (fresh host, no nh yet):
+nix run nixpkgs#nh -- home switch . -c ktaga@kt-ubuntu
 ```
 
 After first install, update font cache:
@@ -73,7 +76,7 @@ nix flake update
 - **Starship**: Custom prompt with Ubuntu logo (󰕈) and icons
 - **Editor**: Neovim (nixvim configuration)
 - **Git**: Pre-configured with common aliases
-- **Color Scheme**: Nord theme via nix-colors
+- **Color Scheme**: Shonan theme via Stylix
 - **Development Tools**: Python, uv, Nix tools
 - **Fonts**: Nerd Fonts (FiraCode, JetBrainsMono, Meslo), Noto CJK, Emoji
 

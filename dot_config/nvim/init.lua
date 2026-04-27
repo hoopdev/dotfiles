@@ -126,101 +126,7 @@ require("lazy").setup({
     },
   },
 
-  -- Fuzzy finder
-  {
-    "nvim-telescope/telescope.nvim",
-    keys = {
-      { "<leader>ff", "<cmd>Telescope find_files<cr>", desc = "Find files" },
-      { "<leader>fg", "<cmd>Telescope live_grep<cr>", desc = "Live grep" },
-      { "<leader>fb", "<cmd>Telescope buffers<cr>", desc = "Buffers" },
-      { "<leader>fh", "<cmd>Telescope help_tags<cr>", desc = "Help tags" },
-      { "<leader>fr", "<cmd>Telescope oldfiles<cr>", desc = "Recent files" },
-      { "<leader>fc", "<cmd>Telescope commands<cr>", desc = "Commands" },
-      { "<leader>fk", "<cmd>Telescope keymaps<cr>", desc = "Keymaps" },
-      { "<leader>fs", "<cmd>Telescope current_buffer_fuzzy_find<cr>", desc = "Search in buffer" },
-      { "<leader>gc", "<cmd>Telescope git_commits<cr>", desc = "Git commits" },
-      { "<leader>gb", "<cmd>Telescope git_branches<cr>", desc = "Git branches" },
-      { "<leader>gs", "<cmd>Telescope git_status<cr>", desc = "Git status" },
-    },
-    dependencies = { "nvim-lua/plenary.nvim" },
-    config = function()
-      local telescope = require('telescope')
-      local actions = require('telescope.actions')
-
-      telescope.setup({
-        defaults = {
-          prompt_prefix = "🔍 ",
-          selection_caret = " ",
-          entry_prefix = "  ",
-          initial_mode = "insert",
-          selection_strategy = "reset",
-          sorting_strategy = "descending",
-          layout_strategy = "horizontal",
-          layout_config = {
-            horizontal = {
-              mirror = false,
-            },
-            vertical = {
-              mirror = false,
-            },
-          },
-          file_ignore_patterns = { "node_modules", ".git/", "%.lock" },
-          winblend = 0,
-          borderchars = { "─", "│", "─", "│", "╭", "╮", "╯", "╰" },
-          color_devicons = true,
-          use_less = true,
-          path_display = { "truncate" },
-          set_env = { ["COLORTERM"] = "truecolor" },
-          mappings = {
-            i = {
-              ["<C-j>"] = actions.move_selection_next,
-              ["<C-k>"] = actions.move_selection_previous,
-              ["<C-n>"] = actions.cycle_history_next,
-              ["<C-p>"] = actions.cycle_history_prev,
-              ["<C-c>"] = actions.close,
-              ["<Down>"] = actions.move_selection_next,
-              ["<Up>"] = actions.move_selection_previous,
-              ["<CR>"] = actions.select_default,
-              ["<C-x>"] = actions.select_horizontal,
-              ["<C-v>"] = actions.select_vertical,
-              ["<C-t>"] = actions.select_tab,
-              ["<C-u>"] = actions.preview_scrolling_up,
-              ["<C-d>"] = actions.preview_scrolling_down,
-            },
-            n = {
-              ["<esc>"] = actions.close,
-              ["<CR>"] = actions.select_default,
-              ["<C-x>"] = actions.select_horizontal,
-              ["<C-v>"] = actions.select_vertical,
-              ["<C-t>"] = actions.select_tab,
-              ["j"] = actions.move_selection_next,
-              ["k"] = actions.move_selection_previous,
-              ["H"] = actions.move_to_top,
-              ["M"] = actions.move_to_middle,
-              ["L"] = actions.move_to_bottom,
-              ["<C-u>"] = actions.preview_scrolling_up,
-              ["<C-d>"] = actions.preview_scrolling_down,
-            },
-          },
-        },
-        pickers = {
-          find_files = {
-            theme = "dropdown",
-            previewer = false,
-          },
-          live_grep = {
-            theme = "ivy",
-          },
-          buffers = {
-            theme = "dropdown",
-            previewer = false,
-            initial_mode = "normal",
-          },
-        },
-        extensions = {},
-      })
-    end,
-  },
+  -- Fuzzy finder is provided by snacks.picker (see snacks.nvim block below)
 
   -- Status line (theme managed by Stylix)
   {
@@ -270,85 +176,89 @@ require("lazy").setup({
     end,
   },
 
-  -- Completion
+  -- Completion (blink.cmp — Rust-backed, replaces nvim-cmp + cmp-* sources)
   {
-    "hrsh7th/nvim-cmp",
+    "saghen/blink.cmp",
+    version = "*",
     event = "InsertEnter",
-    dependencies = {
-      "hrsh7th/cmp-nvim-lsp",
-      "hrsh7th/cmp-buffer",
-      "hrsh7th/cmp-path",
+    dependencies = { "rafamadriz/friendly-snippets" },
+    opts = {
+      keymap = {
+        preset = "none",
+        ["<C-Space>"] = { "show", "show_documentation", "hide_documentation" },
+        ["<C-e>"] = { "hide", "fallback" },
+        ["<CR>"] = { "accept", "fallback" },
+        ["<Tab>"] = { "select_next", "fallback" },
+        ["<S-Tab>"] = { "select_prev", "fallback" },
+        ["<C-b>"] = { "scroll_documentation_up", "fallback" },
+        ["<C-f>"] = { "scroll_documentation_down", "fallback" },
+      },
+      appearance = { nerd_font_variant = "mono" },
+      completion = {
+        menu = { border = "single" },
+        documentation = {
+          auto_show = true,
+          window = { border = "single" },
+        },
+      },
+      sources = {
+        default = { "lazydev", "lsp", "path", "snippets", "buffer" },
+        providers = {
+          lazydev = {
+            name = "LazyDev",
+            module = "lazydev.integrations.blink",
+            score_offset = 100,
+          },
+        },
+      },
+      signature = { enabled = true },
     },
-    config = function()
-      local cmp = require("cmp")
-      cmp.setup({
-        window = {
-          completion = cmp.config.window.bordered(),
-          documentation = cmp.config.window.bordered(),
-        },
-        mapping = cmp.mapping.preset.insert({
-          ['<C-b>'] = cmp.mapping.scroll_docs(-4),
-          ['<C-f>'] = cmp.mapping.scroll_docs(4),
-          ['<C-Space>'] = cmp.mapping.complete(),
-          ['<C-e>'] = cmp.mapping.abort(),
-          ['<CR>'] = cmp.mapping.confirm({ select = true }),
-          ['<Tab>'] = cmp.mapping(function(fallback)
-            if cmp.visible() then
-              cmp.select_next_item()
-            else
-              fallback()
-            end
-          end, { 'i', 's' }),
-          ['<S-Tab>'] = cmp.mapping(function(fallback)
-            if cmp.visible() then
-              cmp.select_prev_item()
-            else
-              fallback()
-            end
-          end, { 'i', 's' }),
-        }),
-        sources = cmp.config.sources({
-          { name = 'nvim_lsp' },
-          { name = 'copilot' },
-        }, {
-          { name = 'buffer' },
-          { name = 'path' },
-        }),
-        formatting = {
-          format = function(entry, vim_item)
-            vim_item.menu = ({
-              nvim_lsp = "[LSP]",
-              copilot = "[Copilot]",
-              buffer = "[Buffer]",
-              path = "[Path]",
-            })[entry.source.name]
-            return vim_item
-          end,
-        },
-      })
-    end,
+  },
+
+  -- Lua LSP enrichment for Neovim config (replaces lua_ls workspace.library hack)
+  {
+    "folke/lazydev.nvim",
+    ft = "lua",
+    opts = {
+      library = {
+        { path = "${3rd}/luv/library", words = { "vim%.uv" } },
+      },
+    },
   },
 
   -- LSP with proper highlighting
   {
     "neovim/nvim-lspconfig",
     event = { "BufReadPost", "BufNewFile" },
-    dependencies = { "hrsh7th/cmp-nvim-lsp" },
+    dependencies = { "saghen/blink.cmp" },
     config = function()
-      local lspconfig = require('lspconfig')
-      local capabilities = require('cmp_nvim_lsp').default_capabilities()
+      local capabilities = require('blink.cmp').get_lsp_capabilities()
 
-      -- Configure LSP servers
+      -- Configure LSP servers (Neovim 0.11+ API)
       local servers = {
-        pyright = {},
+        pyright = {
+          settings = {
+            pyright = {
+              -- Use Ruff for organizing imports
+              disableOrganizeImports = true,
+            },
+            python = {
+              analysis = {
+                -- Use Ruff for linting; pyright handles type checking only
+                ignore = { '*' },
+              },
+            },
+          },
+        },
+        ruff = {},
         ts_ls = {},
         rust_analyzer = {},
         gopls = {},
         lua_ls = {
           settings = {
             Lua = {
-              diagnostics = { globals = { 'vim' } },
-              workspace = { checkThirdParty = false },
+              runtime = { version = 'LuaJIT' },
+              -- workspace.library handled by lazydev.nvim
               telemetry = { enable = false },
             },
           },
@@ -357,7 +267,8 @@ require("lazy").setup({
 
       for server, opts in pairs(servers) do
         opts.capabilities = capabilities
-        vim.lsp.config[server] = opts
+        vim.lsp.config(server, opts)
+        vim.lsp.enable(server)
       end
 
       -- LSP keymaps
@@ -373,29 +284,47 @@ require("lazy").setup({
           vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, opts)
           vim.keymap.set({ 'n', 'v' }, '<leader>ca', vim.lsp.buf.code_action, opts)
           vim.keymap.set('n', 'gr', vim.lsp.buf.references, opts)
+          vim.keymap.set({ 'n', 'v' }, '<leader>cf', function()
+            vim.lsp.buf.format({ async = false })
+          end, opts)
+        end,
+      })
+
+      -- For Python: pyright handles hover/completion, ruff handles linting/formatting
+      vim.api.nvim_create_autocmd('LspAttach', {
+        group = vim.api.nvim_create_augroup('UserLspPython', {}),
+        callback = function(args)
+          local client = vim.lsp.get_client_by_id(args.data.client_id)
+          if client and client.name == 'ruff' then
+            -- Disable hover from Ruff in favor of Pyright
+            client.server_capabilities.hoverProvider = false
+          end
         end,
       })
     end,
   },
 
-  -- GitHub Copilot
+  -- GitHub Copilot (inline ghost-text suggestions)
   {
     "zbirenbaum/copilot.lua",
     event = "InsertEnter",
     config = function()
       require("copilot").setup({
-        suggestion = { enabled = false },
+        suggestion = {
+          enabled = true,
+          auto_trigger = true,
+          hide_during_completion = true,
+          keymap = {
+            accept = "<M-l>",
+            accept_word = "<M-w>",
+            accept_line = "<M-j>",
+            next = "<M-]>",
+            prev = "<M-[>",
+            dismiss = "<C-]>",
+          },
+        },
         panel = { enabled = false },
       })
-    end,
-  },
-
-  {
-    "zbirenbaum/copilot-cmp",
-    event = "InsertEnter",
-    dependencies = { "copilot.lua", "nvim-cmp" },
-    config = function()
-      require("copilot_cmp").setup()
     end,
   },
 
@@ -438,19 +367,13 @@ require("lazy").setup({
     },
   },
 
-  -- Editor enhancements
-  {
-    "numToStr/Comment.nvim",
-    event = "VeryLazy",
-    config = true,
-  },
-
+  -- Editor enhancements (gc/gcc commenting is built-in since Neovim 0.10)
   {
     "windwp/nvim-autopairs",
     event = "InsertEnter",
     opts = {
       check_ts = true,
-      disable_filetype = { "TelescopePrompt", "vim" },
+      disable_filetype = { "vim" },
       fast_wrap = {
         map = '<M-e>',
         chars = { '{', '[', '(', '"', "'" },
@@ -517,12 +440,12 @@ require("lazy").setup({
           { section = "header" },
           { section = "keys", gap = 1, padding = 1 },
           { icon = " ", title = "Obsidian", padding = 1 },
-          { icon = " ", key = "O", desc = "Open in Obsidian", action = ":ObsidianOpen", indent = 2 },
-          { icon = " ", key = "N", desc = "New Note", action = ":ObsidianNew", indent = 2 },
-          { icon = " ", key = "S", desc = "Search Notes", action = ":ObsidianSearch", indent = 2 },
-          { icon = " ", key = "T", desc = "Today's Note", action = ":ObsidianToday", indent = 2 },
-          { icon = " ", key = "D", desc = "Daily Notes", action = ":ObsidianDailies", indent = 2 },
-          { icon = " ", key = "W", desc = "Switch Workspace", action = ":ObsidianWorkspace", indent = 2, padding = 1 },
+          { icon = " ", key = "O", desc = "Open in Obsidian", action = ":Obsidian open", indent = 2 },
+          { icon = " ", key = "N", desc = "New Note", action = ":Obsidian new", indent = 2 },
+          { icon = " ", key = "S", desc = "Search Notes", action = ":Obsidian search", indent = 2 },
+          { icon = " ", key = "T", desc = "Today's Note", action = ":Obsidian today", indent = 2 },
+          { icon = " ", key = "D", desc = "Daily Notes", action = ":Obsidian dailies", indent = 2 },
+          { icon = " ", key = "W", desc = "Switch Workspace", action = ":Obsidian workspace", indent = 2, padding = 1 },
           { icon = " ", title = "Recent Files", section = "recent_files", cwd = true, limit = 5, indent = 2, padding = 1 },
           { section = "startup" },
         },
@@ -560,16 +483,18 @@ require("lazy").setup({
       { "<leader>ba", function() Snacks.bufdelete.all() end, desc = "Delete All Buffers" },
       { "<leader>N", function() Snacks.notifier.show_history() end, desc = "Notification History" },
       { "<leader>un", function() Snacks.notifier.hide() end, desc = "Dismiss All Notifications" },
-      { "<leader>ps", function() Snacks.picker.smart() end, desc = "Smart Picker" },
-      { "<leader>pf", function() Snacks.picker.files() end, desc = "Find Files" },
-      { "<leader>pg", function() Snacks.picker.grep() end, desc = "Grep" },
-      { "<leader>pb", function() Snacks.picker.buffers() end, desc = "Buffers" },
-      { "<leader>ph", function() Snacks.picker.help() end, desc = "Help" },
-      { "<leader>pr", function() Snacks.picker.recent() end, desc = "Recent Files" },
-      { "<leader>pc", function() Snacks.picker.commands() end, desc = "Commands" },
-      { "<leader>pk", function() Snacks.picker.keymaps() end, desc = "Keymaps" },
-      { "<leader>pgs", function() Snacks.picker.git_status() end, desc = "Git Status" },
-      { "<leader>pgc", function() Snacks.picker.git_log() end, desc = "Git Commits" },
+      -- Picker (find prefix — replaces telescope keymaps)
+      { "<leader>ff", function() Snacks.picker.files() end, desc = "Find Files" },
+      { "<leader>fg", function() Snacks.picker.grep() end, desc = "Live Grep" },
+      { "<leader>fb", function() Snacks.picker.buffers() end, desc = "Buffers" },
+      { "<leader>fh", function() Snacks.picker.help() end, desc = "Help Tags" },
+      { "<leader>fr", function() Snacks.picker.recent() end, desc = "Recent Files" },
+      { "<leader>fc", function() Snacks.picker.commands() end, desc = "Commands" },
+      { "<leader>fk", function() Snacks.picker.keymaps() end, desc = "Keymaps" },
+      { "<leader>fs", function() Snacks.picker.lines() end, desc = "Search in Buffer" },
+      { "<leader>fS", function() Snacks.picker.smart() end, desc = "Smart Picker" },
+      { "<leader>gc", function() Snacks.picker.git_log() end, desc = "Git Commits" },
+      { "<leader>gs", function() Snacks.picker.git_status() end, desc = "Git Status" },
       { "<leader>se", function() Snacks.explorer() end, desc = "Toggle Explorer" },
     },
     config = function(_, opts)
@@ -730,34 +655,21 @@ require("lazy").setup({
     config = true,
   },
 
-  -- Obsidian.nvim for note-taking
+  -- Obsidian.nvim for note-taking (active fork — epwalsh/obsidian.nvim is archived)
   {
-    "epwalsh/obsidian.nvim",
+    "obsidian-nvim/obsidian.nvim",
     version = "*",
     lazy = true,
     ft = "markdown",
-    cmd = {
-      "ObsidianOpen",
-      "ObsidianNew",
-      "ObsidianSearch",
-      "ObsidianQuickSwitch",
-      "ObsidianToday",
-      "ObsidianYesterday",
-      "ObsidianTomorrow",
-      "ObsidianDailies",
-      "ObsidianWorkspace",
-      "ObsidianBacklinks",
-      "ObsidianLinks",
-      "ObsidianPasteImg",
-      "ObsidianRename",
-    },
+    cmd = { "Obsidian" },
     dependencies = {
       "nvim-lua/plenary.nvim",
     },
     opts = function()
       -- Use vaults from Nix configuration (vim.g.obsidian_vaults)
       local vaults = vim.g.obsidian_vaults or {
-        { name = "Main", path = vim.fn.expand("~/Obsidian/Main") }
+        { name = "Private", path = vim.fn.expand("~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Private") },
+        { name = "Work", path = vim.fn.expand("~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Work") },
       }
 
       -- Convert to obsidian.nvim format
@@ -783,9 +695,10 @@ require("lazy").setup({
           template = nil,
         },
 
-        -- Completion
+        -- Completion (use blink.cmp instead of nvim-cmp)
         completion = {
-          nvim_cmp = true,
+          nvim_cmp = false,
+          blink = true,
           min_chars = 2,
         },
 
@@ -846,10 +759,10 @@ require("lazy").setup({
           },
         },
 
-        -- Picker for link suggestions
+        -- Picker for link suggestions (uses snacks.picker)
         picker = {
-          name = "telescope.nvim",
-          mappings = {
+          name = "snacks.pick",
+          note_mappings = {
             new = "<C-x>",
             insert_link = "<C-l>",
           },
@@ -857,19 +770,19 @@ require("lazy").setup({
       }
     end,
     keys = {
-      { "<leader>on", "<cmd>ObsidianNew<cr>", desc = "New Obsidian note" },
-      { "<leader>oo", "<cmd>ObsidianOpen<cr>", desc = "Open in Obsidian" },
-      { "<leader>os", "<cmd>ObsidianSearch<cr>", desc = "Search Obsidian notes" },
-      { "<leader>oq", "<cmd>ObsidianQuickSwitch<cr>", desc = "Quick switch note" },
-      { "<leader>ob", "<cmd>ObsidianBacklinks<cr>", desc = "Show backlinks" },
-      { "<leader>ol", "<cmd>ObsidianLinks<cr>", desc = "Show links" },
-      { "<leader>ot", "<cmd>ObsidianToday<cr>", desc = "Today's daily note" },
-      { "<leader>oy", "<cmd>ObsidianYesterday<cr>", desc = "Yesterday's daily note" },
-      { "<leader>om", "<cmd>ObsidianTomorrow<cr>", desc = "Tomorrow's daily note" },
-      { "<leader>od", "<cmd>ObsidianDailies<cr>", desc = "List daily notes" },
-      { "<leader>ow", "<cmd>ObsidianWorkspace<cr>", desc = "Switch workspace" },
-      { "<leader>op", "<cmd>ObsidianPasteImg<cr>", desc = "Paste image" },
-      { "<leader>or", "<cmd>ObsidianRename<cr>", desc = "Rename note" },
+      { "<leader>on", "<cmd>Obsidian new<cr>", desc = "New Obsidian note" },
+      { "<leader>oo", "<cmd>Obsidian open<cr>", desc = "Open in Obsidian" },
+      { "<leader>os", "<cmd>Obsidian search<cr>", desc = "Search Obsidian notes" },
+      { "<leader>oq", "<cmd>Obsidian quick_switch<cr>", desc = "Quick switch note" },
+      { "<leader>ob", "<cmd>Obsidian backlinks<cr>", desc = "Show backlinks" },
+      { "<leader>ol", "<cmd>Obsidian links<cr>", desc = "Show links" },
+      { "<leader>ot", "<cmd>Obsidian today<cr>", desc = "Today's daily note" },
+      { "<leader>oy", "<cmd>Obsidian yesterday<cr>", desc = "Yesterday's daily note" },
+      { "<leader>om", "<cmd>Obsidian tomorrow<cr>", desc = "Tomorrow's daily note" },
+      { "<leader>od", "<cmd>Obsidian dailies<cr>", desc = "List daily notes" },
+      { "<leader>ow", "<cmd>Obsidian workspace<cr>", desc = "Switch workspace" },
+      { "<leader>op", "<cmd>Obsidian paste_img<cr>", desc = "Paste image" },
+      { "<leader>or", "<cmd>Obsidian rename<cr>", desc = "Rename note" },
     },
   },
 
