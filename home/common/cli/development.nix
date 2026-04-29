@@ -7,7 +7,8 @@
 
     # JavaScript/TypeScript development
     nodejs
-    deno
+    # deno  # temporarily disabled: deno-2.7.13 / rusty-v8-147.2.1 not yet in
+    # cache.nixos.org and local V8 build OOMs on 7.5GB RAM. Re-enable once cached.
 
     # Container development
     docker

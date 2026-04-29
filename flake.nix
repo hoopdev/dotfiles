@@ -67,6 +67,16 @@
             extraSpecialArgs = {
               inherit username inputs;
             };
+            # Silence home-manager 26.05 default-change warning while
+            # stateVersion remains 24.05. Drop when stateVersion is bumped.
+            sharedModules = [
+              (
+                { config, lib, ... }:
+                {
+                  gtk.gtk4.theme = lib.mkDefault config.gtk.theme;
+                }
+              )
+            ];
           };
           networking.hostName = hostname;
           users.users.${username}.home = if isNixOS then "/home/${username}" else "/Users/${username}";
@@ -179,38 +189,51 @@
       };
 
       # Standalone home-manager configurations (for non-NixOS systems)
-      homeConfigurations = {
-        "ktaga@kt-ubuntu" = home-manager.lib.homeManagerConfiguration {
-          pkgs = import nixpkgs {
-            system = "x86_64-linux";
-            config.allowUnfree = true;
+      homeConfigurations =
+        let
+          # Silence home-manager 26.05 default-change warning while
+          # stateVersion remains 24.05. Drop when stateVersion is bumped.
+          gtk4ThemeSilencer = (
+            { config, lib, ... }:
+            {
+              gtk.gtk4.theme = lib.mkDefault config.gtk.theme;
+            }
+          );
+        in
+        {
+          "ktaga@kt-ubuntu" = home-manager.lib.homeManagerConfiguration {
+            pkgs = import nixpkgs {
+              system = "x86_64-linux";
+              config.allowUnfree = true;
+            };
+            modules = [
+              stylix.homeModules.stylix
+              ./lib/stylix.nix
+              ./hosts/kt-ubuntu/home.nix
+              gtk4ThemeSilencer
+            ];
+            extraSpecialArgs = {
+              username = "ktaga";
+              inherit inputs;
+            };
           };
-          modules = [
-            stylix.homeModules.stylix
-            ./lib/stylix.nix
-            ./hosts/kt-ubuntu/home.nix
-          ];
-          extraSpecialArgs = {
-            username = "ktaga";
-            inherit inputs;
+          "jovyan@kt-ubuntu" = home-manager.lib.homeManagerConfiguration {
+            pkgs = import nixpkgs {
+              system = "x86_64-linux";
+              config.allowUnfree = true;
+            };
+            modules = [
+              stylix.homeModules.stylix
+              ./lib/stylix.nix
+              ./hosts/kt-ubuntu/home.nix
+              gtk4ThemeSilencer
+            ];
+            extraSpecialArgs = {
+              username = "jovyan";
+              inherit inputs;
+            };
           };
         };
-        "jovyan@kt-ubuntu" = home-manager.lib.homeManagerConfiguration {
-          pkgs = import nixpkgs {
-            system = "x86_64-linux";
-            config.allowUnfree = true;
-          };
-          modules = [
-            stylix.homeModules.stylix
-            ./lib/stylix.nix
-            ./hosts/kt-ubuntu/home.nix
-          ];
-          extraSpecialArgs = {
-            username = "jovyan";
-            inherit inputs;
-          };
-        };
-      };
 
       # Development shells
       devShells = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-darwin" ] (

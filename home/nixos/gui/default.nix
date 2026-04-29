@@ -2,6 +2,7 @@
 {
   imports = [
     ./browser.nix
+    ./fcitx5.nix
     ./hyprland.nix
     ./hyprlock.nix
     ./hypridle.nix
