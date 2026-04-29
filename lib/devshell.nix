@@ -18,11 +18,11 @@ let
     stdenv.cc.cc
     stdenv.cc.cc.lib
     libGL
-    xorg.libX11
-    xorg.libXext
-    xorg.libXrender
-    xorg.libICE
-    xorg.libSM
+    libx11
+    libxext
+    libxrender
+    libice
+    libsm
   ];
 
   darwinLibraries = with pkgs; [

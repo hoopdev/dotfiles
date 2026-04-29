@@ -34,14 +34,14 @@
       fontconfig
       expat
       libGL
-      xorg.libX11
-      xorg.libXext
-      xorg.libXrender
-      xorg.libICE
-      xorg.libSM
-      xorg.libXcursor
-      xorg.libXrandr
-      xorg.libXi
+      libx11
+      libxext
+      libxrender
+      libice
+      libsm
+      libxcursor
+      libxrandr
+      libxi
 
       # Misc
       libxkbcommon

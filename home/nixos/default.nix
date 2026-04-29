@@ -12,6 +12,7 @@
     userDirs = {
       enable = true;
       createDirectories = true;
+      setSessionVariables = true;
       extraConfig = {
         desktop = "$HOME/Desktop";
         download = "$HOME/Downloads";
