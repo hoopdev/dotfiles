@@ -14,7 +14,7 @@
 
 {
   imports = [
-    ../../lib/nixos-common.nix
+    inputs.self.nixosModules.default
     (import ../../lib/wsl-common.nix {
       inherit lib pkgs inputs;
       enableDockerGroup = true;

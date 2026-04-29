@@ -1,15 +1,19 @@
 { inputs, helpers, ... }:
 let
-  inherit (helpers) defaultUsername nixpkgsConfig mkHomeConfiguration;
+  inherit (inputs.nixpkgs) lib;
+  inherit (helpers)
+    defaultUsername
+    nixpkgsConfig
+    mkHomeConfiguration
+    hosts
+    ;
+
+  nixosHosts = lib.filterAttrs (_: meta: meta.type == "nixos") hosts;
 
   mkNixosConfiguration =
-    {
-      hostname,
-      system,
-      username ? defaultUsername,
-    }:
+    hostname: meta:
     inputs.nixpkgs.lib.nixosSystem {
-      inherit system;
+      inherit (meta) system;
       modules = [
         { nixpkgs.config = nixpkgsConfig; }
         ../hosts/${hostname}/configuration.nix
@@ -17,7 +21,8 @@ let
         (import ../lib/stylix.nix { })
         inputs.home-manager.nixosModules.home-manager
         (mkHomeConfiguration {
-          inherit username hostname;
+          username = defaultUsername;
+          inherit hostname;
           hostPath = ../hosts/${hostname}/home.nix;
           isNixOS = true;
         })
@@ -29,18 +34,5 @@ let
     };
 in
 {
-  flake.nixosConfigurations = {
-    kt-proxmox = mkNixosConfiguration {
-      hostname = "kt-proxmox";
-      system = "x86_64-linux";
-    };
-    kt-thinkpad = mkNixosConfiguration {
-      hostname = "kt-thinkpad";
-      system = "x86_64-linux";
-    };
-    kt-wsl = mkNixosConfiguration {
-      hostname = "kt-wsl";
-      system = "x86_64-linux";
-    };
-  };
+  flake.nixosConfigurations = lib.mapAttrs mkNixosConfiguration nixosHosts;
 }

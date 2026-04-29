@@ -128,47 +128,59 @@ A unified development environment is available via `nix develop`.
 | Command | Description |
 |---------|-------------|
 | `nix flake update` | Update all flake inputs |
-| `nix flake check` | Check flake for errors |
+| `nix flake check` | Check flake for errors (incl. format drift) |
 | `nix flake show` | Show flake outputs |
+| `nix fmt` | Format all `.nix` files (nixfmt + statix + deadnix) |
 | `nh clean all --keep 5 --keep-since 7d` | Garbage collection (user + system) |
 | `nh clean user --keep 5 --keep-since 7d` | Garbage collection (user-only) |
 
-### CI/CD
+### Formatting & Linting
 
-GitHub Actions are configured to automatically:
-- Check flake validity (`nix flake check`)
-- Verify code formatting (`nixfmt`)
+`nix fmt` runs nixfmt + statix + deadnix via [treefmt-nix](https://github.com/numtide/treefmt-nix). `nix flake check` also runs the treefmt drift check, so unformatted code fails CI-style verification.
 
 ## Directory Structure
 
 ```
 .
-├── flake.nix                 # Main Flake configuration
-├── flake.lock               # Lock file (reproducibility)
-├── lib/                     # Shared Nix modules
-│   ├── devshell.nix        # Development shell definition
-│   ├── nixos-common.nix    # Common NixOS settings (nix-ld, 1Password, etc.)
-│   ├── japanese-locale.nix # Japanese locale settings
-│   ├── wsl-common.nix      # WSL-specific settings
-│   ├── users.nix           # User account definitions
-│   ├── stylix.nix          # Stylix theming (home-manager standalone)
-│   ├── stylix-nixos.nix    # Stylix theming (NixOS)
-│   ├── stylix-darwin.nix   # Stylix theming (macOS)
-│   └── shonan.yaml         # Shonan base16 color scheme
-├── home/                    # home-manager configurations
-│   ├── common/             # Cross-platform shared
-│   │   ├── cli/           # CLI: git, neovim, shells
-│   │   └── gui/           # GUI: terminals, apps
-│   ├── mac/               # macOS-specific
-│   └── nixos/             # NixOS-specific
-└── hosts/                  # Host-specific configurations
-    ├── kt-thinkpad/       # ThinkPad (NixOS)
-    ├── kt-proxmox/        # Proxmox VM (NixOS)
-    ├── kt-wsl/            # WSL (NixOS)
-    ├── kt-ubuntu/         # Ubuntu (standalone home-manager)
-    ├── kt-mba/            # MacBook Air
-    └── mac/               # Mac Studio/Mini shared
+├── flake.nix                  # Thin entry point — calls flake-parts.lib.mkFlake
+├── flake.lock                 # Lock file (reproducibility)
+├── flake-modules/             # flake-parts modules (the real flake outputs live here)
+│   ├── shared.nix            # Shared helpers + auto-discovered hosts attrset
+│   ├── modules.nix           # flake.nixosModules.* exports
+│   ├── nixos.nix             # nixosConfigurations (auto-built from hosts/*/meta.nix)
+│   ├── darwin.nix            # darwinConfigurations
+│   ├── home.nix              # homeConfigurations (standalone home-manager)
+│   └── per-system.nix        # devShells, formatter, treefmt
+├── modules/nixos/             # Self-exported NixOS modules
+│   ├── default.nix           # Aggregate (imports the three below)
+│   ├── nix-ld.nix            # nix-ld for unpatched binaries
+│   ├── onepassword.nix       # 1Password CLI + GUI
+│   └── nix-settings.nix      # Nix daemon settings + Hyprland cache
+├── lib/                       # Shared Nix utilities (non-module)
+│   ├── devshell.nix          # Development shell definition
+│   ├── japanese-locale.nix   # Japanese locale settings
+│   ├── wsl-common.nix        # WSL-specific settings
+│   ├── users.nix             # User account definitions
+│   ├── stylix.nix            # Unified Stylix theming (NixOS / darwin / home-manager)
+│   └── shonan.yaml           # Shonan base16 color scheme
+├── home/                      # home-manager configurations
+│   ├── common/               # Cross-platform shared
+│   │   ├── cli/             # CLI: git, neovim, shells
+│   │   └── gui/             # GUI: terminals, apps
+│   ├── mac/                 # macOS-specific
+│   └── nixos/               # NixOS-specific
+└── hosts/                    # Host-specific configurations
+    ├── kt-thinkpad/         # ThinkPad (NixOS) — meta.nix + configuration.nix + home.nix
+    ├── kt-proxmox/          # Proxmox VM (NixOS)
+    ├── kt-wsl/              # WSL (NixOS)
+    ├── kt-ubuntu/           # Ubuntu (standalone home-manager)
+    ├── kt-mba/              # MacBook Air
+    ├── kt-mac-studio/       # Mac Studio (meta.nix only — shares mac/)
+    ├── kt-mac-mini/         # Mac Mini (meta.nix only — shares mac/)
+    └── mac/                 # Shared Mac Studio/Mini config
 ```
+
+Each `hosts/<name>/meta.nix` declares `{ type, system?, users?, configFrom? }`; new hosts are picked up automatically by `flake-modules/shared.nix`.
 
 ## Key Components
 
@@ -187,7 +199,8 @@ GitHub Actions are configured to automatically:
 | hyprpanel | Status panel for Hyprland |
 | xremap | Key remapping (NixOS) |
 | wezterm | Terminal emulator |
-| nix-colors | Color scheme definitions |
+| flake-parts | Modular flake structure |
+| treefmt-nix | Multi-formatter integration (nixfmt + statix + deadnix) |
 
 ### Platform-Specific Features
 
