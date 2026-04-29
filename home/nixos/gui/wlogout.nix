@@ -1,6 +1,5 @@
 # wlogout - Logout menu for Wayland
-{ ... }:
-{
+_: {
   programs.wlogout = {
     enable = true;
     layout = [

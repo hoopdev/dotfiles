@@ -9,8 +9,8 @@ let
   cliPackages = commonCliTools.home.packages;
 
   # Platform detection
-  isLinux = pkgs.stdenv.isLinux;
-  isDarwin = pkgs.stdenv.isDarwin;
+  inherit (pkgs.stdenv) isLinux;
+  inherit (pkgs.stdenv) isDarwin;
 
   # Platform-specific libraries
   linuxLibraries = with pkgs; [
@@ -128,7 +128,7 @@ in
   shells = {
     # Unified default development shell with Python support
     default =
-      { environment, devshell }:
+      { devshell }:
       devshell.mkShell {
         environment = "🚀 Development environment with Python & Nix tools";
         packages =

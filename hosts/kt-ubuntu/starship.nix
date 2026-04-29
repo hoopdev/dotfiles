@@ -1,7 +1,7 @@
 { config, lib, ... }:
 let
   # Stylix colors (base16 palette)
-  colors = config.lib.stylix.colors;
+  inherit (config.lib.stylix) colors;
 in
 {
   programs.starship = {

@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ ... }:
 {
   # Import shared Mac configuration
   imports = [

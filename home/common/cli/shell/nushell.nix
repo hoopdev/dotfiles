@@ -1,5 +1,4 @@
-{ pkgs, ... }:
-{
+_: {
   programs.nushell = {
     enable = true;
     shellAliases = import ./aliases.nix;

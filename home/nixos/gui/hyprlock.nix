@@ -1,7 +1,6 @@
 # Hyprlock - GPU-accelerated lock screen for Hyprland
 # Styling is fully managed by Stylix
-{ ... }:
-{
+_: {
   programs.hyprlock = {
     enable = true;
     settings = {

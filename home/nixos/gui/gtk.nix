@@ -1,4 +1,4 @@
-{ pkgs, lib, ... }:
+_:
 
 {
   # dconf settings for GNOME/GTK applications
