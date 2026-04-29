@@ -9,7 +9,7 @@
     # Include the results of the hardware scan.
     ./hardware-configuration.nix
     inputs.xremap.nixosModules.default
-    ../../lib/nixos-common.nix
+    inputs.self.nixosModules.default
     ../../lib/japanese-locale.nix
   ]
   ++ (with inputs.nixos-hardware.nixosModules; [

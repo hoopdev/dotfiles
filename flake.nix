@@ -47,6 +47,7 @@
       ];
       imports = [
         ./flake-modules/shared.nix
+        ./flake-modules/modules.nix
         ./flake-modules/nixos.nix
         ./flake-modules/darwin.nix
         ./flake-modules/home.nix

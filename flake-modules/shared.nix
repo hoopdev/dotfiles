@@ -2,9 +2,19 @@
 #
 # Sibling modules pick these up by destructuring `helpers` in their function
 # signature, e.g. `{ inputs, helpers, ... }:`.
-{ inputs, ... }:
+{ inputs, lib, ... }:
 let
   defaultUsername = "ktaga";
+
+  # Auto-discover hosts: every directory under hosts/ that contains a meta.nix.
+  # Each meta.nix returns { type, system?, users?, configFrom? } describing how
+  # the host should be wired up.
+  hostsDir = ../hosts;
+  hosts = lib.mapAttrs (name: _: import (hostsDir + "/${name}/meta.nix")) (
+    lib.filterAttrs (
+      name: kind: kind == "directory" && builtins.pathExists (hostsDir + "/${name}/meta.nix")
+    ) (builtins.readDir hostsDir)
+  );
 
   # Shared nixpkgs config — applied via the `nixpkgs.config` module option for
   # NixOS/darwin and passed to `import nixpkgs { config = ...; }` for standalone
@@ -72,6 +82,7 @@ in
       nixpkgsConfig
       gtk4ThemeSilencer
       mkHomeConfiguration
+      hosts
       ;
   };
 }

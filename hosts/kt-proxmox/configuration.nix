@@ -3,6 +3,7 @@
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
 {
+  inputs,
   pkgs,
   ...
 }:
@@ -11,7 +12,7 @@
   imports = [
     # Include the results of the hardware scan.
     ./hardware-configuration.nix
-    ../../lib/nixos-common.nix
+    inputs.self.nixosModules.default
     ../../lib/japanese-locale.nix
   ];
 
@@ -138,7 +139,7 @@
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
   system.stateVersion = "24.05"; # Did you read the comment?
 
-  # Host-specific Nix settings (extends nixos-common.nix)
+  # Host-specific Nix settings (extends modules/nixos/nix-settings.nix)
   nix.settings = {
     trusted-users = [
       "root"
