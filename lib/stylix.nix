@@ -1,21 +1,21 @@
-# Stylix theming configuration
-# This module provides a unified theming system across all platforms
-{ pkgs, ... }:
+# Unified Stylix theming for NixOS, nix-darwin, and home-manager.
+#
+# Pass `darwin = true` from `mkDarwinConfiguration` so the cursor option is
+# omitted (nix-darwin's stylix module doesn't expose `stylix.cursor`). All
+# other contexts (NixOS, standalone home-manager on Linux) leave it default.
+{
+  darwin ? false,
+}:
+{ pkgs, lib, ... }:
 
 {
   stylix = {
     enable = true;
 
-    # Wallpaper image (required by Stylix)
     image = ../wallpaper/wallpaper_enoshima.jpg;
-
-    # Use Shonan color scheme (custom blend of Nord and Tokyo Night)
     base16Scheme = ./shonan.yaml;
-
-    # Dark theme polarity
     polarity = "dark";
 
-    # Font configuration
     fonts = {
       serif = {
         package = pkgs.noto-fonts-cjk-serif;
@@ -41,19 +41,18 @@
       };
     };
 
-    # Cursor configuration
-    cursor = {
-      package = pkgs.nordzy-cursor-theme;
-      name = "Nordzy-cursors";
-      size = 24;
-    };
-
-    # Opacity settings
     opacity = {
       terminal = 0.95;
       desktop = 1.0;
       popups = 0.95;
       applications = 1.0;
+    };
+  }
+  // lib.optionalAttrs (!darwin) {
+    cursor = {
+      package = pkgs.nordzy-cursor-theme;
+      name = "Nordzy-cursors";
+      size = 24;
     };
   };
 }

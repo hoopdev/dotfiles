@@ -7,7 +7,6 @@
 
 {
   inputs,
-  config,
   lib,
   pkgs,
   ...

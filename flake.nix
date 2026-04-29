@@ -3,6 +3,14 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    flake-parts = {
+      url = "github:hercules-ci/flake-parts";
+      inputs.nixpkgs-lib.follows = "nixpkgs";
+    };
+    treefmt-nix = {
+      url = "github:numtide/treefmt-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     nix-darwin = {
       url = "github:LnL7/nix-darwin";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -12,7 +20,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixos-hardware.url = "github:NixOS/nixos-hardware";
-    nix-colors.url = "github:misterio77/nix-colors";
     stylix = {
       url = "github:nix-community/stylix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -32,228 +39,18 @@
   };
 
   outputs =
-    inputs@{
-      self,
-      nixpkgs,
-      nix-darwin,
-      home-manager,
-      nixos-wsl,
-      nixos-hardware,
-      wezterm,
-      nixvim,
-      hyprland,
-      xremap,
-      hyprpanel,
-      stylix,
-      ...
-    }:
-    let
-      # Default username for all configurations
-      defaultUsername = "ktaga";
-
-      mkHomeConfiguration =
-        {
-          username ? defaultUsername,
-          hostname,
-          hostPath,
-          isNixOS ? false,
-        }:
-        {
-          home-manager = {
-            useGlobalPkgs = true;
-            useUserPackages = true;
-            users.${username} = import hostPath;
-            backupFileExtension = "backup";
-            extraSpecialArgs = {
-              inherit username inputs;
-            };
-            # Silence home-manager 26.05 default-change warning while
-            # stateVersion remains 24.05. Drop when stateVersion is bumped.
-            sharedModules = [
-              (
-                { config, lib, ... }:
-                {
-                  gtk.gtk4.theme = lib.mkDefault config.gtk.theme;
-                }
-              )
-            ];
-          };
-          networking.hostName = hostname;
-          users.users.${username}.home = if isNixOS then "/home/${username}" else "/Users/${username}";
-
-          # Automatic garbage collection settings
-          nix = {
-            gc = {
-              automatic = true;
-              options = "--delete-older-than 7d";
-            }
-            // (
-              if isNixOS then
-                {
-                  dates = "weekly";
-                  persistent = true;
-                }
-              else
-                { }
-            );
-            settings = {
-              max-free = 10737418240; # 10GB
-              min-free = 536870912; # 512MB
-            };
-          };
-        };
-
-      # Common specialArgs
-      commonArgs = {
-        inherit (nixpkgs) lib;
-        inherit inputs;
-      };
-
-      # Function for NixOS configuration
-      mkNixosConfiguration =
-        {
-          hostname,
-          username ? defaultUsername,
-          system,
-        }:
-        nixpkgs.lib.nixosSystem {
-          inherit system;
-          modules = [
-            ./hosts/${hostname}/configuration.nix
-            stylix.nixosModules.stylix
-            ./lib/stylix-nixos.nix
-            home-manager.nixosModules.home-manager
-            (mkHomeConfiguration {
-              inherit username hostname;
-              hostPath = ./hosts/${hostname}/home.nix;
-              isNixOS = true;
-            })
-          ];
-          specialArgs = commonArgs;
-        };
-
-      # Function for macOS configuration
-      mkDarwinConfiguration =
-        {
-          hostname,
-          username ? defaultUsername,
-          configPath ? ./hosts/mac/configuration.nix,
-          homePath ? ./hosts/mac/home.nix,
-        }:
-        nix-darwin.lib.darwinSystem {
-          system = "aarch64-darwin";
-          modules = [
-            configPath
-            stylix.darwinModules.stylix
-            ./lib/stylix-darwin.nix
-            home-manager.darwinModules.home-manager
-            (mkHomeConfiguration {
-              inherit username hostname;
-              hostPath = homePath;
-            })
-          ];
-          specialArgs = commonArgs;
-        };
-
-    in
-    {
-      # Build nixos using flake
-      nixosConfigurations = {
-        kt-proxmox = mkNixosConfiguration {
-          hostname = "kt-proxmox";
-          system = "x86_64-linux";
-        };
-        kt-thinkpad = mkNixosConfiguration {
-          hostname = "kt-thinkpad";
-          system = "x86_64-linux";
-        };
-        kt-wsl = mkNixosConfiguration {
-          hostname = "kt-wsl";
-          system = "x86_64-linux";
-        };
-      };
-
-      # Build darwin using flake
-      darwinConfigurations = {
-        kt-mac-studio = mkDarwinConfiguration {
-          hostname = "kt-mac-studio";
-        };
-        kt-mac-mini = mkDarwinConfiguration {
-          hostname = "kt-mac-mini";
-        };
-        kt-mba = mkDarwinConfiguration {
-          hostname = "kt-mba";
-          configPath = ./hosts/kt-mba/configuration.nix;
-          homePath = ./hosts/kt-mba/home.nix;
-        };
-      };
-
-      # Standalone home-manager configurations (for non-NixOS systems)
-      homeConfigurations =
-        let
-          # Silence home-manager 26.05 default-change warning while
-          # stateVersion remains 24.05. Drop when stateVersion is bumped.
-          gtk4ThemeSilencer = (
-            { config, lib, ... }:
-            {
-              gtk.gtk4.theme = lib.mkDefault config.gtk.theme;
-            }
-          );
-        in
-        {
-          "ktaga@kt-ubuntu" = home-manager.lib.homeManagerConfiguration {
-            pkgs = import nixpkgs {
-              system = "x86_64-linux";
-              config.allowUnfree = true;
-            };
-            modules = [
-              stylix.homeModules.stylix
-              ./lib/stylix.nix
-              ./hosts/kt-ubuntu/home.nix
-              gtk4ThemeSilencer
-            ];
-            extraSpecialArgs = {
-              username = "ktaga";
-              inherit inputs;
-            };
-          };
-          "jovyan@kt-ubuntu" = home-manager.lib.homeManagerConfiguration {
-            pkgs = import nixpkgs {
-              system = "x86_64-linux";
-              config.allowUnfree = true;
-            };
-            modules = [
-              stylix.homeModules.stylix
-              ./lib/stylix.nix
-              ./hosts/kt-ubuntu/home.nix
-              gtk4ThemeSilencer
-            ];
-            extraSpecialArgs = {
-              username = "jovyan";
-              inherit inputs;
-            };
-          };
-        };
-
-      # Development shells
-      devShells = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-darwin" ] (
-        system:
-        let
-          pkgs = import nixpkgs {
-            inherit system;
-            config.allowUnfree = true;
-          };
-          devshell = import ./lib/devshell.nix {
-            inherit pkgs;
-            lib = nixpkgs.lib;
-          };
-        in
-        {
-          default = devshell.shells.default {
-            inherit devshell;
-            environment = system;
-          };
-        }
-      );
+    inputs:
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+      systems = [
+        "x86_64-linux"
+        "aarch64-darwin"
+      ];
+      imports = [
+        ./flake-modules/shared.nix
+        ./flake-modules/nixos.nix
+        ./flake-modules/darwin.nix
+        ./flake-modules/home.nix
+        ./flake-modules/per-system.nix
+      ];
     };
 }

@@ -1,5 +1,4 @@
 {
-  lib,
   pkgs,
   username,
   inputs,
@@ -23,9 +22,9 @@
       noto-fonts-cjk-sans
       noto-fonts-color-emoji
       # Nerd Fonts for Starship icons and Ubuntu logo
-      (nerd-fonts.fira-code)
-      (nerd-fonts.jetbrains-mono)
-      (nerd-fonts.meslo-lg)
+      nerd-fonts.fira-code
+      nerd-fonts.jetbrains-mono
+      nerd-fonts.meslo-lg
     ];
   };
 

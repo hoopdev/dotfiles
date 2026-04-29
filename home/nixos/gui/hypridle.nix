@@ -1,6 +1,5 @@
 # Hypridle - Idle daemon for Hyprland
-{ ... }:
-{
+_: {
   services.hypridle = {
     enable = true;
     settings = {

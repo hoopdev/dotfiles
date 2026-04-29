@@ -1,15 +1,11 @@
 {
-  lib,
-  pkgs,
   username,
-  inputs,
   ...
 }:
 
 {
   imports = [
     ../../home/mac
-    # nix-colors disabled - Stylix is imported via home/common
   ];
 
   home = {

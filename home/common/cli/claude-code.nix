@@ -4,7 +4,7 @@
   ...
 }:
 let
-  isDarwin = pkgs.stdenv.isDarwin;
+  inherit (pkgs.stdenv) isDarwin;
 in
 {
   # Claude Code本体:

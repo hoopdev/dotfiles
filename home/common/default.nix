@@ -8,8 +8,6 @@
 
 {
   imports = [
-    # nix-colors disabled - using Stylix for theming instead
-    # inputs.nix-colors.homeManagerModules.default
     inputs.nixvim.homeModules.nixvim
     ./cli
     ./gui
@@ -21,7 +19,8 @@
 
     sessionVariables = {
       NIXPKGS_ALLOW_UNFREE = "1";
-    } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+    }
+    // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
       NPM_CONFIG_PREFIX = "$HOME/.npm-global";
     };
 
@@ -32,7 +31,4 @@
   };
 
   programs.home-manager.enable = true;
-
-  # nix-colors disabled - Stylix handles Nord theming via lib/stylix.nix
-  # colorScheme = inputs.nix-colors.colorSchemes.nord;
 }

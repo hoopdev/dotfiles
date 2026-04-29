@@ -1,7 +1,7 @@
 { pkgs, config, ... }:
 let
   # Stylix colors (base16 palette)
-  colors = config.lib.stylix.colors;
+  inherit (config.lib.stylix) colors;
 in
 {
   programs.zsh = {
@@ -66,11 +66,11 @@ in
     plugins = [
       {
         name = "zsh-completions";
-        src = pkgs.zsh-completions.src;
+        inherit (pkgs.zsh-completions) src;
       }
       {
         name = "nix-zsh-completions";
-        src = pkgs.nix-zsh-completions.src;
+        inherit (pkgs.nix-zsh-completions) src;
       }
       {
         name = "zsh-nix-shell";

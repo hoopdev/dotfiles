@@ -58,7 +58,7 @@
       "claude"
       "signal"
       "alt-tab"
-	  "codex"
+      "codex"
       "discord"
       "obsidian"
     ];
@@ -116,9 +116,6 @@
 
   # Set primary user for nix-darwin migration
   system.primaryUser = "ktaga";
-
-  # Allow unfree
-  nixpkgs.config.allowUnfree = true;
 
   # The platform the configuration will be used on.
   nixpkgs.hostPlatform = "aarch64-darwin";

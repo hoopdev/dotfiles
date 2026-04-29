@@ -1,11 +1,10 @@
 {
   pkgs,
-  config,
   ...
 }:
 let
-  isLinux = pkgs.stdenv.isLinux;
-  isDarwin = pkgs.stdenv.isDarwin;
+  inherit (pkgs.stdenv) isLinux;
+  inherit (pkgs.stdenv) isDarwin;
 in
 {
   programs.wezterm = {
