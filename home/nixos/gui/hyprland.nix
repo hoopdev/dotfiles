@@ -9,6 +9,7 @@
     brightnessctl
     playerctl
     pamixer
+    matugen
   ];
 
   services.dunst.enable = true;
@@ -38,8 +39,8 @@
         "GDK_SCALE,2"
         "XCURSOR_SIZE,32"
         "GTK_THEME,Nordic"
-        # IME (Fcitx5) support
-        "GTK_IM_MODULE,fcitx"
+        # IME (Fcitx5) support — GTK4 uses native Wayland text-input-v3,
+        # so GTK_IM_MODULE is intentionally unset to silence the warning.
         "QT_IM_MODULE,fcitx"
         "XMODIFIERS,@im=fcitx"
         "INPUT_METHOD,fcitx"
