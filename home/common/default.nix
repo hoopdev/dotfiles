@@ -31,4 +31,11 @@
   };
 
   programs.home-manager.enable = true;
+
+  # The home-manager stylix submodule checks its release (26.05) against
+  # home-manager's (26.11). Both track nixpkgs-unstable so they're compatible —
+  # skip the check. Set here (not just lib/stylix.nix) because for integrated
+  # NixOS/darwin setups lib/stylix.nix is imported at the system level, leaving
+  # this HM-level instance — the one that emits the warning — unconfigured.
+  stylix.enableReleaseChecks = false;
 }

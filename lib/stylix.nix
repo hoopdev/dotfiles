@@ -12,6 +12,10 @@
   stylix = {
     enable = true;
 
+    # Stylix's `release` constant (26.05) trails home-manager's (26.11), but both
+    # track nixpkgs-unstable so they're compatible. Skip the mismatch warning.
+    enableReleaseChecks = false;
+
     image = ../wallpaper/wallpaper_enoshima.jpg;
     base16Scheme = ./shonan.yaml;
     polarity = "dark";

@@ -27,6 +27,7 @@
       "oven-sh/bun"
     ];
     brews = [
+      "cloudflared"
       "coder"
       "displayplacer"
       "ffmpeg"
@@ -37,7 +38,6 @@
       "syncthing"
     ];
     casks = [
-      "claude-code"
       "vivaldi"
       "1password"
       "notion"
@@ -52,13 +52,11 @@
       "chatgpt"
       "google-japanese-ime"
       "figma"
-      "blender"
       "tailscale-app"
       "bambu-studio"
       "claude"
       "signal"
       "alt-tab"
-      "codex"
       "discord"
       "obsidian"
     ];

@@ -48,6 +48,11 @@ in
   config.programs.nixvim = {
     enable = true;
 
+    # Reuse the host's already-evaluated nixpkgs instead of letting nixvim import
+    # a second one from its flake input. Keeps a single nixpkgs in the closure
+    # and silences nixvim's `inputs.nixvim.inputs.nixpkgs.follows` warning.
+    nixpkgs.pkgs = pkgs;
+
     # Load external Lua configuration (init.lua) with vault paths injected
     extraConfigLua = ''
       -- Obsidian vault configuration (injected from Nix)
