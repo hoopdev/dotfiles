@@ -20,7 +20,9 @@ in
   home.activation.installClaudeCode = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     if [ ! -x "$HOME/.local/bin/claude" ]; then
       echo "Installing Claude Code via official installer..."
-      ${pkgs.curl}/bin/curl -fsSL https://claude.ai/install.sh | bash
+      # install.sh re-invokes curl/wget from PATH, which is sanitized during
+      # home-manager activation — make curl available to the piped script.
+      PATH="${pkgs.curl}/bin:$PATH" ${pkgs.curl}/bin/curl -fsSL https://claude.ai/install.sh | PATH="${pkgs.curl}/bin:$PATH" bash
     fi
   '';
 
