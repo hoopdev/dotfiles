@@ -12,6 +12,8 @@
       init = {
         defaultBranch = "main";
       };
+      # Fetch over HTTPS (anonymous, fast), push over SSH (1Password agent).
+      url."git@github.com:".pushInsteadOf = "https://github.com/";
     };
   };
 
