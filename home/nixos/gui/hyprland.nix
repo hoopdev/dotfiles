@@ -1,14 +1,27 @@
 { pkgs, ... }:
+let
+  # matugen 4.0.0 errors with "IO error: not a terminal" on `matugen image …`
+  # in non-TTY contexts (subprocess, pipe) when --source-color-index is not
+  # passed, because it tries to prompt for color selection via dialoguer.
+  # Inject --source-color-index 0 by default; honour any user override.
+  matugen = pkgs.writeShellScriptBin "matugen" ''
+    if [ "''${1-}" = "image" ] && \
+       ! printf '%s\n' "''${@:2}" | grep -qE -- '^--source-color-index(=|$)'; then
+      exec ${pkgs.matugen}/bin/matugen image --source-color-index 0 "''${@:2}"
+    fi
+    exec ${pkgs.matugen}/bin/matugen "$@"
+  '';
+in
 {
-  home.packages = with pkgs; [
-    hyprpicker
-    hyprpaper
-    wl-clipboard
-    cliphist
-    grimblast
-    brightnessctl
-    playerctl
-    pamixer
+  home.packages = [
+    pkgs.hyprpicker
+    pkgs.hyprpaper
+    pkgs.wl-clipboard
+    pkgs.cliphist
+    pkgs.grimblast
+    pkgs.brightnessctl
+    pkgs.playerctl
+    pkgs.pamixer
     matugen
   ];
 
