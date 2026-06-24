@@ -31,6 +31,7 @@
       "coder"
       "displayplacer"
       "ffmpeg"
+      "opencode"
       "rsync"
       "libiconv"
       "node"

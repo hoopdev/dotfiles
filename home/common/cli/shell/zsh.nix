@@ -63,6 +63,15 @@ in
 
     shellAliases = import ./aliases.nix;
 
+    # Machine-local zsh config kept OUT of the public repo (secrets, per-host
+    # exports like CF_ACCESS_TOKEN for the vLLM endpoint). Not managed by
+    # home-manager — that would push it into the repo / world-readable
+    # /nix/store. Create ~/.config/zsh/local.zsh by hand (chmod 600); it is
+    # sourced here only if it exists.
+    initContent = ''
+      [[ -f "${config.xdg.configHome}/zsh/local.zsh" ]] && source "${config.xdg.configHome}/zsh/local.zsh"
+    '';
+
     plugins = [
       {
         name = "zsh-completions";
