@@ -15,8 +15,13 @@ in
 {
   programs.ssh = {
     enable = true;
-    matchBlocks."github.com gitlab.com bitbucket.org" = {
-      identityAgent = ''"${agentSocket}"'';
+    # Opt out of home-manager's built-in `Host *` defaults (now deprecated) and
+    # rely on OpenSSH's own defaults — we only need the 1Password agent here.
+    enableDefaultConfig = false;
+    # `settings` replaces the deprecated `matchBlocks`: the attribute name is the
+    # `Host` pattern and keys are raw OpenSSH directives (IdentityAgent, …).
+    settings."github.com gitlab.com bitbucket.org" = {
+      IdentityAgent = ''"${agentSocket}"'';
     };
   };
 }
