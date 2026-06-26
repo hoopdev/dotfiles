@@ -1,7 +1,13 @@
-{ pkgs, config, ... }:
+{
+  pkgs,
+  config,
+  lib,
+  ...
+}:
 let
   # Stylix colors (base16 palette)
   inherit (config.lib.stylix) colors;
+  localZsh = "${config.xdg.configHome}/zsh/local.zsh";
 in
 {
   programs.zsh = {
@@ -66,10 +72,16 @@ in
     # Machine-local zsh config kept OUT of the public repo (secrets, per-host
     # exports like CF_ACCESS_TOKEN for the vLLM endpoint). Not managed by
     # home-manager — that would push it into the repo / world-readable
-    # /nix/store. Create ~/.config/zsh/local.zsh by hand (chmod 600); it is
-    # sourced here only if it exists.
-    initContent = ''
-      [[ -f "${config.xdg.configHome}/zsh/local.zsh" ]] && source "${config.xdg.configHome}/zsh/local.zsh"
+    # /nix/store. Home Manager creates an empty file on activation if it
+    # does not exist; edit it locally and keep it chmod 600.
+    #
+    # Sourced from interactive init (.zshrc), NOT envExtra (.zshenv).
+    # local.zsh fetches tokens with `cloudflared`, which is installed through
+    # Home Manager and appears on PATH in interactive shells. Interactive-only
+    # is also desirable here: it avoids re-running cloudflared on every
+    # non-interactive `zsh -c`.
+    initContent = lib.mkAfter ''
+      [[ -f "${localZsh}" ]] && source "${localZsh}"
     '';
 
     plugins = [
@@ -92,6 +104,12 @@ in
         };
       }
     ];
-
   };
+  home.activation.ensureLocalZsh = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    $DRY_RUN_CMD mkdir -p "$(dirname "${localZsh}")"
+    if [ ! -e "${localZsh}" ]; then
+      $DRY_RUN_CMD touch "${localZsh}"
+    fi
+    $DRY_RUN_CMD chmod 600 "${localZsh}"
+  '';
 }

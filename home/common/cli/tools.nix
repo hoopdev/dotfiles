@@ -2,6 +2,7 @@
 {
   home.packages = with pkgs; [
     bat
+    cloudflared
     eza
     fd
     fx

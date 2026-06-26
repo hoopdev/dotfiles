@@ -27,7 +27,6 @@
       "oven-sh/bun"
     ];
     brews = [
-      "cloudflared"
       "coder"
       "displayplacer"
       "ffmpeg"
@@ -60,6 +59,7 @@
       "alt-tab"
       "discord"
       "obsidian"
+      "telegram"
     ];
   };
 
