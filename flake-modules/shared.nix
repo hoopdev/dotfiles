@@ -40,12 +40,31 @@ let
       hostPath,
       isNixOS ? false,
     }:
+    { pkgs, ... }:
+    let
+      backupExistingFile = pkgs.writeShellScript "home-manager-backup-existing-file" ''
+        set -eu
+
+        target=$1
+        timestamp=$(${pkgs.coreutils}/bin/date -u +%Y%m%dT%H%M%SZ)
+        backup="$target.backup.$timestamp"
+        suffix=
+        index=1
+
+        while [ -e "$backup$suffix" ]; do
+          suffix=".$index"
+          index=$((index + 1))
+        done
+
+        ${pkgs.coreutils}/bin/mv "$target" "$backup$suffix"
+      '';
+    in
     {
       home-manager = {
         useGlobalPkgs = true;
         useUserPackages = true;
         users.${username} = import hostPath;
-        backupFileExtension = "backup";
+        backupCommand = "${backupExistingFile}";
         extraSpecialArgs = {
           inherit username inputs;
         };
