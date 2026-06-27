@@ -38,6 +38,11 @@
 
   # Create ~/.zshrc to source home-manager's zsh configuration
   home.file.".zshrc".text = ''
+    # Source Home Manager session variables before zsh init uses them
+    if [ -f "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh" ]; then
+      . "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh"
+    fi
+
     # Source home-manager's zsh configuration
     export ZDOTDIR="''${XDG_CONFIG_HOME:-$HOME/.config}/zsh"
     if [ -f "$ZDOTDIR/.zshrc" ]; then

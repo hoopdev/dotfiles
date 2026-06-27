@@ -6,6 +6,7 @@
 }:
 let
   inherit (pkgs.stdenv) isDarwin;
+  localConfig = "${config.xdg.configHome}/opencode/local.json";
 in
 {
   # macOS では Homebrew、Linux では Nix pkgs で管理
@@ -25,7 +26,10 @@ in
   #   { "provider": { "vllm": { "npm": "@ai-sdk/openai-compatible",
   #       "options": { "baseURL": "...", "apiKey": "..." },
   #       "models": { "<model-id>": {} } } } }
-  home.sessionVariables.OPENCODE_CONFIG = "${config.xdg.configHome}/opencode/local.json";
+  home.sessionVariables.OPENCODE_CONFIG = localConfig;
+  programs.zsh.initContent = lib.mkBefore ''
+    export OPENCODE_CONFIG="${localConfig}"
+  '';
 
   # OpenCode configuration with Shonan theme
   xdg.configFile."opencode/themes/shonan.json".text = builtins.toJSON {

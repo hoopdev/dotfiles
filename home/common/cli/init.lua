@@ -535,6 +535,9 @@ require("lazy").setup({
       "folke/snacks.nvim",
     },
     config = function()
+      local xdg_config_home = vim.env.XDG_CONFIG_HOME or (vim.env.HOME .. "/.config")
+      vim.env.OPENCODE_CONFIG = vim.env.OPENCODE_CONFIG or (xdg_config_home .. "/opencode/local.json")
+
       ---@type opencode.Opts
       vim.g.opencode_opts = {
         -- Configuration options
