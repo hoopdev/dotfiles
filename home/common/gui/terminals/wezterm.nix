@@ -34,6 +34,14 @@ in
         enable_wayland = ${if isLinux then "true" else "false"},
         use_ime = true,
         check_for_updates = false,
+
+        -- Clipboard relies on WezTerm defaults (no override needed):
+        --   * SHIFT bypasses an app's mouse capture (e.g. zellij), so
+        --     SHIFT+drag selects and copies to the system clipboard — and
+        --     SHIFT+wheel scrolls WezTerm natively.
+        --   * OSC 52 writes from remote programs (over SSH) are honored,
+        --     which is how a remote zellij's copy reaches the Mac clipboard.
+        scrollback_lines = 10000,
       }
     '';
   };

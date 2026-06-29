@@ -53,12 +53,22 @@
     enable = true;
     package = pkgs.zellij;
     enableZshIntegration = false;
-    settings =
-      # On macOS use pbcopy for reliable local clipboard.
-      # On Linux (SSH targets) leave unset so Zellij falls back to OSC 52,
-      # which forwards clipboard to the connecting terminal.
-      lib.optionalAttrs pkgs.stdenv.isDarwin {
-        copy_command = "pbcopy";
-      };
+    settings = {
+      # Keep zellij's mouse mode on: click focuses a pane, the wheel scrolls
+      # that pane's scrollback. To copy with the mouse, hold SHIFT while
+      # dragging — that bypasses zellij and uses WezTerm's native selection,
+      # which copies to the system clipboard and behaves identically over SSH
+      # (WezTerm copies the rendered screen, no OSC 52 / remote helper needed).
+      mouse_mode = true;
+      # Auto-copy when a zellij copy-mode / mouse selection is released.
+      copy_on_select = true;
+    }
+    # macOS local sessions: pipe zellij copy-mode selections to pbcopy.
+    # On Linux (SSH targets) copy_command is left unset so zellij emits OSC 52
+    # instead — the only clipboard mechanism that survives an SSH hop (it is
+    # forwarded up to the connecting terminal, i.e. WezTerm on the Mac).
+    // lib.optionalAttrs pkgs.stdenv.isDarwin {
+      copy_command = "pbcopy";
+    };
   };
 }

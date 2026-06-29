@@ -23,6 +23,11 @@ return {
 	use_ime = true,
 	check_for_updates = false,
 
+	-- Clipboard relies on WezTerm defaults: SHIFT+drag bypasses an app's
+	-- mouse capture (e.g. zellij) and copies the selection to the system
+	-- clipboard; OSC 52 writes from remote programs over SSH are honored.
+	scrollback_lines = 10000,
+
 	-- Set Nushell as default shell on Windows
 	default_prog = { "nu" },
 }
