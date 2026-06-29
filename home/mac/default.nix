@@ -20,6 +20,18 @@
 
   programs.zsh = {
     enable = true;
+    # SSH agent strategy (see also home/common/cli/ssh.nix):
+    #   Neither ~/.ssh/config nor config.local sets IdentityAgent anywhere.
+    #   Instead, $SSH_AUTH_SOCK is the single source of truth:
+    #   - Local login  → point SSH_AUTH_SOCK at the 1Password agent socket so all
+    #                    SSH connections (github.com, remote hosts, …) use local 1Password.
+    #   - SSH session  → sshd injects the ForwardAgent socket into SSH_AUTH_SOCK
+    #                    automatically; do NOT override it, so the caller's keys are used.
+    loginExtra = ''
+      if [[ -z "$SSH_CLIENT" && -z "$SSH_TTY" ]]; then
+        export SSH_AUTH_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+      fi
+    '';
     initContent = ''
       export LANG=ja_JP.utf8
       eval "$(/opt/homebrew/bin/brew shellenv)"

@@ -1,32 +1,22 @@
-{ pkgs, ... }:
-let
-  # 1Password SSH agent socket path (varies by platform).
-  # macOS:   the 1Password.app group container
-  # Linux:   the 1Password GUI's agent (requires "Use the SSH agent" toggled
-  #          on in 1Password > Settings > Developer)
-  # WSL:     not handled here — bridge to Windows 1Password via npiperelay
-  #          if needed.
-  agentSocket =
-    if pkgs.stdenv.isDarwin then
-      "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
-    else
-      "~/.1password/agent.sock";
-in
 {
   programs.ssh = {
     enable = true;
     # Opt out of home-manager's built-in `Host *` defaults (now deprecated) and
-    # rely on OpenSSH's own defaults — we only need the 1Password agent here.
+    # rely on OpenSSH's own defaults.
     enableDefaultConfig = false;
     # Pull in a git-ignored, machine-local config for private hosts (hostnames,
-    # IdentityAgent/ForwardAgent for personal boxes). Kept out of this repo so no
-    # private host info is committed. Resolved relative to ~/.ssh, so the file is
-    # ~/.ssh/config.local. Missing file is ignored by OpenSSH.
+    # ForwardAgent for personal boxes). Kept out of this repo so no private host
+    # info is committed. Resolved relative to ~/.ssh; missing file is ignored by
+    # OpenSSH.
     includes = [ "config.local" ];
-    # `settings` replaces the deprecated `matchBlocks`: the attribute name is the
-    # `Host` pattern and keys are raw OpenSSH directives (IdentityAgent, …).
-    settings."github.com gitlab.com bitbucket.org" = {
-      IdentityAgent = ''"${agentSocket}"'';
-    };
+    # IdentityAgent is intentionally absent from every Host block.
+    # $SSH_AUTH_SOCK is the single source of truth for which agent to use:
+    #   - macOS local login: home/mac/default.nix loginExtra sets SSH_AUTH_SOCK
+    #                        to the 1Password agent socket.
+    #   - SSH session with ForwardAgent: sshd overwrites SSH_AUTH_SOCK with the
+    #                        caller's forwarded agent; loginExtra is skipped
+    #                        (SSH_CLIENT / SSH_TTY are set) so the caller's keys
+    #                        are used transparently.
+    # Setting IdentityAgent would pin a specific socket and break the second case.
   };
 }
