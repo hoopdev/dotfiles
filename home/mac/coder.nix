@@ -5,16 +5,20 @@ let
   #
   # DEV_ENVS   — SSH connection targets: "name|user@host|proxy_cmd|shell"
   #              proxy_cmd: empty = direct SSH; %h = hostname placeholder.
-  #              shell: bash (default), zsh, pwsh
+  #              shell: bash (default), zsh, pwsh, nu
   # DEV_LOCAL  — Local projects:  "name|path"
   # DEV_REMOTE — Remote projects: "name|env_name|remote_path"
   #              env_name must be a name in DEV_ENVS.
+  # DEV_SSH_AGENT — env names that authenticate via the 1Password SSH agent and
+  #              forward it onward (so `ssh` from the remote reuses local keys).
+  #              DEV_SSH_AGENT_SOCK optionally overrides the agent socket path.
   #
   # Example:
   #   DEV_ENVS=(
   #     "myenv|user@myenv.example.com|coder-proxy %h|bash"
   #     "win-machine|user@win.ts.net||pwsh"
   #   )
+  #   DEV_SSH_AGENT=( myenv )
   #   DEV_LOCAL=(
   #     "myproject-local|$HOME/git/myproject"
   #   )
@@ -105,6 +109,44 @@ let
       for entry in "''${DEV_ENVS[@]:-}"; do IFS='|' read -r n x x x <<< "$entry"; echo "$n"; done
     }
 
+    _dev_select_project() {
+      if ! command -v fzf >/dev/null 2>&1; then
+        echo "dev: fzf is required when project name is omitted" >&2
+        return 1
+      fi
+      _dev_list_projects | fzf --prompt='dev project> ' --height=40% --reverse
+    }
+    _dev_select_any() {
+      if ! command -v fzf >/dev/null 2>&1; then
+        echo "dev: fzf is required when name is omitted" >&2
+        return 1
+      fi
+      {
+        for n in $(_dev_list_projects); do echo "project $n"; done
+        for n in $(_dev_list_envs); do echo "env     $n"; done
+      } | fzf --prompt='dev> ' --height=40% --reverse | awk '{print $2}'
+    }
+    _dev_select_many_projects() {
+      if ! command -v fzf >/dev/null 2>&1; then
+        echo "dev: fzf is required for '-' selection" >&2
+        return 1
+      fi
+      _dev_list_projects | fzf --multi --prompt='dev projects> ' --height=40% --reverse
+    }
+
+    _dev_require_name() {
+      local kind="$1" name="''${2:-}"
+      if [[ -n "$name" && "$name" != "-" ]]; then
+        echo "$name"
+        return 0
+      fi
+      if [[ "$kind" == "project" ]]; then
+        _dev_select_project
+      else
+        _dev_select_any
+      fi
+    }
+
     # Low-level SSH runner.
     # Args: env_name  rp (may be empty)  cmd (may be empty)  interactive (any non-empty = yes)
     # - rp non-empty → cd/Set-Location before running cmd
@@ -117,6 +159,19 @@ let
       shell=$(_env_get_shell    "$env_name")
       flag="-T"; [[ -n "$interactive" ]] && flag="-t"
       local -a ssh_opts=(-o StrictHostKeyChecking=accept-new -o "UserKnownHostsFile=~/.ssh/known_hosts.coder")
+      # 1Password SSH agent auth + forwarding for envs listed in DEV_SSH_AGENT
+      # (set in local.zsh). IdentityAgent authenticates this hop with 1Password;
+      # ForwardAgent forwards the same agent so onward `ssh` from the remote
+      # reuses the local 1Password keys (prompts still appear on this Mac).
+      # Socket defaults to the macOS 1Password path; override via DEV_SSH_AGENT_SOCK.
+      local _agent_e _sock
+      for _agent_e in "''${DEV_SSH_AGENT[@]:-}"; do
+        if [[ "$_agent_e" == "$env_name" ]]; then
+          _sock="''${DEV_SSH_AGENT_SOCK:-$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock}"
+          ssh_opts+=(-o "IdentityAgent=\"$_sock\"" -o "ForwardAgent=\"$_sock\"")
+          break
+        fi
+      done
       [[ -n "$proxy" ]] && ssh_opts+=(-o "ProxyCommand=$proxy")
       if [[ "$shell" == "pwsh" ]]; then
         local ps_cmd=""
@@ -125,6 +180,22 @@ let
           ssh "''${ssh_opts[@]}" "$flag" "$ssh_host" "''${ps_cmd}pwsh -NoLogo"
         else
           ssh "''${ssh_opts[@]}" "$flag" "$ssh_host" "pwsh -NoLogo -NonInteractive -Command \"''${ps_cmd}''${cmd}\""
+        fi
+      elif [[ "$shell" == "nu" ]]; then
+        # Nushell (e.g. on Windows). Invoke nu by name so the remote default
+        # OpenSSH shell (cmd/pwsh/nu) only needs nu on PATH. Outer double quotes
+        # survive cmd/pwsh parsing; inner single quotes are nu raw strings
+        # (Windows backslash paths stay literal). -e runs then drops to a REPL.
+        if [[ -n "$interactive" && -z "$cmd" ]]; then
+          if [[ -n "$rp" ]]; then
+            ssh "''${ssh_opts[@]}" "$flag" "$ssh_host" "nu -e \"cd '$rp'\""
+          else
+            ssh "''${ssh_opts[@]}" "$flag" "$ssh_host" "nu"
+          fi
+        else
+          local nu_body="$cmd"
+          [[ -n "$rp" ]] && nu_body="cd '$rp'; $cmd"
+          ssh "''${ssh_opts[@]}" "$flag" "$ssh_host" "nu -c \"$nu_body\""
         fi
       else
         local sh_cmd=""
@@ -197,6 +268,190 @@ let
         _dev_exec_on_env "$_env" "$_rp" "exec $tool $(printf '%q ' "$@")" interactive
       fi
     }
+
+    _dev_info() {
+      local name="$1" lp env_name rp ssh_host proxy shell
+      [[ -z "$name" ]] && name=$(_dev_select_any) || true
+      [[ -z "$name" ]] && return 1
+
+      if lp=$(_local_get_path "$name" 2>/dev/null); then
+        echo "NAME    $name"
+        echo "TYPE    local project"
+        echo "PATH    $lp"
+        if [[ -d "$lp/.git" || -n "$(git -C "$lp" rev-parse --show-toplevel 2>/dev/null)" ]]; then
+          echo "GIT"
+          git -C "$lp" log --oneline -1 2>/dev/null | sed 's/^/  head    /'
+          git -C "$lp" branch --show-current 2>/dev/null | sed 's/^/  branch  /'
+          local dirty
+          dirty=$(git -C "$lp" status --short 2>/dev/null | wc -l | tr -d ' ')
+          echo "  changes $dirty"
+        else
+          echo "GIT     n/a"
+        fi
+      elif env_name=$(_remote_get_env "$name" 2>/dev/null); then
+        rp=$(_remote_get_path "$name")
+        ssh_host=$(_env_get_host "$env_name")
+        proxy=$(_env_get_proxy "$env_name")
+        shell=$(_env_get_shell "$env_name")
+        echo "NAME    $name"
+        echo "TYPE    remote project"
+        echo "ENV     $env_name"
+        echo "HOST    $ssh_host"
+        echo "PROXY   ''${proxy:--}"
+        echo "SHELL   $shell"
+        echo "PATH    $rp"
+        if [[ "$shell" == "pwsh" || "$shell" == "nu" ]]; then
+          echo "GIT     n/a ($shell remote)"
+        else
+          echo "GIT"
+          _dev_exec_on_env "$env_name" "$rp" "
+            git log --oneline -1 2>/dev/null | sed 's/^/  head    /'
+            git branch --show-current 2>/dev/null | sed 's/^/  branch  /'
+            printf '  changes '
+            git status --short 2>/dev/null | wc -l | tr -d ' '
+            printf '\n'
+          " 2>/dev/null || echo "  unreachable"
+        fi
+      elif _env_exists "$name"; then
+        ssh_host=$(_env_get_host "$name")
+        proxy=$(_env_get_proxy "$name")
+        shell=$(_env_get_shell "$name")
+        echo "NAME    $name"
+        echo "TYPE    env"
+        echo "HOST    $ssh_host"
+        echo "PROXY   ''${proxy:--}"
+        echo "SHELL   $shell"
+      else
+        echo "dev: unknown name '$name'" >&2
+        echo "  projects: $(_dev_list_projects | tr '\n' ' ')" >&2
+        echo "  envs:     $(_dev_list_envs | tr '\n' ' ')" >&2
+        return 1
+      fi
+    }
+
+    _dev_code() {
+      local name="$1" lp env_name rp ssh_host shell
+      [[ -z "$name" || "$name" == "-" ]] && name=$(_dev_select_project)
+      [[ -z "$name" ]] && return 1
+      command -v code >/dev/null 2>&1 || { echo "dev code: VS Code 'code' command not found" >&2; return 1; }
+
+      if lp=$(_local_get_path "$name" 2>/dev/null); then
+        [[ -d "$lp" ]] || { echo "dev code: local path does not exist: $lp" >&2; return 1; }
+        exec code "$lp"
+      elif env_name=$(_remote_get_env "$name" 2>/dev/null); then
+        rp=$(_remote_get_path "$name")
+        ssh_host=$(_env_get_host "$env_name")
+        shell=$(_env_get_shell "$env_name")
+        if [[ "$shell" == "pwsh" ]]; then
+          echo "dev code: pwsh remotes are not supported yet" >&2
+          return 1
+        fi
+        exec code --remote "ssh-remote+$ssh_host" "$rp"
+      else
+        echo "dev code: unknown project '$name'" >&2
+        echo "  projects: $(_dev_list_projects | tr '\n' ' ')" >&2
+        return 1
+      fi
+    }
+
+    _dev_doctor() {
+      local connect="" failures=0 warnings=0 names=()
+      local entry n host proxy shell path env rp name lp env_name
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --connect) connect=1; shift ;;
+          *) names+=("$1"); shift ;;
+        esac
+      done
+
+      _ok() { printf "ok      %s\n" "$*"; }
+      _warn() { printf "warn    %s\n" "$*"; warnings=$((warnings + 1)); }
+      _fail() { printf "fail    %s\n" "$*"; failures=$((failures + 1)); }
+
+      echo "TOOLS"
+      for tool in ssh git; do
+        command -v "$tool" >/dev/null 2>&1 && _ok "$tool" || _fail "$tool not found"
+      done
+      command -v fzf >/dev/null 2>&1 && _ok "fzf" || _warn "fzf not found; omitted-name selection is unavailable"
+      command -v code >/dev/null 2>&1 && _ok "code" || _warn "VS Code 'code' command not found"
+
+      echo ""
+      echo "CONFIG"
+      [[ ''${#DEV_ENVS[@]} -gt 0 ]] && _ok "DEV_ENVS entries: ''${#DEV_ENVS[@]}" || _warn "DEV_ENVS is empty"
+      [[ ''${#DEV_LOCAL[@]} -gt 0 ]] && _ok "DEV_LOCAL entries: ''${#DEV_LOCAL[@]}" || _warn "DEV_LOCAL is empty"
+      [[ ''${#DEV_REMOTE[@]} -gt 0 ]] && _ok "DEV_REMOTE entries: ''${#DEV_REMOTE[@]}" || _warn "DEV_REMOTE is empty"
+
+      for entry in "''${DEV_ENVS[@]:-}"; do
+        IFS='|' read -r n host proxy shell <<< "$entry"
+        [[ -n "$n" && -n "$host" ]] && _ok "env $n -> $host" || _fail "bad DEV_ENVS entry: $entry"
+        case "''${shell:-bash}" in bash|zsh|pwsh|nu) : ;; *) _warn "env $n has unknown shell '$shell'" ;; esac
+      done
+      for entry in "''${DEV_LOCAL[@]:-}"; do
+        IFS='|' read -r n path <<< "$entry"
+        if [[ -z "$n" || -z "$path" ]]; then
+          _fail "bad DEV_LOCAL entry: $entry"
+        elif [[ -d "$path" ]]; then
+          _ok "local $n path exists"
+        else
+          _fail "local $n path missing: $path"
+        fi
+      done
+      for entry in "''${DEV_REMOTE[@]:-}"; do
+        IFS='|' read -r n env rp <<< "$entry"
+        if [[ -z "$n" || -z "$env" || -z "$rp" ]]; then
+          _fail "bad DEV_REMOTE entry: $entry"
+        elif _env_exists "$env"; then
+          _ok "remote $n uses env $env"
+        else
+          _fail "remote $n references unknown env $env"
+        fi
+      done
+
+      if [[ ''${#DEV_SSH_AGENT[@]:-0} -gt 0 ]]; then
+        local _sock="''${DEV_SSH_AGENT_SOCK:-$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock}"
+        [[ -S "$_sock" ]] && _ok "1Password SSH agent socket present" \
+          || _warn "1Password SSH agent socket missing: $_sock"
+        local _ae
+        for _ae in "''${DEV_SSH_AGENT[@]}"; do
+          _env_exists "$_ae" && _ok "ssh-agent forward for env $_ae" \
+            || _fail "DEV_SSH_AGENT references unknown env $_ae"
+        done
+      fi
+
+      if [[ -n "$connect" ]]; then
+        echo ""
+        echo "CONNECTIVITY"
+        if [[ ''${#names[@]} -eq 0 ]]; then
+          while IFS= read -r n; do names+=("$n"); done < <(_dev_list_envs)
+          while IFS= read -r n; do names+=("$n"); done < <(_dev_list_projects)
+        fi
+        for name in "''${names[@]}"; do
+          if lp=$(_local_get_path "$name" 2>/dev/null); then
+            [[ -d "$lp" ]] && _ok "$name local path reachable" || _fail "$name local path missing"
+          elif env_name=$(_remote_get_env "$name" 2>/dev/null); then
+            rp=$(_remote_get_path "$name")
+            shell=$(_env_get_shell "$env_name")
+            if [[ "$shell" == "pwsh" ]]; then
+              _dev_exec_on_env "$env_name" "" "Test-Path '$rp'" 2>/dev/null | grep -q True && _ok "$name remote path reachable" || _fail "$name remote path unreachable"
+            else
+              _dev_exec_on_env "$env_name" "" "test -d $(printf '%q' "$rp")" 2>/dev/null && _ok "$name remote path reachable" || _fail "$name remote path unreachable"
+            fi
+          elif _env_exists "$name"; then
+            _dev_exec_on_env "$name" "" "true" 2>/dev/null && _ok "$name ssh reachable" || _fail "$name ssh unreachable"
+          else
+            _fail "unknown name for connectivity check: $name"
+          fi
+        done
+      else
+        echo ""
+        echo "CONNECTIVITY"
+        _warn "skipped; run 'dev doctor --connect' to check SSH and remote paths"
+      fi
+
+      echo ""
+      printf "SUMMARY failures=%d warnings=%d\n" "$failures" "$warnings"
+      [[ "$failures" -eq 0 ]]
+    }
   '';
 
   coderBin = "/opt/homebrew/bin/coder";
@@ -266,25 +521,54 @@ let
 
       run)
         # Run a command in any env or project (local/remote transparent). Primary agent interface.
-        name="$1"; shift
-        [[ -z "$name" ]] && { echo "Usage: dev run <env|project> <cmd...>" >&2; exit 1; }
+        name="$1"; shift || true
+        if [[ -z "$name" ]]; then
+          echo "Usage: dev run <env|project|-> <cmd...>" >&2
+          echo "       dev run - <cmd...>    Select target with fzf" >&2
+          exit 1
+        fi
+        [[ "$name" == "-" ]] && name=$(_dev_select_any)
+        [[ -z "$name" ]] && exit 1
         _dev_resolve_and_run "$name" "$(printf '%q ' "$@")"
         ;;
 
       shell)
         # Open an interactive shell. Env name → root of env. Project name → project dir.
-        name="$1"
-        [[ -z "$name" ]] && { echo "Usage: dev shell <env|project>" >&2; exit 1; }
+        name=$(_dev_require_name any "''${1:-}") || exit 1
         _dev_resolve_and_run "$name" "" interactive
         ;;
 
       claude|codex|opencode|agy)
+        if [[ -z "''${1:-}" || "''${1:-}" == "-" ]]; then
+          selected=$(_dev_select_project) || exit 1
+          shift || true
+          set -- "$selected" "$@"
+        fi
         _dev_agent "$subcmd" "$@"
+        ;;
+
+      code)
+        _dev_code "''${1:-}"
+        ;;
+
+      info)
+        _dev_info "''${1:-}"
+        ;;
+
+      doctor)
+        _dev_doctor "$@"
         ;;
 
       status)
         if [[ $# -gt 0 ]]; then
-          names=("$@")
+          names=()
+          for arg in "$@"; do
+            if [[ "$arg" == "-" ]]; then
+              while IFS= read -r n; do names+=("$n"); done < <(_dev_select_many_projects)
+            else
+              names+=("$arg")
+            fi
+          done
         else
           names=()
           while IFS= read -r n; do names+=("$n"); done < <(_dev_list_projects)
@@ -327,9 +611,10 @@ let
           IFS='|' read -r n env rp <<< "$entry"
           remote_order+=("$n")
           (
-            if [[ "$(_env_get_shell "$env")" == "pwsh" ]]; then
-              echo "n/a (Windows)" > "$tmpdir/R_$n"
-            else
+            case "$(_env_get_shell "$env")" in
+              pwsh|nu)
+              echo "n/a (non-POSIX remote)" > "$tmpdir/R_$n" ;;
+              *)
               info=$(_dev_exec_on_env "$env" "" "
                 for _tool in claude codex opencode agy; do
                   pids=\$(pgrep -x \"\$_tool\" 2>/dev/null) || continue
@@ -347,7 +632,8 @@ let
               else
                 echo "stopped" > "$tmpdir/R_$n"
               fi
-            fi
+              ;;
+            esac
           ) &
         done
         wait
@@ -389,6 +675,9 @@ let
         echo "  ls                        List envs and projects" >&2
         echo "  run  <env|project> <cmd>  Run command (env: no cd, project: cd to dir)" >&2
         echo "  shell <env|project>       Interactive shell (env: root, project: project dir)" >&2
+        echo "  code <project>            Open project in VS Code" >&2
+        echo "  info [env|project]        Show resolved target details" >&2
+        echo "  doctor [--connect]        Validate tools, config, and optionally connectivity" >&2
         echo "  claude   <project>        Start Claude Code in project dir" >&2
         echo "  codex    <project>        Start OpenAI Codex in project dir" >&2
         echo "  opencode <project>        Start opencode in project dir" >&2

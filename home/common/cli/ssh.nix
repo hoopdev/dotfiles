@@ -18,6 +18,11 @@ in
     # Opt out of home-manager's built-in `Host *` defaults (now deprecated) and
     # rely on OpenSSH's own defaults — we only need the 1Password agent here.
     enableDefaultConfig = false;
+    # Pull in a git-ignored, machine-local config for private hosts (hostnames,
+    # IdentityAgent/ForwardAgent for personal boxes). Kept out of this repo so no
+    # private host info is committed. Resolved relative to ~/.ssh, so the file is
+    # ~/.ssh/config.local. Missing file is ignored by OpenSSH.
+    includes = [ "config.local" ];
     # `settings` replaces the deprecated `matchBlocks`: the attribute name is the
     # `Host` pattern and keys are raw OpenSSH directives (IdentityAgent, …).
     settings."github.com gitlab.com bitbucket.org" = {
