@@ -4,11 +4,12 @@
     enable = true;
     lfs.enable = true;
     signing.format = "openpgp";
+    # user.name/email live here to keep identity out of the public store.
+    # Commits fail if this file is absent — create it on each new machine.
+    includes = [
+      { path = "~/.config/git/local"; }
+    ];
     settings = {
-      user = {
-        name = "hoopdev";
-        email = "taga@sanken.osaka-u.ac.jp";
-      };
       init = {
         defaultBranch = "main";
       };

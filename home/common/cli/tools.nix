@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 {
   home.packages = with pkgs; [
     bat
@@ -53,9 +53,12 @@
     enable = true;
     package = pkgs.zellij;
     enableZshIntegration = false;
-    settings = {
-      # Theme is managed by Stylix (Shonan theme)
-      copy_command = "pbcopy";
-    };
+    settings =
+      # On macOS use pbcopy for reliable local clipboard.
+      # On Linux (SSH targets) leave unset so Zellij falls back to OSC 52,
+      # which forwards clipboard to the connecting terminal.
+      lib.optionalAttrs pkgs.stdenv.isDarwin {
+        copy_command = "pbcopy";
+      };
   };
 }

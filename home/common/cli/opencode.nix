@@ -267,5 +267,7 @@ in
       "opencode-openai-codex-auth@latest"
       "opencode-gemini-auth@latest"
     ];
+    # anthropic/google accessed via opencode-openai-codex-auth/opencode-gemini-auth plugins above
+    disabled_providers = [ "anthropic" "google" ];
   };
 }

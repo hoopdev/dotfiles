@@ -4,6 +4,7 @@
   imports = [
     ../common
     ./gui
+    ./coder.nix
   ];
 
   home.sessionVariables = {
