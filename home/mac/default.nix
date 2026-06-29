@@ -23,16 +23,19 @@
     # SSH agent strategy (see also home/common/cli/ssh.nix):
     #   Neither ~/.ssh/config nor config.local sets IdentityAgent anywhere.
     #   Instead, $SSH_AUTH_SOCK is the single source of truth:
-    #   - Local login  → point SSH_AUTH_SOCK at the 1Password agent socket so all
+    #   - Local shell  → point SSH_AUTH_SOCK at the 1Password agent socket so all
     #                    SSH connections (github.com, remote hosts, …) use local 1Password.
-    #   - SSH session  → sshd injects the ForwardAgent socket into SSH_AUTH_SOCK
-    #                    automatically; do NOT override it, so the caller's keys are used.
-    loginExtra = ''
+    #   - SSH session  → sshd injects the ForwardAgent socket into SSH_AUTH_SOCK;
+    #                    the guard below skips it so the caller's forwarded keys win.
+    #   This MUST live in initContent (.zshrc), not loginExtra (.zlogin): zellij
+    #   spawns panes as non-login shells, which never source .zlogin — so a
+    #   loginExtra override is invisible inside zellij and `git push` there grabs
+    #   WezTerm's (empty) mux agent instead of 1Password.
+    initContent = ''
       if [[ -z "$SSH_CLIENT" && -z "$SSH_TTY" ]]; then
         export SSH_AUTH_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
       fi
-    '';
-    initContent = ''
+
       export LANG=ja_JP.utf8
       eval "$(/opt/homebrew/bin/brew shellenv)"
 
