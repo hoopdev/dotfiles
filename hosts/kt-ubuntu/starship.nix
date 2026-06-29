@@ -11,7 +11,7 @@ in
 
     settings = lib.mkForce {
       # Ubuntu-specific format with Ubuntu logo
-      format = "[░▒▓](#${colors.base06})[ 󰕈 ](bg:#${colors.base06} fg:#${colors.base00})[](bg:#${colors.base0A} fg:#${colors.base06})$directory[](fg:#${colors.base0A} bg:#${colors.base0B})$git_branch$git_status[](fg:#${colors.base0B} bg:#${colors.base0C})$time[ ](fg:#${colors.base0C})$character";
+      format = "[░▒▓](#${colors.base06})[ 󰕈 ](bg:#${colors.base06} fg:#${colors.base00})[](bg:#${colors.base0A} fg:#${colors.base06})$directory[](fg:#${colors.base0A} bg:#${colors.base0B})$git_branch$git_status[](fg:#${colors.base0B} bg:#${colors.base0C})$time[ ](fg:#${colors.base0C})$character";
 
       directory = {
         format = "[ $path ]($style)";
