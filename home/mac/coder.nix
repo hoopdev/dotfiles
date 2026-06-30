@@ -1,4 +1,4 @@
-{ pkgs, config, ... }:
+{ pkgs, config, lib, ... }:
 let
   coderSessionPath = "${config.home.homeDirectory}/Library/Application Support/coderv2/session";
   # Runtime config lives in ~/.config/zsh/local.zsh (not tracked in git).
@@ -33,6 +33,7 @@ let
   # `claude agents --json` and builds all `--json` output; curl posts Telegram.
   jq = "${pkgs.jq}/bin/jq";
   curl = "${pkgs.curl}/bin/curl";
+
 
   loadEnv = ''
     if [[ -z "$CODER_URL" ]]; then
@@ -186,8 +187,12 @@ let
         -o "UserKnownHostsFile=~/.ssh/known_hosts.coder"
         -o ControlMaster=auto
         -o "ControlPath=~/.ssh/cm-%C"
-        -o ControlPersist=60s
+        -o ControlPersist=10m
       )
+      # Non-interactive calls (ps/status/info fan-out from TUI or scripts) must
+      # never prompt — BatchMode=yes makes SSH fail silently instead of writing
+      # a password dialog to /dev/tty (which would bleed into ratatui TUI output).
+      [[ -z "$interactive" ]] && ssh_opts+=(-o BatchMode=yes)
       # Agent forwarding for envs in DEV_SSH_AGENT (set in local.zsh). The agent
       # is selected by $SSH_AUTH_SOCK (1Password; exported in loadConfig or by the
       # macOS login hook) — we never pin IdentityAgent here, matching
@@ -573,6 +578,34 @@ let
       } | ${jq} -s '.'
     }
 
+    # Backend registry — the ONE place agent backends are enumerated.
+    # fields: name, interactive, dispatchable, review, ps_detect, attach, bg_sub
+    #   ps_detect : agents-json (claude) | pgrep | pgrep-f
+    #   bg_sub    : token after tool name for nohup dispatch; empty = claude --bg
+    #   attach    : strategy key used by _dev_attach
+    _dev_tools_json() {
+      local rows=(
+        "claude|1|1|0|agents-json|claude-resume|"
+        "codex|1|1|1|pgrep|codex-resume|exec"
+        "opencode|1|1|1|pgrep|opencode-continue|run"
+        "agy|1|1|1|pgrep|agy-fresh|-p"
+      )
+      local r n it dp rv pd at bs
+      for r in "''${rows[@]}"; do
+        IFS='|' read -r n it dp rv pd at bs <<< "$r"
+        ${jq} -n --arg n "$n" --argjson it "$it" --argjson dp "$dp" --argjson rv "$rv" \
+          --arg pd "$pd" --arg at "$at" --arg bs "$bs" \
+          '{name:$n,interactive:($it==1),dispatchable:($dp==1),review:($rv==1),ps_detect:$pd,attach:$at,bg_sub:$bs}'
+      done | ${jq} -s '.'
+    }
+
+    # Accessor: get a single field for a named tool.  Returns empty string if
+    # the tool is not in the registry.
+    _dev_tool_field() {
+      _dev_tools_json | ${jq} -r --arg n "$1" --arg f "$2" \
+        '.[]|select(.name==$n)|.[$f] // ""'
+    }
+
     # dev ls --json — grouped to mirror the human sections.
     _dev_ls_json() {
       _dev_targets_json | ${jq} '{
@@ -742,7 +775,7 @@ let
       local ref="$1" q
       _dev_project_resolve "$ref" 2>/dev/null || return 1
       q=$(printf '%q' "\"project\":\"$ref\"")
-      _dev_run_at "$R_PATH" "ls -t \"\$HOME/.dev/runs/\"*.meta 2>/dev/null | while IFS= read -r p; do grep -q $q \"\$p\" && { cat \"\$p\"; break; }; done"
+      _dev_run_at "$R_PATH" "{ ls -t \"\$HOME/.dev/runs\" 2>/dev/null | grep -F '.meta' | while IFS= read -r f; do printf '%s\n' \"\$HOME/.dev/runs/\$f\"; done; } | while IFS= read -r p; do grep -q $q \"\$p\" && { cat \"\$p\"; break; }; done"
     }
 
     # Ensure a worktree for <branch> off <base> on the target; echoes its path.
@@ -757,16 +790,19 @@ let
     }
 
     _dev_dispatch() {
-      local tool=claude worktree="" json="" project="" task=""
+      local tool=claude worktree="" json="" project="" task="" model="" effort="" sandbox=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --tool) tool="$2"; shift 2 ;;
+          --tool)     tool="$2";    shift 2 ;;
           --worktree) worktree="$2"; shift 2 ;;
-          --json) json=1; shift ;;
+          --model)    model="$2";   shift 2 ;;
+          --effort)   effort="$2";  shift 2 ;;
+          --sandbox)  sandbox="$2"; shift 2 ;;
+          --json)     json=1;       shift ;;
           *) if [[ -z "$project" ]]; then project="$1"; else task="''${task:+$task }$1"; fi; shift ;;
         esac
       done
-      [[ -z "$project" || -z "$task" ]] && { echo "Usage: dev dispatch <project> [--tool claude|codex|opencode] [--worktree <branch>] \"<task>\"" >&2; return 1; }
+      [[ -z "$project" || -z "$task" ]] && { echo "Usage: dev dispatch <project> [--tool claude|codex|opencode] [--model m] [--effort e] [--sandbox s] [--worktree b] \"<task>\"" >&2; return 1; }
       _dev_project_resolve "$project" || { echo "dev dispatch: unknown project '$project'" >&2; return 1; }
       local cwd="$R_PATH" branch="" wt="" id="$tool-$project-$(date +%s)"
       if [[ -n "$worktree" ]]; then branch="$worktree"; wt=$(_dev_worktree_ensure "$R_PATH" "$worktree"); cwd="$wt"; fi
@@ -774,19 +810,44 @@ let
       qtask=$(printf '%q' "$task"); qcwd=$(printf '%q' "$cwd")
       case "$tool" in
         claude)
-          _dev_run_at "$cwd" "mkdir -p \"\$HOME/.dev/runs\"; claude --bg -p $qtask >/dev/null 2>&1 </dev/null || true"
+          # Build optional model/effort flags.
+          local mf=""
+          [[ -n "$model"  ]] && mf="$mf --model $(printf '%q' "$model")"
+          [[ -n "$effort" ]] && mf="$mf --effort $(printf '%q' "$effort")"
+          _dev_run_at "$cwd" "mkdir -p \"\$HOME/.dev/runs\"; claude --bg$mf -p $qtask >/dev/null 2>&1 </dev/null || true"
           local cj
           cj=$(_dev_run_at "$cwd" "claude agents --json --cwd $qcwd 2>/dev/null")
           session=$(printf '%s' "$cj" | ${jq} -r 'sort_by(.startedAt)|last|.sessionId // ""' 2>/dev/null)
           pid=$(printf '%s' "$cj" | ${jq} -r 'sort_by(.startedAt)|last|.pid // ""' 2>/dev/null)
           ;;
-        codex|opencode)
+        *)
+          # Registry-driven dispatch for all non-claude backends.
+          # bg_sub is the subcommand token (codex=exec, opencode=run, agy=-p, …).
+          # The detached pid is recorded so _dev_kill and dev ps can locate it.
+          local sub; sub=$(_dev_tool_field "$tool" bg_sub)
+          if [[ -z "$(_dev_tool_field "$tool" name)" ]]; then
+            echo "dev dispatch: unknown tool '$tool'" >&2; return 1
+          fi
+          if [[ -z "$sub" ]]; then
+            echo "dev dispatch: '$tool' is not background-dispatchable" >&2; return 1
+          fi
+          # Per-tool extra flags (model/sandbox).  safe: qmodel/qsb are printf '%q'.
+          local extra=""
+          case "$tool" in
+            codex)
+              [[ -n "$model"   ]] && extra="$extra --model $(printf '%q' "$model")"
+              [[ -n "$sandbox" ]] && extra="$extra --sandbox $(printf '%q' "$sandbox")"
+              extra="$extra --ask-for-approval never"
+              ;;
+            opencode)
+              [[ -n "$model" ]] && extra="$extra --model $(printf '%q' "$model")"
+              extra="$extra --format json"
+              ;;
+          esac
           # nohup (not setsid — absent on macOS) detaches from SIGHUP so the
           # agent survives the SSH session / shell exiting; logged to the registry.
-          local sub; [[ "$tool" == codex ]] && sub="exec" || sub="run"
-          _dev_run_at "$cwd" "mkdir -p \"\$HOME/.dev/runs\"; nohup $tool $sub $qtask >\"\$HOME/.dev/runs/$id.log\" 2>&1 </dev/null & disown 2>/dev/null; true"
+          pid=$(_dev_run_at "$cwd" "mkdir -p \"\$HOME/.dev/runs\"; nohup $tool $sub$extra $qtask >\"\$HOME/.dev/runs/$id.log\" 2>&1 </dev/null & echo \$!; disown 2>/dev/null; true")
           ;;
-        *) echo "dev dispatch: unknown tool '$tool'" >&2; return 1 ;;
       esac
       local meta
       meta=$(${jq} -n -c --arg id "$id" --arg tool "$tool" --arg project "$project" --arg branch "$branch" \
@@ -866,10 +927,11 @@ let
         _dev_agent claude "$ref"; return
       fi
       local tool session; tool=$(printf '%s' "$meta" | ${jq} -r '.tool'); session=$(printf '%s' "$meta" | ${jq} -r '.session // ""')
-      case "$tool" in
-        claude)  if [[ -n "$session" ]]; then _dev_agent claude "$ref" --resume "$session"; else _dev_agent claude "$ref"; fi ;;
-        codex)   _dev_agent codex "$ref" resume --last ;;
-        opencode) _dev_agent opencode "$ref" --continue ;;
+      case "$(_dev_tool_field "$tool" attach 2>/dev/null || echo "")" in
+        claude-resume)    if [[ -n "$session" ]]; then _dev_agent claude "$ref" --resume "$session"; else _dev_agent claude "$ref"; fi ;;
+        codex-resume)     _dev_agent codex "$ref" resume --last ;;
+        opencode-continue) _dev_agent opencode "$ref" --continue ;;
+        agy-fresh)        _dev_agent agy "$ref" ;;  # agy has no resume API → fresh interactive
         *) echo "dev attach: cannot attach tool '$tool'; try 'dev logs $ref -f'" >&2; return 1 ;;
       esac
     }
@@ -982,8 +1044,186 @@ let
       fi
     }
 
+    # ============ review ============
+    # Run a code-review agent on a project's uncommitted (or branched) diff.
+    # Codex has a native `codex review` command; other tools receive the diff
+    # via an agent prompt and use their own tool-use to read `git diff`.
+    _dev_review() {
+      local tool="" base="" json="" ref=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --tool)  tool="$2";  shift 2 ;;
+          --base)  base="$2";  shift 2 ;;
+          --json)  json=1;     shift ;;
+          *)       ref="$1";   shift ;;
+        esac
+      done
+      [[ -z "$ref" ]] && { echo "Usage: dev review <project> [--tool codex|opencode|agy|claude] [--base <ref>] [--json]" >&2; return 1; }
+      _dev_project_resolve "$ref" || { echo "dev review: unknown project '$ref'" >&2; return 1; }
+      local path qpath; path=$(_dev_target_path "$ref"); qpath=$(printf '%q' "$path")
+      # Auto-select: codex first (native review), then opencode, then claude.
+      if [[ -z "$tool" ]]; then
+        for _t in codex opencode claude; do
+          if _dev_run_at "$path" "command -v $_t >/dev/null 2>&1"; then tool="$_t"; break; fi
+        done
+      fi
+      [[ -z "$tool" ]] && { echo "dev review: no supported review tool found" >&2; return 1; }
+      local base_arg=""
+      [[ -n "$base" ]] && base_arg="--base $(printf '%q' "$base")"
+      local review_prompt="Review all uncommitted changes in this project for bugs, security issues, and code quality. Use git diff to inspect what changed. Provide concise, actionable feedback."
+      [[ -n "$base" ]] && review_prompt="Review changes since $(printf '%s' "$base") for bugs, security issues, and code quality. Use git diff to inspect. Provide concise, actionable feedback."
+      local out rc=0
+      case "$tool" in
+        codex)
+          if [[ -n "$base" ]]; then
+            out=$(_dev_run_at "$path" "codex review $base_arg 2>&1"); rc=$?
+          else
+            out=$(_dev_run_at "$path" "codex review --uncommitted 2>&1"); rc=$?
+          fi
+          ;;
+        opencode)
+          out=$(_dev_run_at "$path" "opencode run $(printf '%q' "$review_prompt") 2>&1"); rc=$?
+          ;;
+        agy)
+          out=$(_dev_run_at "$path" "agy -p $(printf '%q' "$review_prompt") 2>&1"); rc=$?
+          ;;
+        claude)
+          out=$(_dev_run_at "$path" "claude --print $(printf '%q' "$review_prompt") 2>&1"); rc=$?
+          ;;
+        *)
+          echo "dev review: unsupported tool '$tool'" >&2; return 1 ;;
+      esac
+      if [[ -n "$json" ]]; then
+        local ok_val="true"; [[ $rc -ne 0 ]] && ok_val="false"
+        ${jq} -n -c --arg t "$ref" --arg tool "$tool" --argjson ok "$ok_val" \
+          --arg out "$out" '{target:$t,tool:$tool,ok:$ok,lines:($out|split("\n"))}'
+      else
+        printf '%s\n' "$out"
+      fi
+      return $rc
+    }
+
+    # ============ session management ============
+    # List or resume recorded sessions for a project.
+    _dev_session() {
+      local sub="''${1:-}"; shift || true
+      case "$sub" in
+        list)
+          local ref="''${1:-}" json=""
+          [[ "''${1:-}" == --json ]] && { json=1; shift; ref="''${1:-}"; shift || true; } || { ref="''${1:-}"; shift || true; }
+          [[ -z "$ref" ]] && { echo "Usage: dev session list [--json] <project>" >&2; return 1; }
+          _dev_project_resolve "$ref" || { echo "dev session: unknown project '$ref'" >&2; return 1; }
+          local path="$R_PATH"
+          # Claude: read per-project sessions-index.json
+          local hash; hash=$(printf '%s' "$path" | shasum -a 256 | cut -c1-64 | tr 'a-z' 'A-Z' | sed 's/  .*//' 2>/dev/null)
+          # Claude stores the hash as a hex-to-escaped path; use the actual path match
+          local idx="" idx_dir
+          idx_dir=$(ls -d "$HOME/.claude/projects/"*/ 2>/dev/null | while read -r d; do
+            local op; op=$(cat "$d/sessions-index.json" 2>/dev/null | ${jq} -r '.originalPath // ""' 2>/dev/null)
+            [[ "$op" == "$path" ]] && { printf '%s' "$d"; break; }
+          done)
+          [[ -n "$idx_dir" ]] && idx=$(cat "$idx_dir/sessions-index.json" 2>/dev/null)
+          if [[ -n "$json" ]]; then
+            if [[ -n "$idx" ]]; then
+              printf '%s' "$idx" | ${jq} -c '[.entries[]|{sessionId,summary,firstPrompt,gitBranch,created,modified,messageCount}]'
+            else
+              echo '[]'
+            fi
+          else
+            if [[ -n "$idx" ]]; then
+              printf '%s' "$idx" | ${jq} -r '.entries[]|"\(.created[0:16])  \(.messageCount)msg  \(.gitBranch // "-")  \(.summary // .firstPrompt // "-")"' \
+                | column -t -s '  ' 2>/dev/null || printf '%s' "$idx" | ${jq} -r '.entries[]|[.created[0:16],.messageCount,.gitBranch // "-",.summary // "-"]|@tsv'
+            else
+              echo "dev session: no Claude sessions found for '$ref' at $path"
+            fi
+          fi
+          ;;
+        resume)
+          local ref="''${1:-}" sid="''${2:-}"
+          [[ -z "$ref" ]] && { echo "Usage: dev session resume <project> [session_id]" >&2; return 1; }
+          _dev_project_resolve "$ref" || { echo "dev session: unknown project '$ref'" >&2; return 1; }
+          if [[ -n "$sid" ]]; then
+            _dev_agent claude "$ref" --resume "$sid"
+          else
+            _dev_agent claude "$ref" --resume
+          fi
+          ;;
+        *)
+          echo "Usage: dev session <list|resume> <project> [args...]" >&2; return 1 ;;
+      esac
+    }
+
+    # ============ model catalog ============
+    # Show available models per tool.  dev models [tool] [--json]
+    _dev_models() {
+      local tool="''${1:-}" json=""
+      [[ "''${2:-}" == --json ]] && json=1
+      case "$tool" in
+        claude)
+          # Claude models are not dynamically listed via CLI; use well-known list.
+          local models='[
+            {"name":"claude-sonnet-4-6","alias":"sonnet","tier":"standard"},
+            {"name":"claude-opus-4-8","alias":"opus","tier":"powerful"},
+            {"name":"claude-haiku-4-5-20251001","alias":"haiku","tier":"fast"},
+            {"name":"claude-fable-5","alias":"fable","tier":"ultra"}
+          ]'
+          if [[ -n "$json" ]]; then printf '%s\n' "$models"
+          else printf '%s\n' "$models" | ${jq} -r '.[]|"\(.alias)\t\(.name)\t\(.tier)"' | column -t -s "$(printf '\t')"
+          fi
+          ;;
+        codex)
+          local out; out=$(codex debug models 2>/dev/null)
+          if [[ -n "$json" ]]; then printf '%s\n' "$out"
+          else printf '%s\n' "$out" | ${jq} -r '.[]|"\(.slug)\t\(.name // "")"' 2>/dev/null | column -t -s "$(printf '\t')"
+          fi
+          ;;
+        opencode)
+          local out; out=$(opencode models --verbose 2>/dev/null)
+          if [[ -n "$json" ]]; then printf '%s\n' "$out"
+          else printf '%s\n' "$out" | ${jq} -r '.[]|"\(.id)\t\(.name // "")"' 2>/dev/null | column -t -s "$(printf '\t')"
+          fi
+          ;;
+        "")
+          # All tools summary.
+          echo "=== claude ===" && _dev_models claude
+          echo "=== codex ===" && _dev_models codex
+          echo "=== opencode ===" && _dev_models opencode
+          ;;
+        *)
+          echo "dev models: unknown tool '$tool' (claude|codex|opencode)" >&2; return 1 ;;
+      esac
+    }
+
     # Poll `dev ps --json`; on an agent entering waiting/error, or a previously
     # seen agent disappearing (finished), push one Telegram notification.
+    _dev_usage() {
+      local json=0
+      while [[ $# -gt 0 ]]; do
+        case "$1" in --json) json=1; shift;; *) shift;; esac
+      done
+      local file="''${XDG_CACHE_HOME:-$HOME/.cache}/claude/usage.json"
+      if [[ ! -f "$file" ]]; then
+        echo "No usage data yet — start Claude Code and send at least one message." >&2
+        exit 1
+      fi
+      if [[ $json -eq 1 ]]; then
+        cat "$file"
+      else
+        ${jq} -r '
+          def pct: if . == null then "-" else "\(.)%" end;
+          def eta:
+            if . == null then "" else
+              (now - .) as $s |
+              if $s < 0 then " (resets in \(($s * -1) | floor / 60)m)" else "" end
+            end;
+          "claude usage",
+          "  5h:  \(.five_hour.used_percentage | pct)\(.five_hour.resets_at | eta)",
+          "  7d:  \(.seven_day.used_percentage | pct)\(.seven_day.resets_at | eta)",
+          "  updated: \(.updated_at | strftime("%H:%M:%S") // "-")"
+        ' "$file"
+      fi
+    }
+
     _dev_watch() {
       local interval=30 once=""
       while [[ $# -gt 0 ]]; do
@@ -1044,7 +1284,7 @@ let
       ${coderBin} "$@"
   '';
 
-  # `dev top` — live fleet TUI (ratatui). A pure client of `dev … --json`:
+  # `dev tui` — live fleet TUI (ratatui). A pure client of `dev … --json`:
   # it polls `dev ps --json` and shells out to dev for actions, holding no
   # local/remote/Coder logic of its own. Crate lives in pkgs/dev-tui.
   devTui = pkgs.rustPlatform.buildRustPackage {
@@ -1095,6 +1335,19 @@ let
         else
           _dev_targets_json | ${jq} -r '.[] | "\(.kind)\t\(.name)\t\(.path // .host // "")"' \
             | while IFS=$'\t' read -r k n p; do printf "%-16s %-26s %s\n" "$k" "$n" "$p"; done
+        fi
+        ;;
+
+      tools)
+        # Backend registry: agent tools known to dev.
+        # dev tools [--json]
+        _dev_take_flags "$@"
+        if [[ -n "$JSON" ]]; then
+          _dev_tools_json
+        else
+          _dev_tools_json | ${jq} -r \
+            '.[] | "\(.name)\tdispatch=\(.dispatchable)\treview=\(.review)\tps=\(.ps_detect)\tattach=\(.attach)"' \
+            | column -t -s "$(printf '\t')"
         fi
         ;;
 
@@ -1221,6 +1474,8 @@ let
               cjson=$(claude agents --json --cwd "$lp" 2>/dev/null)
             fi
             [[ -z "''${cjson:-}" ]] && cjson='[]'
+            # Save full claude JSON for JSON renderer (session_id/name enrichment).
+            printf '%s' "$cjson" > "$tmpdir/cj_L_$n"
             printf '%s' "$cjson" \
               | ${jq} -r '.[]? | "claude \(.pid) \(.status)/\(.kind)"' 2>/dev/null \
               >> "$tmpdir/L_$n"
@@ -1256,6 +1511,7 @@ let
               if [[ $rc -ne 0 ]]; then
                 echo "unreachable" > "$tmpdir/R_$n"
               else
+                printf '%s' "$cjson" > "$tmpdir/cj_R_$n"
                 printf '%s' "$cjson" \
                   | ${jq} -r '.[]? | "claude \(.pid) \(.status)/\(.kind)"' 2>/dev/null \
                   >> "$tmpdir/R_$n"
@@ -1311,18 +1567,24 @@ let
           case "$result" in
             stopped|unreachable|"?"|"n/a"*)
               ${jq} -n -c --arg t "$n" --arg loc "$loc" --arg st "$result" \
-                '{target:$t,location:$loc,tool:null,pid:null,status:$st,kind:null,cwd:null}' ;;
+                '{target:$t,location:$loc,tool:null,pid:null,status:$st,kind:null,cwd:null,session_id:null,name:null}' ;;
             *)
               while IFS= read -r line; do
                 [[ -z "$line" ]] && continue
                 tool=''${line%% *}; rest=''${line#* }; pid=''${rest%% *}; detail=''${rest#* }
                 if [[ "$tool" == claude ]]; then
                   st=''${detail%%/*}; kd=''${detail#*/}
+                  local cjf="$tmpdir/cj_$key" sid="" nm=""
+                  if [[ -f "$cjf" ]]; then
+                    sid=$(${jq} -r --argjson p "$pid" '.[]?|select(.pid==$p)|.sessionId // ""' "$cjf" 2>/dev/null)
+                    nm=$(${jq} -r --argjson p "$pid" '.[]?|select(.pid==$p)|.name // ""' "$cjf" 2>/dev/null)
+                  fi
                   ${jq} -n -c --arg t "$n" --arg loc "$loc" --argjson pid "$pid" --arg st "$st" --arg kd "$kd" \
-                    '{target:$t,location:$loc,tool:"claude",pid:$pid,status:$st,kind:$kd,cwd:null}'
+                    --arg sid "$sid" --arg nm "$nm" \
+                    '{target:$t,location:$loc,tool:"claude",pid:$pid,status:$st,kind:$kd,cwd:null,session_id:$sid,name:$nm}'
                 else
                   ${jq} -n -c --arg t "$n" --arg loc "$loc" --arg tool "$tool" --argjson pid "$pid" --arg cwd "$detail" \
-                    '{target:$t,location:$loc,tool:$tool,pid:$pid,status:"running",kind:null,cwd:$cwd}'
+                    '{target:$t,location:$loc,tool:$tool,pid:$pid,status:"running",kind:null,cwd:$cwd,session_id:null,name:null}'
                 fi
               done <<< "$result" ;;
           esac
@@ -1370,6 +1632,18 @@ let
         _dev_dispatch "$@"
         ;;
 
+      review)
+        _dev_review "$@"
+        ;;
+
+      session)
+        _dev_session "$@"
+        ;;
+
+      models)
+        _dev_models "''${1:-}" "''${2:-}"
+        ;;
+
       attach)
         _dev_attach "''${1:-}"
         ;;
@@ -1398,8 +1672,12 @@ let
         _dev_watch "$@"
         ;;
 
-      top)
+      tui)
         exec ${devTui}/bin/dev-tui "$@"
+        ;;
+
+      usage)
+        _dev_usage "$@"
         ;;
 
       *)
@@ -1407,6 +1685,7 @@ let
         echo "" >&2
         echo "  ls [--json]               List envs and projects" >&2
         echo "  targets [--json]          Flat enumeration of every project + env" >&2
+        echo "  tools [--json]            Backend registry (agent tools and their capabilities)" >&2
         echo "  run [--json] <name|--all|a,b,c> <cmd>  Run command (single streams; multi fans out)" >&2
         echo "  shell <env|project>       Interactive shell (env: root, project: project dir)" >&2
         echo "  code <project>            Open project in VS Code" >&2
@@ -1416,7 +1695,10 @@ let
         echo "  codex    <project>        Start OpenAI Codex in project dir" >&2
         echo "  opencode <project>        Start opencode in project dir" >&2
         echo "  agy      <project>        Start antigravity in project dir" >&2
-        echo "  dispatch <project> [--tool t] [--worktree b] <task>  Launch background agent" >&2
+        echo "  dispatch <project> [--tool t] [--model m] [--effort e] [--sandbox s] [--worktree b] <task>  Launch background agent" >&2
+        echo "  review <project> [--tool codex|opencode|agy|claude] [--base ref] [--json]  Code review" >&2
+        echo "  session <list|resume> <project> [id]  Session management" >&2
+        echo "  models [claude|codex|opencode] [--json]  List available models per tool" >&2
         echo "  attach <project|id>       Attach to a dispatched agent" >&2
         echo "  logs <project|id> [-f]    Tail a dispatched agent log" >&2
         echo "  kill <project|id>         Stop a dispatched agent" >&2
@@ -1428,7 +1710,8 @@ let
         echo "  ps [--json]               Agent process status (local + remote projects)" >&2
         echo "  notify <message...>       Send a Telegram push" >&2
         echo "  dash                      Live fleet dashboard (fzf over ps)" >&2
-        echo "  top                       Live fleet TUI (ratatui)" >&2
+        echo "  tui                       Live fleet TUI (ratatui, review/dispatch/model picker)" >&2
+        echo "  usage [--json]            Claude rate-limit usage (5h/7d, from statusline cache)" >&2
         exit 1
         ;;
     esac
@@ -1443,6 +1726,46 @@ in
     devTui
     opencodeWrapper
   ];
+
+  # ~/.claude/statusline.sh — piped JSON from Claude Code on each API response.
+  # Caches rate_limits to ~/.cache/claude/usage.json for `dev usage` and the TUI.
+  home.file.".claude/statusline.sh" = {
+    executable = true;
+    text = ''
+      #!/usr/bin/env bash
+      input=$(cat)
+      cache_dir="''${XDG_CACHE_HOME:-$HOME/.cache}/claude"
+      cache_file="$cache_dir/usage.json"
+      mkdir -p "$cache_dir"
+      printf '%s' "$input" | ${jq} '{
+        updated_at: now,
+        five_hour: .rate_limits.five_hour,
+        seven_day: .rate_limits.seven_day
+      }' > "$cache_file.tmp" && mv "$cache_file.tmp" "$cache_file"
+      five_hour=$(printf '%s' "$input" | ${jq} -r '.rate_limits.five_hour.used_percentage // empty')
+      seven_day=$(printf '%s' "$input" | ${jq} -r '.rate_limits.seven_day.used_percentage // empty')
+      if [[ -n "$five_hour" ]]; then
+        printf '5h:%.0f%% 7d:%.0f%%\n' "$five_hour" "$seven_day"
+      fi
+    '';
+  };
+
+  # Inject statusLine into ~/.claude/settings.json (merged, not replaced).
+  # Claude Code writes this file itself so we cannot manage it as a symlink —
+  # activation merge is the right approach: idempotent, survives Claude Code's writes.
+  home.activation.claudeStatusline = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    settings="$HOME/.claude/settings.json"
+    script="$HOME/.claude/statusline.sh"
+    if [[ -f "$settings" ]]; then
+      run ${jq} --arg cmd "$script" \
+        '. + {statusLine: {type: "command", command: $cmd}}' \
+        "$settings" > "$settings.tmp" && mv "$settings.tmp" "$settings"
+    else
+      run ${jq} -n --arg cmd "$script" \
+        '{statusLine: {type: "command", command: $cmd}}' \
+        > "$settings"
+    fi
+  '';
 
   programs.ssh.settings = {
     "coder.*" = {
