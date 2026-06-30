@@ -2448,20 +2448,517 @@ Rules:
             fi
             ;;
 
+          # dev task dispatch <task-id> [--tool t] [--model m] [--worktree b] [--force] [--json]
+          dispatch)
+            task_id="''${1:-}"; shift || true
+            disp_tool="claude"; disp_model=""; disp_wt=""; FORCE=""; JSON=""
+            while [[ $# -gt 0 ]]; do
+              case "''${1:-}" in
+                --tool)     disp_tool="''${2:-}";  shift 2 ;;
+                --model)    disp_model="''${2:-}"; shift 2 ;;
+                --worktree) disp_wt="''${2:-}";    shift 2 ;;
+                --force)    FORCE=1; shift ;;
+                --json)     JSON=1;  shift ;;
+                *) shift ;;
+              esac
+            done
+            if [[ -z "$task_id" ]]; then
+              echo "Usage: dev task dispatch <task-id> [--tool <t>] [--worktree <b>] [--force] [--json]" >&2
+              exit 1
+            fi
+            tdir=$(_task_find_tdir "$task_id") || {
+              [[ -n "$JSON" ]] && _task_json_err "not_found" "task not found" "$task_id" || echo "not found: $task_id" >&2; exit 1
+            }
+            pname=$(${jq} -r '.project_id' "''${tdir}/task.json")
+            disp_phase=$(${jq} -r '.phase // "draft"' "''${tdir}/task.json")
+            if [[ "$disp_phase" != "approved" && "$disp_phase" != "needs_fix" ]]; then
+              [[ -n "$JSON" ]] && _task_json_err "wrong_phase" "phase must be approved or needs_fix (is $disp_phase)" "$task_id" \
+                || echo "error: phase is $disp_phase (need approved or needs_fix)" >&2
+              exit 1
+            fi
+            if [[ ! -f "''${tdir}/approved-plan.md" ]]; then
+              [[ -n "$JSON" ]] && _task_json_err "no_plan" "approved-plan.md not found" "$task_id" \
+                || echo "error: approved-plan.md not found in $tdir" >&2
+              exit 1
+            fi
+            if [[ -z "$disp_wt" ]]; then
+              disp_wt="task/$(echo "$task_id" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')"
+            fi
+            if [[ -z "$FORCE" ]]; then
+              store=$(_task_store)
+              my_scope=$(${jq} -r '.scope.allowed_paths // [] | join(",")' "''${tdir}/task.json" 2>/dev/null)
+              if [[ -n "$my_scope" ]]; then
+                for other_tdir in "$store"/*/tasks/*/; do
+                  [[ -d "$other_tdir" ]] || continue
+                  [[ "$other_tdir" == "''${tdir}/" ]] && continue
+                  other_id=$(${jq} -r '.id // ""' "''${other_tdir}task.json" 2>/dev/null)
+                  [[ -z "$other_id" || "$other_id" == "$task_id" ]] && continue
+                  other_phase=$(${jq} -r '.phase // "draft"' "''${other_tdir}task.json" 2>/dev/null)
+                  [[ "$other_phase" =~ ^(implementing|review|mergeable)$ ]] || continue
+                  other_scope=$(${jq} -r '.scope.allowed_paths // [] | join(",")' "''${other_tdir}task.json" 2>/dev/null)
+                  [[ -z "$other_scope" ]] && continue
+                  IFS=',' read -ra my_paths <<< "$my_scope"
+                  for mp in "''${my_paths[@]}"; do
+                    [[ -z "$mp" ]] && continue
+                    if [[ "$other_scope" == *"$mp"* ]]; then
+                      echo "warning: $task_id may overlap with $other_id ($other_phase) on $mp. Use --force to skip." >&2
+                      break
+                    fi
+                  done
+                done
+              fi
+            fi
+            FORCE=""
+            tmp=$(${jq} --arg wt "$disp_wt" --arg tool "$disp_tool" --arg model "$disp_model" \
+              '.worktree_branch = $wt | .assigned_tool = $tool | if $model != "" then .assigned_model = $model else . end' \
+              "''${tdir}/task.json")
+            printf '%s\n' "$tmp" > "''${tdir}/task.json"
+            _task_phase_set "$tdir" "implementing" "dev" "implementation agent dispatched"
+            _task_event_append "$tdir" "implementation_started" "dev" \
+              "dispatched $disp_tool on worktree $disp_wt" \
+              "$(${jq} -n -c --arg tool "$disp_tool" --arg wt "$disp_wt" '{tool:$tool,worktree:$wt}')"
+            impl_prompt="You are implementing approved dev task $task_id for project $pname.
+
+Rules:
+- Read: dev task context $task_id --markdown
+- Implement only the approved plan.
+- Do not broaden scope.
+- Respect allowed_paths and forbidden_paths.
+- If the approved plan is insufficient or contradicts the code, run:
+    dev task ask $task_id \"<question>\" --category <category> --severity blocking
+  and stop.
+- Run the declared validation commands when feasible.
+- At the end, write a handoff:
+    dev task write-handoff $task_id
+  Include: changed files, tests run, results, risks, follow-up."
+            if [[ -n "$disp_model" ]]; then
+              _dev_dispatch "$pname" --tool "$disp_tool" --worktree "$disp_wt" --model "$disp_model" "$impl_prompt"
+            else
+              _dev_dispatch "$pname" --tool "$disp_tool" --worktree "$disp_wt" "$impl_prompt"
+            fi
+            if [[ -n "$JSON" ]]; then
+              _task_json_ok "$task_id" "$pname" "implementing" "dispatched $disp_tool on $disp_wt"
+            else
+              echo "implementing: $task_id (project=$pname tool=$disp_tool worktree=$disp_wt)"
+            fi
+            ;;
+
+          # dev task attach <task-id>
+          attach)
+            task_id="''${1:-}"; shift || true
+            if [[ -z "$task_id" ]]; then echo "Usage: dev task attach <task-id>" >&2; exit 1; fi
+            tdir=$(_task_find_tdir "$task_id") || { echo "not found: $task_id" >&2; exit 1; }
+            pname=$(${jq} -r '.project_id' "''${tdir}/task.json")
+            _dev_attach "$pname"
+            ;;
+
+          # dev task logs <task-id> [-f] [--json]
+          logs)
+            task_id="''${1:-}"; shift || true
+            logs_follow=""; logs_json_flag=""
+            while [[ $# -gt 0 ]]; do
+              case "''${1:-}" in
+                -f|--follow) logs_follow="-f"; shift ;;
+                --json)      logs_json_flag="--json"; shift ;;
+                *) shift ;;
+              esac
+            done
+            if [[ -z "$task_id" ]]; then echo "Usage: dev task logs <task-id> [-f] [--json]" >&2; exit 1; fi
+            tdir=$(_task_find_tdir "$task_id") || { echo "not found: $task_id" >&2; exit 1; }
+            pname=$(${jq} -r '.project_id' "''${tdir}/task.json")
+            _dev_logs "$pname" ''${logs_follow:+"$logs_follow"} ''${logs_json_flag:+"$logs_json_flag"}
+            ;;
+
+          # dev task kill <task-id> [--json]
+          kill)
+            task_id="''${1:-}"; shift || true
+            JSON=""
+            while [[ $# -gt 0 ]]; do
+              case "''${1:-}" in --json) JSON=1; shift ;; *) shift ;; esac
+            done
+            if [[ -z "$task_id" ]]; then echo "Usage: dev task kill <task-id> [--json]" >&2; exit 1; fi
+            tdir=$(_task_find_tdir "$task_id") || {
+              [[ -n "$JSON" ]] && _task_json_err "not_found" "task not found" "$task_id" || echo "not found: $task_id" >&2; exit 1
+            }
+            pname=$(${jq} -r '.project_id' "''${tdir}/task.json")
+            _dev_kill "$pname" || true
+            _task_phase_set "$tdir" "killed" "human" "task killed"
+            _task_event_append "$tdir" "task_killed" "human" "agent killed for $task_id"
+            [[ -n "$JSON" ]] && _task_json_ok "$task_id" "$pname" "killed" "agent killed" || echo "killed: $task_id"
+            ;;
+
+          # dev task write-handoff <task-id> [--file <path>] [--json]
+          write-handoff)
+            task_id="''${1:-}"; shift || true
+            wh_file=""; JSON=""
+            while [[ $# -gt 0 ]]; do
+              case "''${1:-}" in
+                --file) wh_file="''${2:-}"; shift 2 ;;
+                --json) JSON=1; shift ;;
+                *) shift ;;
+              esac
+            done
+            if [[ -z "$task_id" ]]; then echo "Usage: dev task write-handoff <task-id> [--file <path>] [--json]" >&2; exit 1; fi
+            tdir=$(_task_find_tdir "$task_id") || {
+              [[ -n "$JSON" ]] && _task_json_err "not_found" "task not found" "$task_id" || echo "not found: $task_id" >&2; exit 1
+            }
+            pname=$(${jq} -r '.project_id' "''${tdir}/task.json")
+            if [[ -n "$wh_file" ]]; then
+              wh_content=$(cat "$wh_file" 2>/dev/null) || { echo "error: cannot read $wh_file" >&2; exit 1; }
+            else
+              wh_content=$(cat)
+            fi
+            printf '%s\n' "$wh_content" > "''${tdir}/handoff.md"
+            pdir="$(_task_store)/$pname"
+            open_blocking=$(_task_blocking_questions_open "$pdir" "$task_id")
+            if [[ "$open_blocking" -gt 0 ]]; then
+              wh_new_phase="needs_spec"
+            else
+              wh_new_phase="review"
+            fi
+            _task_phase_set "$tdir" "$wh_new_phase" "dev" "handoff written"
+            wh_summary=$(printf '%s' "$wh_content" | head -c 200)
+            tmp=$(${jq} --arg s "$wh_summary" '.summary.latest_handoff = $s' "''${tdir}/task.json")
+            printf '%s\n' "$tmp" > "''${tdir}/task.json"
+            _task_event_append "$tdir" "handoff_written" "dev" "handoff written (phase->$wh_new_phase)"
+            [[ -n "$JSON" ]] && _task_json_ok "$task_id" "$pname" "$wh_new_phase" "handoff written" \
+              || echo "handoff written: $task_id (phase=$wh_new_phase)"
+            ;;
+
+          # dev task handoff <task-id> [--markdown|--json]
+          handoff)
+            task_id="''${1:-}"; shift || true
+            ho_json=""; ho_md=""
+            while [[ $# -gt 0 ]]; do
+              case "''${1:-}" in
+                --json)     ho_json=1; shift ;;
+                --markdown) ho_md=1;   shift ;;
+                *) shift ;;
+              esac
+            done
+            if [[ -z "$task_id" ]]; then echo "Usage: dev task handoff <task-id> [--markdown|--json]" >&2; exit 1; fi
+            tdir=$(_task_find_tdir "$task_id") || { echo "not found: $task_id" >&2; exit 1; }
+            pname=$(${jq} -r '.project_id' "''${tdir}/task.json")
+            ho_path="''${tdir}/handoff.md"
+            if [[ -n "$ho_json" ]]; then
+              if [[ -f "$ho_path" ]]; then
+                ho_text=$(cat "$ho_path")
+                ${jq} -n -c --arg tid "$task_id" --arg pid "$pname" --arg h "$ho_text" --argjson ex true \
+                  '{task_id:$tid,project_id:$pid,handoff:$h,exists:$ex}'
+              else
+                ${jq} -n -c --arg tid "$task_id" --arg pid "$pname" --argjson ex false \
+                  '{task_id:$tid,project_id:$pid,handoff:"",exists:$ex}'
+              fi
+            else
+              if [[ -f "$ho_path" ]]; then
+                cat "$ho_path"
+              else
+                echo "(no handoff yet)"
+              fi
+            fi
+            ;;
+
+          # dev task harvest <task-id> [--json]
+          harvest)
+            task_id="''${1:-}"; shift || true
+            JSON=""
+            while [[ $# -gt 0 ]]; do
+              case "''${1:-}" in --json) JSON=1; shift ;; *) shift ;; esac
+            done
+            if [[ -z "$task_id" ]]; then echo "Usage: dev task harvest <task-id> [--json]" >&2; exit 1; fi
+            tdir=$(_task_find_tdir "$task_id") || {
+              [[ -n "$JSON" ]] && _task_json_err "not_found" "task not found" "$task_id" || echo "not found: $task_id" >&2; exit 1
+            }
+            pname=$(${jq} -r '.project_id' "''${tdir}/task.json")
+            hv_diff_json=$(_dev_diff "$pname" --json 2>/dev/null) || hv_diff_json="{}"
+            hv_files=$(printf '%s' "$hv_diff_json" | ${jq} -c '[.files[]? | select(.path != null) | .path] // []' 2>/dev/null || echo "[]")
+            hv_count=$(printf '%s' "$hv_files" | ${jq} 'length' 2>/dev/null || echo 0)
+            tmp=$(${jq} --argjson files "$hv_files" '.summary.diff_files = $files' "''${tdir}/task.json")
+            printf '%s\n' "$tmp" > "''${tdir}/task.json"
+            if [[ -f "''${tdir}/handoff.md" ]]; then
+              hv_ho=$(head -c 150 "''${tdir}/handoff.md")
+              tmp=$(${jq} --arg s "$hv_ho" '.summary.latest_handoff = $s' "''${tdir}/task.json")
+              printf '%s\n' "$tmp" > "''${tdir}/task.json"
+            fi
+            _task_event_append "$tdir" "diff_harvested" "dev" \
+              "harvested $hv_count files from diff" \
+              "$(${jq} -n -c --argjson n "$hv_count" '{file_count:$n}')"
+            hv_phase=$(${jq} -r '.phase' "''${tdir}/task.json")
+            [[ -n "$JSON" ]] && _task_json_ok "$task_id" "$pname" "$hv_phase" "harvested $hv_count files" \
+              || echo "harvested: $hv_count files ($task_id)"
+            ;;
+
+          # dev task diff <task-id> [--stat] [--json]
+          diff)
+            task_id="''${1:-}"; shift || true
+            diff_stat=""; diff_json_flag=""
+            while [[ $# -gt 0 ]]; do
+              case "''${1:-}" in
+                --stat) diff_stat="--stat"; shift ;;
+                --json) diff_json_flag="--json"; shift ;;
+                *) shift ;;
+              esac
+            done
+            if [[ -z "$task_id" ]]; then echo "Usage: dev task diff <task-id> [--stat] [--json]" >&2; exit 1; fi
+            tdir=$(_task_find_tdir "$task_id") || { echo "not found: $task_id" >&2; exit 1; }
+            pname=$(${jq} -r '.project_id' "''${tdir}/task.json")
+            _dev_diff "$pname" ''${diff_stat:+"$diff_stat"} ''${diff_json_flag:+"$diff_json_flag"}
+            ;;
+
+          # dev task test <task-id> [--cmd <cmd>] [--json]
+          test)
+            task_id="''${1:-}"; shift || true
+            test_cmd=""; JSON=""
+            while [[ $# -gt 0 ]]; do
+              case "''${1:-}" in
+                --cmd)  test_cmd="''${2:-}"; shift 2 ;;
+                --json) JSON=1; shift ;;
+                *) shift ;;
+              esac
+            done
+            if [[ -z "$task_id" ]]; then echo "Usage: dev task test <task-id> [--cmd <cmd>] [--json]" >&2; exit 1; fi
+            tdir=$(_task_find_tdir "$task_id") || {
+              [[ -n "$JSON" ]] && _task_json_err "not_found" "task not found" "$task_id" || echo "not found: $task_id" >&2; exit 1
+            }
+            pname=$(${jq} -r '.project_id' "''${tdir}/task.json")
+            if [[ -n "$test_cmd" ]]; then
+              test_cmds_json=$(${jq} -n -c --arg c "$test_cmd" '[$c]')
+            else
+              test_cmds_json=$(${jq} -c '.validation.commands // []' "''${tdir}/task.json" 2>/dev/null || echo "[]")
+            fi
+            vid="V-$(date +%Y%m%d)-$(printf '%03d' $((RANDOM % 999 + 1)))"
+            ts=$(_task_now_iso)
+            test_passed=0; test_failed=0; test_results="[]"
+            while IFS= read -r tc; do
+              [[ -z "$tc" ]] && continue
+              tc_out=$(_dev_resolve_and_run "$pname" "$tc" 2>&1); tc_rc=$?
+              if [[ $tc_rc -eq 0 ]]; then
+                tc_ok="true"; test_passed=$((test_passed + 1))
+              else
+                tc_ok="false"; test_failed=$((test_failed + 1))
+              fi
+              test_results=$(printf '%s' "$test_results" | ${jq} -c \
+                --arg cmd "$tc" --argjson ok "$tc_ok" --arg out "$tc_out" \
+                '. + [{cmd:$cmd,ok:$ok,output:$out}]')
+            done < <(printf '%s' "$test_cmds_json" | ${jq} -r '.[]')
+            if [[ $test_failed -eq 0 ]]; then
+              test_status="passed"
+            elif [[ $test_passed -eq 0 ]]; then
+              test_status="failed"
+            else
+              test_status="partial"
+            fi
+            mkdir -p "''${tdir}/test-results"
+            test_result_json=$(${jq} -n -c \
+              --arg id "$vid" --arg tid "$task_id" --arg ts "$ts" \
+              --argjson cmds "$test_cmds_json" --argjson results "$test_results" \
+              --argjson passed "$test_passed" --argjson failed "$test_failed" \
+              '{id:$id,task_id:$tid,commands:$cmds,results:$results,passed:$passed,failed:$failed,ts:$ts}')
+            printf '%s\n' "$test_result_json" > "''${tdir}/test-results/''${vid}.json"
+            tmp=$(${jq} --arg s "$test_status" '.summary.test_status = $s' "''${tdir}/task.json")
+            printf '%s\n' "$tmp" > "''${tdir}/task.json"
+            _task_event_append "$tdir" "test_completed" "dev" \
+              "tests: $test_passed passed, $test_failed failed" \
+              "$(${jq} -n -c --argjson p "$test_passed" --argjson f "$test_failed" '{passed:$p,failed:$f}')"
+            if [[ -n "$JSON" ]]; then
+              printf '%s\n' "$test_result_json"
+            else
+              echo "test $vid: $test_passed passed, $test_failed failed (status=$test_status)"
+            fi
+            ;;
+
+          # dev task review <task-id> [--tool <tool>] [--json]
+          review)
+            task_id="''${1:-}"; shift || true
+            rv_tool=""; JSON=""
+            while [[ $# -gt 0 ]]; do
+              case "''${1:-}" in
+                --tool) rv_tool="''${2:-}"; shift 2 ;;
+                --json) JSON=1; shift ;;
+                *) shift ;;
+              esac
+            done
+            if [[ -z "$task_id" ]]; then echo "Usage: dev task review <task-id> [--tool <t>] [--json]" >&2; exit 1; fi
+            tdir=$(_task_find_tdir "$task_id") || {
+              [[ -n "$JSON" ]] && _task_json_err "not_found" "task not found" "$task_id" || echo "not found: $task_id" >&2; exit 1
+            }
+            pname=$(${jq} -r '.project_id' "''${tdir}/task.json")
+            rv_wt=$(${jq} -r '.worktree_branch // ""' "''${tdir}/task.json")
+            rv_nfiles=$(${jq} -r '(.summary.diff_files // []) | length' "''${tdir}/task.json" 2>/dev/null || echo 0)
+            if [[ -z "$rv_wt" && "$rv_nfiles" -eq 0 ]]; then
+              [[ -n "$JSON" ]] && _task_json_err "diff_missing" "no worktree or diff_files for $task_id" "$task_id" \
+                || echo "error: no worktree_branch or diff_files -- run harvest first" >&2
+              exit 1
+            fi
+            rid="R-$(date +%Y%m%d)-$(printf '%03d' $((RANDOM % 999 + 1)))"
+            ts=$(_task_now_iso)
+            if [[ -n "$rv_tool" ]]; then
+              rv_out=$(_dev_review "$pname" --tool "$rv_tool" 2>&1)
+            else
+              rv_out=$(_dev_review "$pname" 2>&1)
+            fi
+            mkdir -p "''${tdir}/reviews"
+            printf '%s\n' "$rv_out" > "''${tdir}/reviews/''${rid}.md"
+            rv_rec="unknown"
+            if printf '%s' "$rv_out" | grep -qi 'mergeable'; then rv_rec="mergeable"
+            elif printf '%s' "$rv_out" | grep -qi 'needs.fix'; then rv_rec="needs_fix"
+            elif printf '%s' "$rv_out" | grep -qi 'reject'; then rv_rec="reject"
+            fi
+            rv_tool_used="''${rv_tool:-auto}"
+            rv_json=$(${jq} -n -c \
+              --arg id "$rid" --arg tid "$task_id" --arg tool "$rv_tool_used" \
+              --arg out "$rv_out" --arg rec "$rv_rec" --arg ts "$ts" \
+              '{id:$id,task_id:$tid,tool:$tool,output:$out,recommendation:$rec,ts:$ts}')
+            printf '%s\n' "$rv_json" > "''${tdir}/reviews/''${rid}.json"
+            tmp=$(${jq} --arg rs "$rv_rec" '.summary.review_status = $rs' "''${tdir}/task.json")
+            printf '%s\n' "$tmp" > "''${tdir}/task.json"
+            case "$rv_rec" in
+              reject)    _task_phase_set "$tdir" "rejected"  "dev" "review recommendation: $rv_rec" ;;
+              needs_fix) _task_phase_set "$tdir" "needs_fix" "dev" "review recommendation: $rv_rec" ;;
+              mergeable) _task_phase_set "$tdir" "mergeable" "dev" "review recommendation: $rv_rec" ;;
+            esac
+            _task_event_append "$tdir" "review_completed" "dev" \
+              "review $rid: $rv_rec" \
+              "$(${jq} -n -c --arg rid "$rid" --arg rec "$rv_rec" '{rid:$rid,recommendation:$rec}')"
+            if [[ -n "$JSON" ]]; then
+              printf '%s\n' "$rv_json"
+            else
+              printf '%s\n' "$rv_out"
+              echo ""
+              echo "review $rid: recommendation=$rv_rec"
+            fi
+            ;;
+
+          # dev task fix <task-id> [--tool <tool>] [--model <m>] [--json]
+          fix)
+            task_id="''${1:-}"; shift || true
+            fix_tool="claude"; fix_model=""; JSON=""
+            while [[ $# -gt 0 ]]; do
+              case "''${1:-}" in
+                --tool)  fix_tool="''${2:-}";  shift 2 ;;
+                --model) fix_model="''${2:-}"; shift 2 ;;
+                --json)  JSON=1; shift ;;
+                *) shift ;;
+              esac
+            done
+            if [[ -z "$task_id" ]]; then echo "Usage: dev task fix <task-id> [--tool <t>] [--model <m>] [--json]" >&2; exit 1; fi
+            tdir=$(_task_find_tdir "$task_id") || {
+              [[ -n "$JSON" ]] && _task_json_err "not_found" "task not found" "$task_id" || echo "not found: $task_id" >&2; exit 1
+            }
+            pname=$(${jq} -r '.project_id' "''${tdir}/task.json")
+            fix_phase=$(${jq} -r '.phase // "draft"' "''${tdir}/task.json")
+            if [[ "$fix_phase" != "needs_fix" ]]; then
+              [[ -n "$JSON" ]] && _task_json_err "wrong_phase" "phase must be needs_fix (is $fix_phase)" "$task_id" \
+                || echo "error: phase is $fix_phase (need needs_fix)" >&2
+              exit 1
+            fi
+            fix_wt=$(${jq} -r '.worktree_branch // ""' "''${tdir}/task.json")
+            fix_prompt="You are fixing dev task $task_id (phase: needs_fix) for project $pname.
+
+Rules:
+- Read: dev task context $task_id --markdown for the approved plan.
+- Read: dev task handoff $task_id --markdown for the last handoff and review feedback.
+- Fix only the reported issues. Do not change unrelated code.
+- Run declared validation commands.
+- At the end, write a new handoff: dev task write-handoff $task_id"
+            _task_phase_set "$tdir" "implementing" "dev" "fix agent dispatched"
+            _task_event_append "$tdir" "implementation_started" "dev" \
+              "fix agent dispatched (tool=$fix_tool)" \
+              "$(${jq} -n -c --arg tool "$fix_tool" --arg wt "$fix_wt" '{tool:$tool,worktree:$wt}')"
+            if [[ -n "$fix_wt" ]]; then
+              if [[ -n "$fix_model" ]]; then
+                _dev_dispatch "$pname" --tool "$fix_tool" --worktree "$fix_wt" --model "$fix_model" "$fix_prompt"
+              else
+                _dev_dispatch "$pname" --tool "$fix_tool" --worktree "$fix_wt" "$fix_prompt"
+              fi
+            else
+              if [[ -n "$fix_model" ]]; then
+                _dev_dispatch "$pname" --tool "$fix_tool" --model "$fix_model" "$fix_prompt"
+              else
+                _dev_dispatch "$pname" --tool "$fix_tool" "$fix_prompt"
+              fi
+            fi
+            if [[ -n "$JSON" ]]; then
+              _task_json_ok "$task_id" "$pname" "implementing" "fix agent dispatched (tool=$fix_tool)"
+            else
+              echo "implementing: $task_id (project=$pname tool=$fix_tool phase=fix)"
+            fi
+            ;;
+
+          # dev task pr <task-id> [--title <t>] [--base <base>] [--draft] [--json]
+          pr)
+            task_id="''${1:-}"; shift || true
+            pr_title=""; pr_base="main"; pr_draft=""; JSON=""
+            while [[ $# -gt 0 ]]; do
+              case "''${1:-}" in
+                --title) pr_title="''${2:-}"; shift 2 ;;
+                --base)  pr_base="''${2:-}";  shift 2 ;;
+                --draft) pr_draft=1; shift ;;
+                --json)  JSON=1; shift ;;
+                *) shift ;;
+              esac
+            done
+            if [[ -z "$task_id" ]]; then echo "Usage: dev task pr <task-id> [--title <t>] [--base <b>] [--draft] [--json]" >&2; exit 1; fi
+            tdir=$(_task_find_tdir "$task_id") || {
+              [[ -n "$JSON" ]] && _task_json_err "not_found" "task not found" "$task_id" || echo "not found: $task_id" >&2; exit 1
+            }
+            pname=$(${jq} -r '.project_id' "''${tdir}/task.json")
+            pr_phase=$(${jq} -r '.phase // "draft"' "''${tdir}/task.json")
+            if [[ "$pr_phase" != "mergeable" ]]; then
+              [[ -n "$JSON" ]] && _task_json_err "wrong_phase" "phase must be mergeable (is $pr_phase)" "$task_id" \
+                || echo "error: phase is $pr_phase (need mergeable)" >&2
+              exit 1
+            fi
+            pr_args=("$pname" "--base" "$pr_base")
+            [[ -n "$pr_title" ]] && pr_args+=("--title" "$pr_title")
+            [[ -n "$pr_draft" ]] && pr_args+=("--draft")
+            [[ -n "$JSON"     ]] && pr_args+=("--json")
+            pr_out=$(_dev_pr "''${pr_args[@]}" 2>&1); pr_rc=$?
+            if [[ $pr_rc -ne 0 ]]; then
+              [[ -n "$JSON" ]] && _task_json_err "pr_failed" "$pr_out" "$task_id" || echo "error: $pr_out" >&2
+              exit 1
+            fi
+            pr_url=$(printf '%s' "$pr_out" | grep -oE 'https://[^ ]+/pull/[0-9]+' | head -1)
+            ts=$(_task_now_iso)
+            tmp=$(${jq} --arg url "$pr_url" --arg ts "$ts" \
+              '.links.pr_url = $url | .updated_at = $ts' "''${tdir}/task.json")
+            printf '%s\n' "$tmp" > "''${tdir}/task.json"
+            _task_phase_set "$tdir" "merged" "dev" "PR created"
+            _task_event_append "$tdir" "pr_created" "dev" "PR created: $pr_url" \
+              "$(${jq} -n -c --arg url "$pr_url" '{url:$url}')"
+            if [[ -n "$JSON" ]]; then
+              _task_json_ok "$task_id" "$pname" "merged" "PR: ''${pr_url}"
+            else
+              echo "PR: ''${pr_url:-$pr_out}"
+            fi
+            ;;
+
           *)
             echo "Usage: dev task <command> [args...]" >&2
             echo "" >&2
-            echo "  new <project> --title <title> [--brief <text>]   Create task" >&2
-            echo "  list [project] [--phase <phase>] [--json]         List tasks" >&2
-            echo "  show <task-id> [--json]                           Show task" >&2
-            echo "  context <task-id> [--markdown|--json]             Agent context" >&2
-            echo "  events <task-id> [--json]                         Task events" >&2
+            echo "  new <project> --title <title> [--brief <text>]    Create task" >&2
+            echo "  list [project] [--phase <phase>] [--json]          List tasks" >&2
+            echo "  show <task-id> [--json]                            Show task" >&2
+            echo "  context <task-id> [--markdown|--json]              Agent context" >&2
+            echo "  events <task-id> [--json]                          Task events" >&2
             echo "  ask <task-id> <question> [--category <c>] [--severity <s>]" >&2
-            echo "  answer <question-id> <answer> [--json]            Answer question" >&2
-            echo "  write-plan <task-id> [--file <path>] [--json]     Save plan (agent)" >&2
-            echo "  approve <task-id> [--json]                        Approve plan" >&2
-            echo "  reject <task-id> [--reason <text>] [--json]       Reject task" >&2
-            echo "  plan <task-id> [--tool <t>] [--model <m>]         Start planning agent" >&2
+            echo "  answer <question-id> <answer> [--json]             Answer question" >&2
+            echo "  write-plan <task-id> [--file <path>] [--json]      Save plan (agent)" >&2
+            echo "  approve <task-id> [--json]                         Approve plan" >&2
+            echo "  reject <task-id> [--reason <text>] [--json]        Reject task" >&2
+            echo "  plan <task-id> [--tool <t>] [--model <m>]          Start planning agent" >&2
+            echo "  dispatch <task-id> [--tool <t>] [--worktree <b>]   Dispatch impl agent" >&2
+            echo "  attach <task-id>                                    Attach to agent" >&2
+            echo "  logs <task-id> [-f] [--json]                       Tail logs" >&2
+            echo "  kill <task-id> [--json]                            Kill agent" >&2
+            echo "  write-handoff <task-id> [--file <f>] [--json]      Write handoff (agent)" >&2
+            echo "  handoff <task-id> [--markdown|--json]              Show handoff" >&2
+            echo "  harvest <task-id> [--json]                         Update from worktree" >&2
+            echo "  diff <task-id> [--stat] [--json]                   Show diff" >&2
+            echo "  test <task-id> [--cmd <cmd>] [--json]              Run validation" >&2
+            echo "  review <task-id> [--tool <t>] [--json]             Review diff" >&2
+            echo "  fix <task-id> [--tool <t>] [--json]                Dispatch fix agent" >&2
+            echo "  pr <task-id> [--title <t>] [--base <b>] [--json]   Create PR" >&2
             exit 1
             ;;
         esac
@@ -2506,15 +3003,28 @@ Rules:
         echo "  git pr <target> ...           Create pull request" >&2
         echo "" >&2
         echo "Task:" >&2
-        echo "  task new <project> --title <t> Create task" >&2
-        echo "  task list [project] [--phase]  List tasks" >&2
-        echo "  task show <task-id>            Show task details" >&2
-        echo "  task context <task-id>         Agent context" >&2
-        echo "  task ask <task-id> <question>  Open question" >&2
-        echo "  task answer <q-id> <answer>    Answer question" >&2
-        echo "  task write-plan <task-id>      Save plan (agent)" >&2
-        echo "  task approve <task-id>         Approve plan" >&2
-        echo "  task reject <task-id>          Reject task" >&2
+        echo "  task new <project> --title <t>  Create task" >&2
+        echo "  task list [project] [--phase]   List tasks" >&2
+        echo "  task show <task-id>             Show task details" >&2
+        echo "  task context <task-id>          Agent context" >&2
+        echo "  task ask <task-id> <question>   Open question" >&2
+        echo "  task answer <q-id> <answer>     Answer question" >&2
+        echo "  task write-plan <task-id>       Save plan (agent)" >&2
+        echo "  task approve <task-id>          Approve plan" >&2
+        echo "  task reject <task-id>           Reject task" >&2
+        echo "  task plan <task-id>             Start planning agent" >&2
+        echo "  task dispatch <task-id>         Dispatch impl agent" >&2
+        echo "  task attach <task-id>           Attach to agent" >&2
+        echo "  task logs <task-id> [-f]        Tail agent logs" >&2
+        echo "  task kill <task-id>             Kill agent" >&2
+        echo "  task write-handoff <task-id>    Write handoff (agent)" >&2
+        echo "  task handoff <task-id>          Show handoff" >&2
+        echo "  task harvest <task-id>          Update diff from worktree" >&2
+        echo "  task diff <task-id>             Show diff" >&2
+        echo "  task test <task-id>             Run validation" >&2
+        echo "  task review <task-id>           Review diff" >&2
+        echo "  task fix <task-id>              Dispatch fix agent" >&2
+        echo "  task pr <task-id>               Create PR" >&2
         echo "" >&2
         echo "TUI:" >&2
         echo "  tui                           Live fleet TUI" >&2

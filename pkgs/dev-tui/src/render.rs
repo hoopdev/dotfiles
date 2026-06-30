@@ -1238,6 +1238,16 @@ fn render_tab_bar(f: &mut Frame, area: Rect, app: &App) {
 }
 
 fn render_task_board(f: &mut Frame, area: Rect, app: &App) {
+    let h = Layout::horizontal([
+        Constraint::Percentage(40),
+        Constraint::Percentage(60),
+    ])
+    .split(area);
+    render_board_left(f, h[0], app);
+    render_board_right(f, h[1], app);
+}
+
+fn render_board_left(f: &mut Frame, area: Rect, app: &App) {
     // Split: lane selector header (1 line) + task list
     let v = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).split(area);
 
@@ -1260,7 +1270,11 @@ fn render_task_board(f: &mut Frame, area: Rect, app: &App) {
     // Task list for current lane
     let lane_tasks = app.tasks_for_lane(col);
     let height = v[1].height as usize;
-    let sel = if lane_tasks.is_empty() { 0 } else { app.board_sel.min(lane_tasks.len().saturating_sub(1)) };
+    let sel = if lane_tasks.is_empty() {
+        0
+    } else {
+        app.board_sel.min(lane_tasks.len().saturating_sub(1))
+    };
 
     if lane_tasks.is_empty() {
         let msg = Paragraph::new("(no tasks in this lane)")
@@ -1273,13 +1287,16 @@ fn render_task_board(f: &mut Frame, area: Rect, app: &App) {
         for (i, task) in lane_tasks.iter().enumerate().skip(offset).take(height) {
             let selected = i == sel;
             let id_short = task.id.clone();
-            let title = truncate(&task.title, 40);
+            let title = truncate(&task.title, 32);
             let tool = task.assigned_tool.as_deref().unwrap_or("-").to_string();
             let q_count = app.dev_questions.iter().filter(|q| q.task_id == task.id).count();
             let project_id = task.project_id.clone();
             let line1 = if selected {
                 Line::from(vec![
-                    Span::styled(format!("{id_short}  "), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        format!("{id_short}  "),
+                        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                    ),
                     Span::styled(title, Style::default().add_modifier(Modifier::BOLD)),
                 ])
             } else {
@@ -1288,12 +1305,10 @@ fn render_task_board(f: &mut Frame, area: Rect, app: &App) {
                     Span::raw(title),
                 ])
             };
-            let line2 = Line::from(vec![
-                Span::styled(
-                    format!("  {}  {}  q:{}", project_id, tool, q_count),
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ]);
+            let line2 = Line::from(vec![Span::styled(
+                format!("  {}  {}  q:{}", project_id, tool, q_count),
+                Style::default().fg(Color::DarkGray),
+            )]);
             let style = if selected {
                 Style::default().bg(Color::DarkGray)
             } else {
@@ -1301,13 +1316,12 @@ fn render_task_board(f: &mut Frame, area: Rect, app: &App) {
             };
             items.push(ListItem::new(vec![line1, line2]).style(style));
         }
-
         let list = List::new(items).block(Block::default().borders(Borders::NONE));
         f.render_widget(list, v[1]);
     }
 
-    // Key hints at bottom right
-    let hints = "h/l:lane  j/k:select  A:approve  p:plan  ?:help";
+    // Key hints at bottom
+    let hints = "←→:lane  j/k:sel  A:approve  p:plan  ?:help";
     let hint_area = Rect {
         x: area.x,
         y: area.bottom().saturating_sub(1),
@@ -1315,9 +1329,131 @@ fn render_task_board(f: &mut Frame, area: Rect, app: &App) {
         height: 1,
     };
     f.render_widget(
-        Paragraph::new(hints).style(Style::default().fg(Color::DarkGray)).alignment(Alignment::Right),
+        Paragraph::new(hints)
+            .style(Style::default().fg(Color::DarkGray))
+            .alignment(Alignment::Right),
         hint_area,
     );
+}
+
+fn phase_style(phase: &str) -> Style {
+    match phase {
+        "needs_spec"    => Style::default().fg(Color::Red),
+        "planned"       => Style::default().fg(Color::Blue),
+        "approved"      => Style::default().fg(Color::Green),
+        "implementing"  => Style::default().fg(Color::Yellow),
+        "review"        => Style::default().fg(Color::Magenta),
+        "needs_fix"     => Style::default().fg(Color::Red),
+        "mergeable"     => Style::default().fg(Color::Green),
+        "merged"        => Style::default().fg(Color::DarkGray),
+        _               => Style::default().fg(Color::DarkGray),
+    }
+}
+
+fn render_board_right(f: &mut Frame, area: Rect, app: &App) {
+    let lanes = app.tasks_for_lane(app.board_col);
+    let sel = app.board_sel.min(lanes.len().saturating_sub(1));
+    let task = match lanes.get(sel) {
+        Some(t) => t,
+        None => {
+            let empty = Paragraph::new("(no task selected)")
+                .block(Block::default().borders(Borders::ALL).title(" Task Detail "));
+            f.render_widget(empty, area);
+            return;
+        }
+    };
+
+    let mut lines: Vec<Line<'static>> = vec![
+        Line::from(vec![
+            Span::styled(
+                task.id.clone(),
+                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("  "),
+            Span::styled(task.phase.clone(), phase_style(&task.phase)),
+        ]),
+        Line::from(vec![Span::styled(
+            task.title.clone(),
+            Style::default().add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![
+            Span::styled(
+                format!("{} ", task.project_id),
+                Style::default().fg(Color::DarkGray),
+            ),
+            Span::styled(
+                task.assigned_tool.as_deref().unwrap_or("-").to_string(),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]),
+        Line::from(Span::raw("")),
+    ];
+
+    if let Some(detail) = &app.task_detail {
+        if detail.task_id == task.id {
+            if !detail.brief.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    "Brief:",
+                    Style::default().fg(Color::Yellow),
+                )));
+                for l in detail.brief.lines().take(4) {
+                    lines.push(Line::from(Span::raw(format!("  {l}"))));
+                }
+                lines.push(Line::from(Span::raw("")));
+            }
+            if !detail.plan_summary.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    "Plan:",
+                    Style::default().fg(Color::Green),
+                )));
+                for l in detail.plan_summary.lines().take(8) {
+                    lines.push(Line::from(Span::raw(format!("  {l}"))));
+                }
+                lines.push(Line::from(Span::raw("")));
+            }
+            if !detail.handoff.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    "Handoff:",
+                    Style::default().fg(Color::Magenta),
+                )));
+                for l in detail.handoff.lines().take(4) {
+                    lines.push(Line::from(Span::raw(format!("  {l}"))));
+                }
+                lines.push(Line::from(Span::raw("")));
+            }
+            if !detail.review_summary.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    "Review:",
+                    Style::default().fg(Color::Red),
+                )));
+                for l in detail.review_summary.lines().take(3) {
+                    lines.push(Line::from(Span::raw(format!("  {l}"))));
+                }
+            }
+        } else {
+            lines.push(Line::from(Span::styled(
+                "(loading...)",
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
+    } else {
+        lines.push(Line::from(Span::styled(
+            "(loading...)",
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
+
+    // Action hints
+    lines.push(Line::from(Span::raw("")));
+    lines.push(Line::from(Span::styled(
+        "i:impl  a:attach  l:logs  h:harvest  d:diff  t:test  r:review  f:fix  m:pr",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let detail_widget = Paragraph::new(lines)
+        .block(Block::default().borders(Borders::ALL).title(" Task Detail "))
+        .wrap(Wrap { trim: false });
+    f.render_widget(detail_widget, area);
 }
 
 fn render_inbox(f: &mut Frame, area: Rect, app: &App) {

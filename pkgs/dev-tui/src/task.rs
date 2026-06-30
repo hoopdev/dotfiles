@@ -284,9 +284,75 @@ pub(crate) struct DevQuestion {
     pub options: Vec<QuestionOption>,
 }
 
-fn dev_store_path() -> Option<std::path::PathBuf> {
+pub(crate) fn dev_store_path() -> Option<std::path::PathBuf> {
     let home = std::env::var("HOME").ok()?;
     Some(std::path::PathBuf::from(home).join(".dev/projects"))
+}
+
+// ── Task detail (for the right-panel in TaskBoard) ────────────────────────────
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct TaskDetail {
+    pub task_id: String,
+    pub brief: String,          // from brief.md, first 300 chars
+    pub plan_summary: String,   // from plan.md or approved-plan.md, first 500 chars
+    pub handoff: String,        // from handoff.md, first 300 chars
+    pub review_summary: String, // latest review content, first 200 chars
+}
+
+pub(crate) fn load_task_detail(task_id: &str) -> Option<TaskDetail> {
+    let store = dev_store_path()?;
+    let entries = std::fs::read_dir(&store).ok()?;
+    for project_entry in entries.flatten() {
+        let task_path = project_entry.path().join("tasks").join(task_id);
+        if !task_path.exists() {
+            continue;
+        }
+
+        let read_first = |path: &std::path::Path, max: usize| -> String {
+            std::fs::read_to_string(path)
+                .unwrap_or_default()
+                .chars()
+                .take(max)
+                .collect()
+        };
+
+        let brief = read_first(&task_path.join("brief.md"), 300);
+        let plan_summary = if task_path.join("approved-plan.md").exists() {
+            read_first(&task_path.join("approved-plan.md"), 500)
+        } else {
+            read_first(&task_path.join("plan.md"), 500)
+        };
+        let handoff = read_first(&task_path.join("handoff.md"), 300);
+
+        // Latest review
+        let review_summary = {
+            let reviews_dir = task_path.join("reviews");
+            let mut latest = String::new();
+            if let Ok(rd) = std::fs::read_dir(&reviews_dir) {
+                let mut mds: Vec<_> = rd
+                    .flatten()
+                    .filter(|e| {
+                        e.path().extension().and_then(|x| x.to_str()) == Some("md")
+                    })
+                    .collect();
+                mds.sort_by_key(|e| e.file_name());
+                if let Some(last) = mds.last() {
+                    latest = read_first(&last.path(), 200);
+                }
+            }
+            latest
+        };
+
+        return Some(TaskDetail {
+            task_id: task_id.to_string(),
+            brief,
+            plan_summary,
+            handoff,
+            review_summary,
+        });
+    }
+    None
 }
 
 fn vs(v: &Value, key: &str) -> Option<String> {

@@ -694,21 +694,29 @@ impl App {
             KeyCode::Char('q') | KeyCode::Esc => return true,
             KeyCode::Char('j') | KeyCode::Down => {
                 let count = self.tasks_for_lane(self.board_col).len();
-                if count > 0 { self.board_sel = (self.board_sel + 1).min(count - 1); }
+                if count > 0 {
+                    self.board_sel = (self.board_sel + 1).min(count - 1);
+                }
+                self.refresh_task_detail();
             }
             KeyCode::Char('k') | KeyCode::Up => {
                 self.board_sel = self.board_sel.saturating_sub(1);
+                self.refresh_task_detail();
             }
-            KeyCode::Char('h') | KeyCode::Left => {
+            // Lane navigation: arrow keys only (h/l now bound to harvest/logs)
+            KeyCode::Left => {
                 self.board_col = self.board_col.saturating_sub(1);
                 self.board_sel = 0;
+                self.refresh_task_detail();
             }
-            KeyCode::Char('l') | KeyCode::Right => {
+            KeyCode::Right => {
                 let max_col = App::BOARD_LANES.len() - 1;
                 self.board_col = (self.board_col + 1).min(max_col);
                 self.board_sel = 0;
+                self.refresh_task_detail();
             }
-            KeyCode::Char('r') => {
+            // R (capital) = refresh task list
+            KeyCode::Char('R') => {
                 self.request_dev_tasks();
                 self.set_flash("tasks refreshing…");
             }
@@ -747,6 +755,86 @@ impl App {
                     self.set_flash(&format!("rejected {id}"));
                     self.after_action();
                 }
+            }
+            // ── Phase 3 action keys ─────────────────────────────────────────
+            KeyCode::Char('i') => {
+                let id = self.tasks_for_lane(self.board_col).get(self.board_sel).map(|t| t.id.clone());
+                if let Some(id) = id {
+                    run_dev(&["task", "dispatch", &id], term);
+                    self.request_dev_tasks();
+                    self.set_flash(&format!("dispatching impl for {id}"));
+                    self.after_action();
+                }
+            }
+            KeyCode::Char('a') => {
+                let id = self.tasks_for_lane(self.board_col).get(self.board_sel).map(|t| t.id.clone());
+                if let Some(id) = id {
+                    run_dev(&["task", "attach", &id], term);
+                    self.after_action();
+                }
+            }
+            KeyCode::Char('l') => {
+                let id = self.tasks_for_lane(self.board_col).get(self.board_sel).map(|t| t.id.clone());
+                if let Some(id) = id {
+                    run_dev(&["task", "logs", &id, "-f"], term);
+                    self.after_action();
+                }
+            }
+            KeyCode::Char('h') => {
+                let id = self.tasks_for_lane(self.board_col).get(self.board_sel).map(|t| t.id.clone());
+                if let Some(id) = id {
+                    run_dev(&["task", "harvest", &id], term);
+                    self.request_dev_tasks();
+                    self.set_flash(&format!("harvested {id}"));
+                    self.after_action();
+                }
+            }
+            KeyCode::Char('d') => {
+                let id = self.tasks_for_lane(self.board_col).get(self.board_sel).map(|t| t.id.clone());
+                if let Some(id) = id {
+                    run_dev(&["task", "diff", &id, "--stat"], term);
+                    self.after_action();
+                }
+            }
+            KeyCode::Char('t') => {
+                let id = self.tasks_for_lane(self.board_col).get(self.board_sel).map(|t| t.id.clone());
+                if let Some(id) = id {
+                    run_dev(&["task", "test", &id], term);
+                    self.request_dev_tasks();
+                    self.set_flash(&format!("test run for {id}"));
+                    self.after_action();
+                }
+            }
+            KeyCode::Char('r') => {
+                // r = review (R = refresh)
+                let id = self.tasks_for_lane(self.board_col).get(self.board_sel).map(|t| t.id.clone());
+                if let Some(id) = id {
+                    run_dev(&["task", "review", &id], term);
+                    self.request_dev_tasks();
+                    self.set_flash(&format!("reviewing {id}"));
+                    self.after_action();
+                }
+            }
+            KeyCode::Char('f') => {
+                let id = self.tasks_for_lane(self.board_col).get(self.board_sel).map(|t| t.id.clone());
+                if let Some(id) = id {
+                    run_dev(&["task", "fix", &id], term);
+                    self.request_dev_tasks();
+                    self.set_flash(&format!("fix dispatched for {id}"));
+                    self.after_action();
+                }
+            }
+            KeyCode::Char('m') => {
+                let id = self.tasks_for_lane(self.board_col).get(self.board_sel).map(|t| t.id.clone());
+                if let Some(id) = id {
+                    run_dev(&["task", "pr", &id], term);
+                    self.request_dev_tasks();
+                    self.set_flash(&format!("PR created for {id}"));
+                    self.after_action();
+                }
+            }
+            KeyCode::Char('n') => {
+                self.set_flash("use: dev task new <project> --title <t>");
             }
             KeyCode::Char('?') => self.mode = Mode::Help,
             _ => {}

@@ -167,6 +167,11 @@ pub(crate) struct App {
     pub(crate) inbox_answering: bool,
     pub(crate) last_tasks: Instant,
     pub(crate) tasks_inflight: bool,
+
+    // ── Phase 3: task detail panel ───────────────────────────────────────
+    pub(crate) task_detail: Option<crate::task::TaskDetail>,
+    /// Which task ID the current detail is for (avoids redundant fetches).
+    pub(crate) detail_task_id: String,
 }
 
 impl App {
@@ -240,6 +245,8 @@ impl App {
             inbox_answering: false,
             last_tasks: Instant::now(),
             tasks_inflight: false,
+            task_detail: None,
+            detail_task_id: String::new(),
         }
     }
 
@@ -259,6 +266,22 @@ impl App {
         self.tasks_inflight = true;
         self.last_tasks = Instant::now();
         let _ = self.req_tx.send(Req::DevTasks);
+    }
+
+    /// Request fresh detail for the currently selected task board item.
+    /// Clears cached detail when the selection has changed.
+    pub(crate) fn refresh_task_detail(&mut self) {
+        let id = self
+            .tasks_for_lane(self.board_col)
+            .get(self.board_sel)
+            .map(|t| t.id.clone());
+        if let Some(id) = id {
+            if id != self.detail_task_id {
+                self.detail_task_id = id.clone();
+                self.task_detail = None;
+            }
+            let _ = self.req_tx.send(Req::TaskDetail(id));
+        }
     }
 
     pub(crate) fn request_refresh(&mut self) {
@@ -398,6 +421,21 @@ impl App {
                 let qcount = self.dev_questions.len();
                 if qcount == 0 { self.inbox_sel = 0; }
                 else { self.inbox_sel = self.inbox_sel.min(qcount - 1); }
+                // Request detail for the currently selected task
+                let selected_task_id = self
+                    .tasks_for_lane(self.board_col)
+                    .get(self.board_sel)
+                    .map(|t| t.id.clone());
+                if let Some(task_id) = selected_task_id {
+                    if task_id != self.detail_task_id {
+                        self.detail_task_id = task_id.clone();
+                        self.task_detail = None;
+                    }
+                    let _ = self.req_tx.send(Req::TaskDetail(task_id));
+                }
+            }
+            Msg::TaskDetail(detail) => {
+                self.task_detail = detail;
             }
         }
     }

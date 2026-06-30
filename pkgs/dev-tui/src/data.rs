@@ -19,6 +19,7 @@ pub enum Req {
     Usage,
     AgyUsage,
     DevTasks,
+    TaskDetail(String),
 }
 
 #[allow(dead_code)]
@@ -37,6 +38,7 @@ pub enum Msg {
     /// Error message to display as flash.
     Error(String),
     DevTasks(Vec<crate::task::DevTask>, Vec<crate::task::DevQuestion>),
+    TaskDetail(Option<crate::task::TaskDetail>),
 }
 
 /// Codex rate-limit data via JSON-RPC to `codex app-server`.
@@ -193,6 +195,10 @@ pub fn worker(req_rx: Receiver<Req>, msg_tx: Sender<Msg>) {
                 Req::DevTasks => {
                     let (tasks, questions) = crate::task::load_dev_tasks();
                     Msg::DevTasks(tasks, questions)
+                }
+                Req::TaskDetail(task_id) => {
+                    let detail = crate::task::load_task_detail(&task_id);
+                    Msg::TaskDetail(detail)
                 }
             };
             let _ = tx.send(msg);
