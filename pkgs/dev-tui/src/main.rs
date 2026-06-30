@@ -20,6 +20,7 @@ mod render;
 mod task;
 mod terminal;
 mod usage;
+mod watcher;
 
 use app::App;
 use data::{worker, Msg, Req};
@@ -53,7 +54,7 @@ fn run(term: &mut terminal::Term, app: &mut App) -> io::Result<()> {
         if !app.codex_usage_inflight && app.last_codex_usage.elapsed() >= Duration::from_secs(180) {
             app.request_codex_usage();
         }
-        if !app.tasks_inflight && app.last_tasks.elapsed() >= Duration::from_secs(30) {
+        if !app.tasks_inflight && app.last_tasks.elapsed() >= Duration::from_secs(300) {
             app.request_dev_tasks();
         }
         app.maybe_request_logs();
@@ -94,6 +95,8 @@ fn main() -> io::Result<()> {
     let _ = app.req_tx.send(Req::AgyUsage);
     app.request_codex_usage();
     app.request_dev_tasks();
+
+    let _task_watcher = watcher::start_task_watcher(app.req_tx.clone());
 
     let res = run(&mut terminal, &mut app);
     app.stop_tail();
