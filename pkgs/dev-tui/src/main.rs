@@ -325,26 +325,35 @@ fn fetch_state() -> Vec<Env> {
 }
 
 fn fetch_git() -> HashMap<String, GitState> {
-    let mut m = HashMap::new();
-    let out = match Command::new("dev").args(["status", "--json"]).stdin(Stdio::null()).output() {
-        Ok(o) => o,
-        Err(_) => return m,
-    };
-    if let Ok(Value::Array(arr)) = serde_json::from_slice::<Value>(&out.stdout) {
-        for g in &arr {
-            if let Some(t) = sget(g, "target") {
-                m.insert(
-                    t,
-                    GitState {
-                        branch: sget(g, "branch").unwrap_or_default(),
-                        head: sget(g, "head").unwrap_or_default(),
-                        changes: g.get("changes").and_then(|x| x.as_i64()).unwrap_or(0),
-                    },
-                );
+    // `dev status --json` can hang when remote hosts are unreachable; cap at 10 s.
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+        let mut m = HashMap::new();
+        let out = match Command::new("dev")
+            .args(["status", "--json"])
+            .stdin(Stdio::null())
+            .output()
+        {
+            Ok(o) => o,
+            Err(_) => { let _ = tx.send(m); return; }
+        };
+        if let Ok(Value::Array(arr)) = serde_json::from_slice::<Value>(&out.stdout) {
+            for g in &arr {
+                if let Some(t) = sget(g, "target") {
+                    m.insert(
+                        t,
+                        GitState {
+                            branch: sget(g, "branch").unwrap_or_default(),
+                            head: sget(g, "head").unwrap_or_default(),
+                            changes: g.get("changes").and_then(|x| x.as_i64()).unwrap_or(0),
+                        },
+                    );
+                }
             }
         }
-    }
-    m
+        let _ = tx.send(m);
+    });
+    rx.recv_timeout(Duration::from_secs(10)).unwrap_or_default()
 }
 
 fn fetch_logs(target: &str) -> Vec<String> {
@@ -619,29 +628,30 @@ fn fetch_agy_usage() -> Option<AgyUsage> {
 
 fn worker(req_rx: Receiver<Req>, msg_tx: Sender<Msg>) {
     while let Ok(req) = req_rx.recv() {
-        let msg = match req {
-            Req::Refresh => Msg::State(fetch_state()),
-            Req::Git => Msg::Git(fetch_git()),
-            Req::Logs(t) => {
-                let lines = fetch_logs(&t);
-                Msg::Logs { target: t, lines }
-            }
-            Req::Tools => Msg::Tools(fetch_tools()),
-            Req::Review { target, tool } => {
-                let lines = fetch_review(&target, &tool);
-                let title = if tool.is_empty() {
-                    format!("review: {target}")
-                } else {
-                    format!("review: {target} ({tool})")
-                };
-                Msg::Result { title, lines }
-            }
-            Req::Usage => Msg::Usage(fetch_usage()),
-            Req::AgyUsage => Msg::AgyUsage(fetch_agy_usage()),
-        };
-        if msg_tx.send(msg).is_err() {
-            break;
-        }
+        let tx = msg_tx.clone();
+        thread::spawn(move || {
+            let msg = match req {
+                Req::Refresh => Msg::State(fetch_state()),
+                Req::Git => Msg::Git(fetch_git()),
+                Req::Logs(t) => {
+                    let lines = fetch_logs(&t);
+                    Msg::Logs { target: t, lines }
+                }
+                Req::Tools => Msg::Tools(fetch_tools()),
+                Req::Review { target, tool } => {
+                    let lines = fetch_review(&target, &tool);
+                    let title = if tool.is_empty() {
+                        format!("review: {target}")
+                    } else {
+                        format!("review: {target} ({tool})")
+                    };
+                    Msg::Result { title, lines }
+                }
+                Req::Usage => Msg::Usage(fetch_usage()),
+                Req::AgyUsage => Msg::AgyUsage(fetch_agy_usage()),
+            };
+            let _ = tx.send(msg);
+        });
     }
 }
 
