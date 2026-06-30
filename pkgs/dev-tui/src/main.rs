@@ -495,15 +495,15 @@ fn fetch_codex_usage() -> Option<CodexUsage> {
                     if v.get("id").and_then(|x| x.as_u64()) == Some(2) {
                         if let Some(rl) = v.pointer("/result/rateLimits") {
                             result = Some(CodexUsage {
-                                primary_used_pct: rl.pointer("/primary/used_percent")
+                                primary_used_pct: rl.pointer("/primary/usedPercent")
                                     .and_then(|x| x.as_f64()),
-                                primary_resets_at: rl.pointer("/primary/resets_at")
+                                primary_resets_at: rl.pointer("/primary/resetsAt")
                                     .and_then(|x| x.as_i64()),
-                                secondary_used_pct: rl.pointer("/secondary/used_percent")
+                                secondary_used_pct: rl.pointer("/secondary/usedPercent")
                                     .and_then(|x| x.as_f64()),
-                                secondary_resets_at: rl.pointer("/secondary/resets_at")
+                                secondary_resets_at: rl.pointer("/secondary/resetsAt")
                                     .and_then(|x| x.as_i64()),
-                                plan_type: rl.get("plan_type")
+                                plan_type: rl.get("planType")
                                     .and_then(|x| x.as_str())
                                     .map(String::from),
                             });
@@ -521,11 +521,11 @@ fn fetch_codex_usage() -> Option<CodexUsage> {
     result
 }
 
-/// Find the running Antigravity language-server PID and optional CSRF token.
+/// Find the running agy (antigravity) language-server PID and optional CSRF token.
 /// Returns (pid_string, csrf_token).
 fn agy_find_process() -> Option<(String, String)> {
-    // pgrep -f to find any antigravity process
-    let out = Command::new("pgrep").args(["-f", "antigravity"]).stdin(Stdio::null()).output().ok()?;
+    // agy embeds the language server in the CLI process itself; search by process name.
+    let out = Command::new("pgrep").args(["-x", "agy"]).stdin(Stdio::null()).output().ok()?;
     let pids: Vec<String> = String::from_utf8(out.stdout)
         .unwrap_or_default()
         .lines()
@@ -533,10 +533,11 @@ fn agy_find_process() -> Option<(String, String)> {
         .map(String::from)
         .collect();
     for pid in pids {
-        let args_out = Command::new("ps").args(["-p", &pid, "-o", "args="]).stdin(Stdio::null()).output().ok()?;
+        let args_out = match Command::new("ps").args(["-p", &pid, "-o", "args="]).stdin(Stdio::null()).output() {
+            Ok(o) => o,
+            Err(_) => continue,
+        };
         let args = String::from_utf8(args_out.stdout).unwrap_or_default();
-        // Look for the language-server process specifically
-        if !args.contains("antigravity") { continue; }
         let csrf = args.split_whitespace()
             .find(|a| a.starts_with("--csrf_token="))
             .map(|a| a["--csrf_token=".len()..].to_string())
@@ -2727,7 +2728,7 @@ fn run(term: &mut Term, app: &mut App) -> io::Result<()> {
         if !app.git_inflight && app.last_git.elapsed() >= app.git_interval {
             app.request_git();
         }
-        if app.last_usage.elapsed() >= Duration::from_secs(30) {
+        if app.last_usage.elapsed() >= Duration::from_secs(120) {
             app.last_usage = Instant::now();
             let _ = app.req_tx.send(Req::Usage);
         }
