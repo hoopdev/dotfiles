@@ -1,0 +1,13 @@
+[package]
+name = "dev-cli"
+version = "0.1.0"
+edition = "2021"
+description = "dev CLI — Rust implementation replacing the bash script in coder.nix"
+
+[[bin]]
+name = "dev"
+path = "src/main.rs"
+
+[dependencies]
+dev-core = { path = "../dev-core" }
+serde_json = "1"

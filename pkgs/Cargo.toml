@@ -1,0 +1,13 @@
+[workspace]
+members = [
+    "dev-tui",
+    "dev-core",
+    "dev-cli",
+    "dev-zellij",
+]
+resolver = "2"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
