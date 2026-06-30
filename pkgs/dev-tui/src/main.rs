@@ -786,10 +786,10 @@ impl App {
             list_state,
             last_refresh: Instant::now(),
             refreshing: false,
-            interval: Duration::from_secs(3),
+            interval: Duration::from_secs(10),
             last_git: Instant::now(),
             git_inflight: false,
-            git_interval: Duration::from_secs(60),
+            git_interval: Duration::from_secs(120),
             filter: String::new(),
             active_only: false,
             mode: Mode::Normal,
@@ -2737,7 +2737,7 @@ fn run(term: &mut Term, app: &mut App) -> io::Result<()> {
             app.last_agy_usage = Instant::now();
             let _ = app.req_tx.send(Req::AgyUsage);
         }
-        if !app.codex_usage_inflight && app.last_codex_usage.elapsed() >= Duration::from_secs(300) {
+        if !app.codex_usage_inflight && app.last_codex_usage.elapsed() >= Duration::from_secs(120) {
             app.request_codex_usage();
         }
         app.maybe_request_logs();
