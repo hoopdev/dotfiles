@@ -1,5 +1,7 @@
 pub mod task;
 pub mod store;
+#[cfg(feature = "git")]
+pub mod git;
 
 pub use task::{
     DevTask, DevQuestion, QuestionOption, TaskDetail,

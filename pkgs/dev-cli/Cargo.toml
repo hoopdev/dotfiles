@@ -9,5 +9,5 @@ name = "dev"
 path = "src/main.rs"
 
 [dependencies]
-dev-core = { path = "../dev-core" }
+dev-core = { path = "../dev-core", features = ["git"] }
 serde_json = "1"

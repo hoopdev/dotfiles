@@ -801,22 +801,38 @@ fn cmd_harvest(args: &[String]) {
     let v = read_task_json(&tdir);
     let project_id = vs(&v, "project_id");
 
-    // Call dev git diff --json to get changed files
-    let diff_output = std::process::Command::new("dev")
-        .args(["git", "diff", &project_id, "--json"])
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .unwrap_or_default();
-
-    let mut files: Vec<String> = Vec::new();
-    if let Ok(diff_v) = serde_json::from_str::<Value>(&diff_output) {
-        if let Some(arr) = diff_v.get("files").and_then(|x| x.as_array()) {
-            files = arr.iter()
-                .filter_map(|f| f.get("path").and_then(|x| x.as_str()).map(|s| s.to_string()))
-                .collect();
+    // Try git2 if worktree_path is set
+    let files = {
+        let wt_path = vs(&v, "worktree_path");
+        if !wt_path.is_empty() {
+            let path = std::path::Path::new(&wt_path);
+            dev_core::git::diff_head_to_workdir(path)
+                .ok()
+                .map(|r| r.files)
+        } else {
+            None
         }
-    }
+    };
+
+    let files = if let Some(f) = files {
+        f
+    } else {
+        // Fallback: call dev git diff --json
+        let diff_output = std::process::Command::new("dev")
+            .args(["git", "diff", &project_id, "--json"])
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .unwrap_or_default();
+
+        if let Ok(diff_v) = serde_json::from_str::<Value>(&diff_output) {
+            if let Some(arr) = diff_v.get("files").and_then(|x| x.as_array()) {
+                arr.iter()
+                    .filter_map(|f| f.get("path").and_then(|x| x.as_str()).map(|s| s.to_string()))
+                    .collect()
+            } else { Vec::new() }
+        } else { Vec::new() }
+    };
 
     // Update task.json summary
     let json_path = tdir.join("task.json");

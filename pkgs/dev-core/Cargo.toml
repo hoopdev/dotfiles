@@ -21,3 +21,5 @@ optional = true
 [dependencies.git2]
 version = "0.19"
 optional = true
+default-features = false
+features = ["vendored-libgit2"]
