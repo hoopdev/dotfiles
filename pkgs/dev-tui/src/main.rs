@@ -472,7 +472,7 @@ fn fetch_codex_usage() -> Option<CodexUsage> {
                 }
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
-            Err(mpsc::RecvTimeoutError::Timeout) => break,
+            Err(mpsc::RecvTimeoutError::Timeout) => continue,
         }
     }
 
@@ -513,7 +513,7 @@ fn fetch_codex_usage() -> Option<CodexUsage> {
                 }
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
-            Err(mpsc::RecvTimeoutError::Timeout) => break,
+            Err(mpsc::RecvTimeoutError::Timeout) => continue,
         }
     }
 
