@@ -1211,15 +1211,13 @@ let
       else
         ${jq} -r '
           def pct: if . == null then "-" else "\(.)%" end;
-          def eta:
-            if . == null then "" else
-              (now - .) as $s |
-              if $s < 0 then " (resets in \(($s * -1) | floor / 60)m)" else "" end
-            end;
+          def jst: if . == null then "" else
+            (. + 32400) | strftime(" (resets %m/%d %H:%M JST)")
+          end;
           "claude usage",
-          "  5h:  \(.five_hour.used_percentage | pct)\(.five_hour.resets_at | eta)",
-          "  7d:  \(.seven_day.used_percentage | pct)\(.seven_day.resets_at | eta)",
-          "  updated: \(.updated_at | strftime("%H:%M:%S") // "-")"
+          "  5h:  \(.five_hour.used_percentage | pct)\(.five_hour.resets_at | jst)",
+          "  7d:  \(.seven_day.used_percentage | pct)\(.seven_day.resets_at | jst)",
+          "  updated: \((.updated_at + 32400) | strftime("%H:%M:%S") // "-") JST"
         ' "$file"
       fi
     }
