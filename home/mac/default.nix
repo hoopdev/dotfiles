@@ -25,14 +25,14 @@
     #   Instead, $SSH_AUTH_SOCK is the single source of truth:
     #   - Local shell  → point SSH_AUTH_SOCK at the 1Password agent socket so all
     #                    SSH connections (github.com, remote hosts, …) use local 1Password.
-    #   - SSH session  → sshd injects the ForwardAgent socket into SSH_AUTH_SOCK;
-    #                    the guard below skips it so the caller's forwarded keys win.
+    #   - SSH session  → use only a client-forwarded SSH_AUTH_SOCK, so the
+    #                    agent follows the origin machine.
     #   This MUST live in initContent (.zshrc), not loginExtra (.zlogin): zellij
     #   spawns panes as non-login shells, which never source .zlogin — so a
     #   loginExtra override is invisible inside zellij and `git push` there grabs
     #   WezTerm's (empty) mux agent instead of 1Password.
     initContent = ''
-      if [[ -z "$SSH_CLIENT" && -z "$SSH_TTY" ]]; then
+      if [[ -z "''${SSH_AUTH_SOCK:-}" && -z "''${SSH_CONNECTION:-}" ]]; then
         export SSH_AUTH_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
       fi
 
