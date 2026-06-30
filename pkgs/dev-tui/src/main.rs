@@ -1827,9 +1827,10 @@ fn render_summary(f: &mut Frame, area: Rect, app: &App) {
             }
         }
     }
-    let n_envs = app.envs.len();
+    let n_projects = app.envs.len();
+    let n_envs = app.groups.len();
     spans.push(Span::styled(
-        format!("· {n_envs} envs {total_agents} agents "),
+        format!("· {n_envs} envs {n_projects} projects {total_agents} agents "),
         Style::default().fg(Color::DarkGray),
     ));
     if !app.marked.is_empty() {
