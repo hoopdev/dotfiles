@@ -1,7 +1,18 @@
-//! dev CLI — Rust implementation.
-//! Phase 0 skeleton: full implementation in Phase 1.
+//! dev CLI — Rust implementation of dev task subcommands.
+
+mod cmd;
 
 fn main() {
-    eprintln!("dev-cli: not yet implemented");
-    std::process::exit(1);
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    match args.first().map(|s| s.as_str()) {
+        Some("task") => cmd::task::run(&args[1..]),
+        Some(c) => {
+            eprintln!("dev: unknown command '{c}'. This binary handles: task");
+            std::process::exit(1);
+        }
+        None => {
+            eprintln!("Usage: dev task <command> [args...]");
+            std::process::exit(1);
+        }
+    }
 }
