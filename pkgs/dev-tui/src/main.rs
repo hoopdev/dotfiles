@@ -789,7 +789,7 @@ impl App {
             interval: Duration::from_secs(3),
             last_git: Instant::now(),
             git_inflight: false,
-            git_interval: Duration::from_secs(12),
+            git_interval: Duration::from_secs(60),
             filter: String::new(),
             active_only: false,
             mode: Mode::Normal,
