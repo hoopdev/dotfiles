@@ -2,7 +2,7 @@
 name = "dev-tui"
 version = "0.1.0"
 edition = "2021"
-description = "Live fleet TUI for the dev CLI — consumes `dev ps --json`, shells out to dev for actions."
+description = "Live fleet TUI for the dev CLI — consumes `dev ps/status/logs --json` on a background thread, shells out to dev for actions."
 
 [[bin]]
 name = "dev-tui"
