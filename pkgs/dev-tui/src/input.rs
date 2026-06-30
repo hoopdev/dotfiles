@@ -4,7 +4,6 @@ use std::time::{Duration, Instant};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{sh_quote, App, Mode};
-use crate::data::Req;
 use crate::model::{env_dominant_status, status_rank, Item, Tab, ToolPurpose};
 use crate::render::ACTION_MENU_ITEMS;
 use crate::terminal::{run_dev, run_shell, Term};
@@ -443,21 +442,13 @@ impl App {
                         self.mode = Mode::ToolPick;
                     }
                     4 => {
-                        // review — tool picker or direct execution
+                        // review — tool picker or direct streaming execution
                         match self.selected_item_cloned() {
                             Some(Item::AgentRow(i, j)) => {
-                                // Agent row: review with that agent's tool
-                                self.mode = Mode::Normal;
+                                // Agent row: review with that agent's tool (streaming via LogView)
                                 let agent_tool = self.envs[i].agents[j].tool.clone();
-                                self.result_title = format!("review: {target} ({agent_tool}) (loading…)");
-                                self.result_lines = vec!["running dev review, please wait…".into()];
-                                self.result_scroll = 0;
-                                self.result_inflight = true;
-                                self.mode = Mode::ResultView;
-                                let _ = self.req_tx.send(Req::Review {
-                                    target: target.clone(),
-                                    tool: agent_tool,
-                                });
+                                self.start_review_process(&target, &agent_tool);
+                                self.mode = Mode::LogView;
                             }
                             _ => {
                                 // Env row: show tool picker for review
@@ -522,16 +513,9 @@ impl App {
                         self.mode = Mode::Dispatch;
                     }
                     ToolPurpose::Review => {
-                        self.mode = Mode::Normal;
-                        self.result_title = format!("review: {target} ({tool}) (loading…)");
-                        self.result_lines = vec!["running dev review, please wait…".into()];
-                        self.result_scroll = 0;
-                        self.result_inflight = true;
-                        self.mode = Mode::ResultView;
-                        let _ = self.req_tx.send(Req::Review {
-                            target: target.clone(),
-                            tool: tool.clone(),
-                        });
+                        // Stream review output live via LogView
+                        self.start_review_process(&target, &tool);
+                        self.mode = Mode::LogView;
                     }
                 }
             }
@@ -542,7 +526,10 @@ impl App {
     fn key_result_view(&mut self, key: KeyEvent) {
         let page = 20usize;
         match key.code {
-            KeyCode::Char('q') | KeyCode::Esc if !self.result_inflight => {
+            KeyCode::Char('q') | KeyCode::Esc => {
+                if self.result_inflight {
+                    self.result_cancelled = true;
+                }
                 self.mode = Mode::Normal;
             }
             KeyCode::Char('j') | KeyCode::Down => {
@@ -631,7 +618,7 @@ impl App {
                     targets.sort();
                     let parts: Vec<String> = targets
                         .iter()
-                        .map(|t| format!("echo '=== {} ==='; dev diff {}", t, sh_quote(t)))
+                        .map(|t| format!("echo '=== {} ==='; dev git diff {}", t, sh_quote(t)))
                         .collect();
                     let cmd = format!("{{ {}; }} 2>&1 | less -R", parts.join("; "));
                     self.mode = Mode::Normal;

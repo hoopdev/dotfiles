@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use ratatui::widgets::ListState;
 
-use crate::data::{fetch_codex_usage, Msg, Req};
+use crate::data::{fetch_codex_usage, strip_ansi, Msg, Req};
 use crate::model::{Env, GitState, GroupInfo, Item, Tab, Tool, ToolPurpose};
 
 pub(crate) const SPIN: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -126,6 +126,8 @@ pub(crate) struct App {
     pub(crate) result_scroll: usize,
     /// true while a background Req::Review (etc.) is in flight.
     pub(crate) result_inflight: bool,
+    /// true when the user dismissed the result view before it completed.
+    pub(crate) result_cancelled: bool,
 
     /// Dispatch model override (set by ModelPicker, applied to next dispatch).
     pub(crate) dispatch_model: String,
@@ -216,6 +218,7 @@ impl App {
             result_lines: Vec::new(),
             result_scroll: 0,
             result_inflight: false,
+            result_cancelled: false,
             dispatch_model: String::new(),
             dispatch_effort: String::new(),
             model_pick_index: 0,
@@ -380,11 +383,14 @@ impl App {
                 }
             }
             Msg::Result { title, lines } => {
-                self.result_title = title;
-                self.result_lines = lines;
-                self.result_scroll = 0;
                 self.result_inflight = false;
-                self.mode = Mode::ResultView;
+                if !self.result_cancelled {
+                    self.result_title = title;
+                    self.result_lines = lines;
+                    self.result_scroll = 0;
+                    self.mode = Mode::ResultView;
+                }
+                self.result_cancelled = false;
             }
             Msg::Usage(u) => {
                 self.claude_usage = u;
@@ -444,6 +450,7 @@ impl App {
     pub(crate) const BOARD_LANES: &'static [(&'static str, &'static str)] = &[
         ("Needs Spec", "needs_spec"),
         ("Planned",    "planned"),
+        ("Approved",   "approved"),
         ("Running",    "implementing"),
         ("Review",     "review"),
         ("Needs Fix",  "needs_fix"),
@@ -606,6 +613,7 @@ impl App {
     }
 
     /// Session ID of the selected Claude agent (for --resume on attach).
+    #[allow(dead_code)]
     pub(crate) fn selected_agent_session_id(&self) -> Option<String> {
         match self.selected_item_cloned()? {
             Item::AgentRow(i, j) => {
@@ -780,10 +788,63 @@ impl App {
 
     // ── new methods ──────────────────────────────────────────────────────
 
+    /// Launch `dev agent review <target> [--tool <tool>]` as a streaming process
+    /// and route its output into the LogView (reuses tail_pid / LogLine machinery).
+    pub(crate) fn start_review_process(&mut self, target: &str, tool: &str) {
+        self.stop_tail();
+        let log_key = if tool.is_empty() {
+            format!("review:{target}")
+        } else {
+            format!("review:{target}({tool})")
+        };
+        self.log_target = log_key.clone();
+        self.log_lines = vec!["(starting review…)".into()];
+
+        let sh_cmd = if tool.is_empty() {
+            format!("dev agent review {} 2>&1", sh_quote(target))
+        } else {
+            format!("dev agent review {} --tool {} 2>&1", sh_quote(target), sh_quote(tool))
+        };
+        let mut child = match std::process::Command::new("sh")
+            .args(["-c", &sh_cmd])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .stdin(std::process::Stdio::null())
+            .spawn()
+        {
+            Ok(c) => c,
+            Err(e) => {
+                self.log_lines = vec![format!("failed to start review: {e}")];
+                return;
+            }
+        };
+        self.tail_pid = Some(child.id());
+        let stdout = match child.stdout.take() {
+            Some(s) => s,
+            None => return,
+        };
+        let tx = self.msg_tx.clone();
+        let key = log_key.clone();
+        std::thread::spawn(move || {
+            use std::io::BufRead;
+            for line in std::io::BufReader::new(stdout).lines().flatten() {
+                let line = strip_ansi(&line);
+                if tx.send(crate::data::Msg::LogLine { target: key.clone(), line }).is_err() {
+                    break;
+                }
+            }
+            let _ = child.wait();
+            let _ = tx.send(crate::data::Msg::LogLine {
+                target: key.clone(),
+                line: "── review complete ──".into(),
+            });
+        });
+    }
+
     pub(crate) fn start_tail(&mut self, target: &str) {
         self.stop_tail();
         let mut child = match std::process::Command::new("dev")
-            .args(["logs", target, "-f"])
+            .args(["agent", "logs", target, "-f"])
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null())
             .stdin(std::process::Stdio::null())

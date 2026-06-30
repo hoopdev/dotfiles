@@ -15,7 +15,6 @@ pub enum Req {
     Git,
     Logs(String),
     Tools,
-    Review { target: String, tool: String },
     Usage,
     AgyUsage,
     DevTasks,
@@ -181,15 +180,6 @@ pub fn worker(req_rx: Receiver<Req>, msg_tx: Sender<Msg>) {
                     Msg::Logs { target: t, lines }
                 }
                 Req::Tools => Msg::Tools(fetch_tools()),
-                Req::Review { target, tool } => {
-                    let lines = fetch_review(&target, &tool);
-                    let title = if tool.is_empty() {
-                        format!("review: {target}")
-                    } else {
-                        format!("review: {target} ({tool})")
-                    };
-                    Msg::Result { title, lines }
-                }
                 Req::Usage => Msg::Usage(fetch_claude_usage()),
                 Req::AgyUsage => Msg::AgyUsage(fetch_agy_usage()),
                 Req::DevTasks => {
@@ -349,28 +339,23 @@ fn fetch_logs(target: &str) -> Vec<String> {
     Vec::new()
 }
 
-fn fetch_review(target: &str, tool: &str) -> Vec<String> {
-    let args = if tool.is_empty() {
-        vec!["agent".to_string(), "review".to_string(), target.to_string()]
-    } else {
-        vec![
-            "agent".to_string(),
-            "review".to_string(),
-            target.to_string(),
-            "--tool".to_string(),
-            tool.to_string(),
-        ]
-    };
-    let out = Command::new("dev").args(&args).stdin(Stdio::null()).output();
-    match out {
-        Ok(o) => {
-            let text = String::from_utf8_lossy(&o.stdout);
-            let err = String::from_utf8_lossy(&o.stderr);
-            let combined = format!("{}{}", text, err);
-            combined.lines().map(|l| l.to_string()).collect()
+pub(crate) fn strip_ansi(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            if chars.peek() == Some(&'[') {
+                chars.next();
+                // consume until a letter terminator
+                for ch in chars.by_ref() {
+                    if ch.is_ascii_alphabetic() { break; }
+                }
+            }
+        } else {
+            out.push(c);
         }
-        Err(e) => vec![format!("dev agent review failed: {e}")],
     }
+    out
 }
 
 fn fetch_tools() -> Vec<Tool> {

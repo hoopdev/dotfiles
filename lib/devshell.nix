@@ -2,7 +2,7 @@
 
 let
   # Import common CLI tools from home-manager configuration
-  commonCliTools = import ../home/common/cli/tools.nix { inherit pkgs; };
+  commonCliTools = import ../home/common/cli/tools.nix { inherit pkgs lib; };
   commonAliases = import ../home/common/cli/shell/aliases.nix;
 
   # Extract packages from home.packages

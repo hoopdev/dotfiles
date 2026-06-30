@@ -1062,7 +1062,7 @@ let
     _dev_worktree() {
       local sub="''${1:-}"; shift || true
       case "$sub" in
-        list)
+        ls|list)
           local proj="''${1:-}"; [[ -z "$proj" ]] && { echo "Usage: dev worktree list <project>" >&2; return 1; }
           _dev_project_resolve "$proj" || { echo "dev worktree: unknown project '$proj'" >&2; return 1; }
           _dev_run_at "$R_PATH" "git -C $(printf '%q' "$R_PATH") worktree list"
@@ -1541,6 +1541,32 @@ let
       ${coderBin} "$@"
   '';
 
+  # `dev board` — Zellij task-board plugin (Wasm cdylib).
+  # Built with pkgsCross.wasi32 (wasm32-unknown-wasi) using lld as linker,
+  # matching the pattern used by nixpkgs zellijPlugins.
+  devZellij =
+    let
+      pkgs' = pkgs.pkgsCross.wasi32;
+      unwrapped = pkgs'.rustPlatform.buildRustPackage {
+        pname = "dev-zellij";
+        version = "0.1.0";
+        src = pkgs.lib.cleanSource ../../pkgs;
+        cargoLock.lockFile = ../../pkgs/Cargo.lock;
+        cargoBuildFlags = [ "--package" "dev-zellij" ];
+        doCheck = false;
+        nativeBuildInputs = [ pkgs'.lld ];
+        env.RUSTFLAGS = " -C linker=wasm-ld";
+      };
+    in
+      pkgs.stdenvNoCC.mkDerivation {
+        name = "dev-zellij.wasm";
+        src = unwrapped;
+        dontUnpack = true;
+        buildPhase = ''
+          cp "$(find "$src" -name '*.wasm')" "$out"
+        '';
+      };
+
   # `dev tui` — live fleet TUI (ratatui). A pure client of `dev … --json`:
   # it polls `dev ps --json` and shells out to dev for actions, holding no
   # local/remote/Coder logic of its own. Crate lives in pkgs/dev-tui.
@@ -1990,6 +2016,17 @@ let
         exec ${devTui}/bin/dev-tui "$@"
         ;;
 
+      board)
+        # Zellij task-board plugin. Opens in the current Zellij session (new
+        # floating pane); falls back to a new Zellij session if not inside one.
+        if [[ -n "''${ZELLIJ:-}" ]]; then
+          exec zellij plugin --floating -- file:"$HOME/.config/zellij/plugins/dev.wasm"
+        else
+          exec zellij --layout plugin -- file:"$HOME/.config/zellij/plugins/dev.wasm" 2>/dev/null \
+            || exec zellij plugin -- file:"$HOME/.config/zellij/plugins/dev.wasm"
+        fi
+        ;;
+
       dash)
         # Interim fleet dashboard over `dev agent ps --json`. Live refresh with ctrl-r;
         # row actions (enter/ctrl-l/ctrl-k/ctrl-d) shell out to dev — they light
@@ -2133,6 +2170,7 @@ let
         echo "TUI:" >&2
         echo "  tui                           Live fleet TUI" >&2
         echo "  dash                          Live fleet dashboard (fzf)" >&2
+        echo "  board                         Zellij task-board plugin" >&2
         echo "" >&2
         echo "Utilities:" >&2
         echo "  tools [--json]                List available tools" >&2
@@ -2151,9 +2189,12 @@ in
     coderCli
     devCmd
     devTui
-    devCli
     opencodeWrapper
   ];
+
+  # Zellij task-board plugin — installed to the standard plugin search path.
+  # Load with: dev board  (or manually: zellij plugin -- file:~/.config/zellij/plugins/dev.wasm)
+  home.file.".config/zellij/plugins/dev.wasm".source = devZellij;
 
   # ~/.claude/statusline.sh — piped JSON from Claude Code on each API response.
   # Caches rate_limits to ~/.cache/claude/usage.json for `dev usage` and the TUI.
