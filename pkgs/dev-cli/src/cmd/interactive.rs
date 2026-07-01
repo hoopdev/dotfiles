@@ -11,11 +11,19 @@ use std::process::{Command, Stdio};
 /// Resolve which backend to use: an explicit `--backend` wins; else fzf-pick
 /// from the registry (filtered by `purpose`) on a TTY; else fall back to
 /// `default` silently (keeps scripts / agents / the TUI non-interactive).
-pub fn choose_backend(given: Option<&str>, purpose: Purpose, default: &str) -> String {
+/// `non_interactive` (e.g. the global `--json`) forces the silent fallback even
+/// on a TTY — the TUI shells out over an inherited PTY, so `is_terminal()` alone
+/// can't tell it apart from a human at a prompt.
+pub fn choose_backend(
+    given: Option<&str>,
+    purpose: Purpose,
+    default: &str,
+    non_interactive: bool,
+) -> String {
     if let Some(g) = given {
         return g.to_string();
     }
-    if std::io::stdout().is_terminal() {
+    if !non_interactive && std::io::stdout().is_terminal() {
         let names: Vec<String> = agent::backends_for(purpose)
             .iter()
             .map(|b| b.name.to_string())
@@ -29,11 +37,17 @@ pub fn choose_backend(given: Option<&str>, purpose: Purpose, default: &str) -> S
 
 /// Resolve a model override: an explicit `--model` wins; else fzf-pick from the
 /// backend's registry on a TTY (Esc/no-TTY ⇒ None = the backend's own default).
-pub fn choose_model(given: Option<&str>, backend_name: &str) -> Option<String> {
+/// `non_interactive` (e.g. the global `--json`) suppresses the picker even on a
+/// TTY, so the TUI's inherited-PTY dispatch never pops an unexpected fzf prompt.
+pub fn choose_model(
+    given: Option<&str>,
+    backend_name: &str,
+    non_interactive: bool,
+) -> Option<String> {
     if let Some(g) = given {
         return Some(g.to_string());
     }
-    if !std::io::stdout().is_terminal() {
+    if non_interactive || !std::io::stdout().is_terminal() {
         return None;
     }
     let spec = agent::backend(backend_name)?;

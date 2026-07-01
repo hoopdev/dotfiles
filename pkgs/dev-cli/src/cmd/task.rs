@@ -20,6 +20,21 @@ fn json_ok(task_id: &str, project_id: &str, phase: &str, message: &str) {
     );
 }
 
+/// Emit the `--json` failure receipt for a dispatch that never launched. Uses
+/// serde so an error message with quotes/backslashes/newlines can't produce
+/// invalid JSON on stdout.
+fn json_dispatch_err(task_id: &str, msg: &str) {
+    println!(
+        "{}",
+        serde_json::json!({
+            "ok": false,
+            "error": "dispatch_failed",
+            "message": msg,
+            "task_id": task_id,
+        })
+    );
+}
+
 fn read_task_json(task_dir: &Path) -> Value {
     let content =
         std::fs::read_to_string(task_dir.join("task.json")).unwrap_or_else(|_| "{}".to_string());
@@ -35,6 +50,59 @@ fn vs(v: &Value, key: &str) -> String {
 
 fn truncate_chars(s: &str, max: usize) -> String {
     s.chars().take(max).collect()
+}
+
+/// Launch a background agent via `dev agent dispatch` and return its run id.
+///
+/// This is the one bridge from the task store (`~/.dev/projects`) to the run
+/// registry (`~/.dev/runs`). It calls `dev agent dispatch … --backend <tool> …
+/// --json <prompt>` and parses the JSON receipt, so callers can (a) know whether
+/// the launch actually succeeded — instead of the old `let _ = cmd.status()`
+/// that flipped the task phase even when clap rejected the flags — and (b) record
+/// `links.run_id` back onto the task. `--json` also marks the call non-interactive
+/// so the CLI never pops an fzf backend/model picker into the caller's terminal.
+fn spawn_dispatch(
+    project_id: &str,
+    tool: &str,
+    worktree: Option<&str>,
+    model: Option<&str>,
+    prompt: &str,
+) -> Result<String, String> {
+    let mut cmd = std::process::Command::new("dev");
+    cmd.args(["agent", "dispatch", project_id, "--backend", tool]);
+    if let Some(w) = worktree {
+        cmd.args(["--worktree", w]);
+    }
+    if let Some(m) = model {
+        cmd.args(["--model", m]);
+    }
+    // `--json` (a global flag) must precede the trailing-var-arg prompt.
+    cmd.arg("--json");
+    cmd.arg(prompt);
+    let out = cmd
+        .stdin(std::process::Stdio::null())
+        .output()
+        .map_err(|e| format!("could not run dev agent dispatch: {e}"))?;
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr);
+        let first = err
+            .lines()
+            .map(str::trim)
+            .find(|l| !l.is_empty())
+            .unwrap_or("dispatch failed");
+        return Err(first.to_string());
+    }
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let v: Value = serde_json::from_str(stdout.trim())
+        .map_err(|e| format!("could not parse dispatch receipt: {e}"))?;
+    if v.get("ok").and_then(|x| x.as_bool()) != Some(true) {
+        return Err(v
+            .get("error")
+            .and_then(|x| x.as_str())
+            .unwrap_or("dispatch reported failure")
+            .to_string());
+    }
+    Ok(vs(&v, "id"))
 }
 
 fn review_recommendation(output: &str, ok: bool) -> &'static str {
@@ -843,16 +911,6 @@ fn cmd_plan(
     let v = read_task_json(&tdir);
     let project_id = vs(&v, "project_id");
 
-    task_phase_set(&tdir, "planning", "dev", "planning agent dispatched").ok();
-    event_append(
-        &tdir,
-        "agent_dispatched",
-        "dev",
-        &format!("planning agent dispatched (tool={tool})"),
-        None,
-    )
-    .ok();
-
     let prompt = format!(
         "You are planning dev task {task_id} for project {project_id}.\n\n\
          Rules:\n\
@@ -868,13 +926,31 @@ fn cmd_plan(
          - Do not implement until the task is approved."
     );
 
-    let mut cmd = std::process::Command::new("dev");
-    cmd.args(["agent", "dispatch", &project_id, "--tool", &tool]);
-    if let Some(m) = &model {
-        cmd.args(["--model", m]);
+    // Launch first; only transition the task if the agent actually started.
+    let run_id = match spawn_dispatch(&project_id, &tool, None, model.as_deref(), &prompt) {
+        Ok(id) => id,
+        Err(e) => {
+            if json_out {
+                json_dispatch_err(&task_id, &e);
+            } else {
+                eprintln!("error: planning agent not dispatched: {e}");
+            }
+            std::process::exit(1);
+        }
+    };
+
+    task_phase_set(&tdir, "planning", "dev", "planning agent dispatched").ok();
+    if !run_id.is_empty() {
+        task_set_link(&tdir, "run_id", serde_json::json!(run_id)).ok();
     }
-    cmd.arg(&prompt);
-    let _ = cmd.status();
+    event_append(
+        &tdir,
+        "agent_dispatched",
+        "dev",
+        &format!("planning agent dispatched (tool={tool})"),
+        Some(serde_json::json!({ "tool": tool, "run_id": run_id })),
+    )
+    .ok();
 
     if json_out {
         json_ok(
@@ -935,22 +1011,6 @@ fn cmd_dispatch(
     let wt_branch = worktree
         .unwrap_or_else(|| format!("task/{}", task_id.to_lowercase().replace(['_', ' '], "-")));
 
-    // Update task.json
-    task_update_field(&tdir, "worktree_branch", serde_json::json!(wt_branch)).ok();
-    task_update_field(&tdir, "assigned_tool", serde_json::json!(tool)).ok();
-    if let Some(m) = &model {
-        task_update_field(&tdir, "assigned_model", serde_json::json!(m)).ok();
-    }
-    task_phase_set(&tdir, "implementing", "dev", "implementation started").ok();
-    event_append(
-        &tdir,
-        "implementation_started",
-        "dev",
-        "implementation agent dispatched",
-        Some(serde_json::json!({"tool": tool, "worktree": wt_branch})),
-    )
-    .ok();
-
     let prompt = format!(
         "You are implementing approved dev task {task_id} for project {project_id}.\n\n\
          Rules:\n\
@@ -966,21 +1026,43 @@ fn cmd_dispatch(
            Include: changed files, tests run, results, risks, follow-up."
     );
 
-    let mut cmd = std::process::Command::new("dev");
-    cmd.args([
-        "agent",
-        "dispatch",
+    // Launch first; only mutate task state if the agent actually started.
+    let run_id = match spawn_dispatch(
         &project_id,
-        "--tool",
         &tool,
-        "--worktree",
-        &wt_branch,
-    ]);
+        Some(&wt_branch),
+        model.as_deref(),
+        &prompt,
+    ) {
+        Ok(id) => id,
+        Err(e) => {
+            if json_out {
+                json_dispatch_err(&task_id, &e);
+            } else {
+                eprintln!("error: implementation agent not dispatched: {e}");
+            }
+            std::process::exit(1);
+        }
+    };
+
+    // Update task.json
+    task_update_field(&tdir, "worktree_branch", serde_json::json!(wt_branch)).ok();
+    task_update_field(&tdir, "assigned_tool", serde_json::json!(tool)).ok();
     if let Some(m) = &model {
-        cmd.args(["--model", m]);
+        task_update_field(&tdir, "assigned_model", serde_json::json!(m)).ok();
     }
-    cmd.arg(&prompt);
-    let _ = cmd.status();
+    if !run_id.is_empty() {
+        task_set_link(&tdir, "run_id", serde_json::json!(run_id)).ok();
+    }
+    task_phase_set(&tdir, "implementing", "dev", "implementation started").ok();
+    event_append(
+        &tdir,
+        "implementation_started",
+        "dev",
+        "implementation agent dispatched",
+        Some(serde_json::json!({"tool": tool, "worktree": wt_branch, "run_id": run_id})),
+    )
+    .ok();
 
     if json_out {
         json_ok(
@@ -1411,7 +1493,7 @@ fn cmd_review(task_id: Option<String>, tool: Option<String>, json_out: bool) -> 
     let mut cmd = std::process::Command::new("dev");
     cmd.args(["agent", "review", &project_id]);
     if let Some(t) = &tool {
-        cmd.args(["--tool", t]);
+        cmd.args(["--backend", t]);
     }
     let out = cmd.output().unwrap_or_else(|e| {
         eprintln!("error: {e}");
@@ -1532,15 +1614,6 @@ fn cmd_fix(
         std::process::exit(1);
     }
     let wt_branch = vs(&v, "worktree_branch");
-    task_phase_set(&tdir, "implementing", "dev", "fix agent dispatched").ok();
-    event_append(
-        &tdir,
-        "implementation_started",
-        "dev",
-        "fix agent dispatched",
-        Some(serde_json::json!({"tool": tool, "worktree": wt_branch})),
-    )
-    .ok();
 
     let prompt = format!(
         "You are fixing dev task {task_id} (phase: needs_fix) for project {project_id}.\n\n\
@@ -1552,16 +1625,31 @@ fn cmd_fix(
          - At the end, write a new handoff: dev task write-handoff {task_id}"
     );
 
-    let mut cmd = std::process::Command::new("dev");
-    cmd.args(["agent", "dispatch", &project_id, "--tool", &tool]);
-    if !wt_branch.is_empty() {
-        cmd.args(["--worktree", &wt_branch]);
+    let wt = (!wt_branch.is_empty()).then_some(wt_branch.as_str());
+    let run_id = match spawn_dispatch(&project_id, &tool, wt, model.as_deref(), &prompt) {
+        Ok(id) => id,
+        Err(e) => {
+            if json_out {
+                json_dispatch_err(&task_id, &e);
+            } else {
+                eprintln!("error: fix agent not dispatched: {e}");
+            }
+            std::process::exit(1);
+        }
+    };
+
+    if !run_id.is_empty() {
+        task_set_link(&tdir, "run_id", serde_json::json!(run_id)).ok();
     }
-    if let Some(m) = &model {
-        cmd.args(["--model", m]);
-    }
-    cmd.arg(&prompt);
-    let _ = cmd.status();
+    task_phase_set(&tdir, "implementing", "dev", "fix agent dispatched").ok();
+    event_append(
+        &tdir,
+        "implementation_started",
+        "dev",
+        "fix agent dispatched",
+        Some(serde_json::json!({"tool": tool, "worktree": wt_branch, "run_id": run_id})),
+    )
+    .ok();
 
     if json_out {
         json_ok(

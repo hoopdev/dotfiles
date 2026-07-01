@@ -224,6 +224,7 @@ fn main() {
                 effort: None,
                 sandbox: None,
                 worktree,
+                supervise: false,
                 task,
             },
             json,

@@ -33,6 +33,10 @@ pub enum AgentCmd {
         sandbox: Option<String>,
         #[arg(long)]
         worktree: Option<String>,
+        /// Track this dispatch as a task so the agent can raise blocking questions
+        /// into the Inbox (`dev task ask`) and leave a handoff. Local targets only.
+        #[arg(long)]
+        supervise: bool,
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         task: Vec<String>,
     },
@@ -64,6 +68,20 @@ pub enum AgentCmd {
         worktree: Option<String>,
         #[arg(long)]
         base: Option<String>,
+    },
+    /// Print an agent's final result — the last assistant message (claude) or the
+    /// run log (others). Richer than `logs`; `--full` prints the whole log.
+    Output {
+        reference: String,
+        #[arg(long)]
+        full: bool,
+    },
+    /// Continue a run with a new instruction: re-dispatch a background agent seeded
+    /// with the prior run's result, on the same project/backend/worktree.
+    Followup {
+        reference: String,
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        text: Vec<String>,
     },
     /// Poll agent state and push a Telegram note on finish / waiting / error.
     Watch {
@@ -97,9 +115,10 @@ pub fn run(cmd: &AgentCmd, json: bool) {
             effort,
             sandbox,
             worktree,
+            supervise,
             task,
         } => dispatch(
-            project, backend, model, effort, sandbox, worktree, task, json,
+            project, backend, model, effort, sandbox, worktree, *supervise, task, json,
         ),
         AgentCmd::Kill { reference } => kill(reference, json),
         AgentCmd::Attach {
@@ -124,6 +143,8 @@ pub fn run(cmd: &AgentCmd, json: bool) {
             base.as_deref(),
             json,
         ),
+        AgentCmd::Output { reference, full } => output(reference, *full, json),
+        AgentCmd::Followup { reference, text } => followup(reference, text, json),
         AgentCmd::Watch { interval, once } => watch(*interval, *once),
         AgentCmd::Runs { project } => runs(project.as_deref(), json),
         AgentCmd::Prune {
@@ -245,7 +266,10 @@ fn attach(
         // resuming, carry the newest run's session for that same backend.
         let newest = agent::newest_run(&cfg, &n);
         let default = agent::default_backend(&cfg, &n, newest.as_ref());
-        let chosen = interactive::choose_backend(backend_override, agent::Purpose::Fresh, &default);
+        // Attach is genuinely interactive (a human reconnecting), so let the fzf
+        // picker run when the backend is omitted on a TTY.
+        let chosen =
+            interactive::choose_backend(backend_override, agent::Purpose::Fresh, &default, false);
         let session = newest
             .as_ref()
             .filter(|m| m.get("tool").and_then(|v| v.as_str()) == Some(chosen.as_str()))
@@ -294,6 +318,7 @@ fn review(
         effort,
         &None,
         worktree,
+        false,
         std::slice::from_ref(&prompt),
         json_out,
     );
@@ -382,21 +407,27 @@ fn dispatch(
     effort: &Option<String>,
     sandbox: &Option<String>,
     worktree: &Option<String>,
+    supervise: bool,
     task: &[String],
     json_out: bool,
 ) {
     let cfg = Config::load_or_default();
     let taskstr = task.join(" ");
     if taskstr.trim().is_empty() {
-        eprintln!("Usage: dev agent dispatch <project> [--backend b] [--worktree b] <task...>");
+        eprintln!("Usage: dev agent dispatch <project> [--backend b] [--supervise] [--worktree b] <task...>");
         std::process::exit(1);
     }
     // --backend wins; else fzf-pick on a TTY; else the project/newest default.
+    // `json_out` marks a non-interactive caller (agent/skill/TUI) → no fzf.
     let default = agent::default_backend(&cfg, project, None);
-    let backend_s =
-        interactive::choose_backend(backend.as_deref(), agent::Purpose::Dispatch, &default);
+    let backend_s = interactive::choose_backend(
+        backend.as_deref(),
+        agent::Purpose::Dispatch,
+        &default,
+        json_out,
+    );
     // --model wins; else fzf-pick from the backend's registry on a TTY; else none.
-    let model_s = interactive::choose_model(model.as_deref(), &backend_s);
+    let model_s = interactive::choose_model(model.as_deref(), &backend_s, json_out);
     let opts = agent::DispatchOpts {
         backend: &backend_s,
         task: &taskstr,
@@ -404,14 +435,20 @@ fn dispatch(
         effort: effort.as_deref(),
         sandbox: sandbox.as_deref(),
         worktree: worktree.as_deref(),
+        supervise,
     };
     match agent::dispatch(&cfg, project, &opts) {
         Ok(v) => {
             if json_out {
                 println!("{}", serde_json::to_string(&v).unwrap());
             } else {
+                let task_note = v["task_id"]
+                    .as_str()
+                    .filter(|t| !t.is_empty())
+                    .map(|t| format!(" task={t}"))
+                    .unwrap_or_default();
                 println!(
-                    "dispatched {} on {} (backend={}{})",
+                    "dispatched {} on {} (backend={}{}{})",
                     v["id"].as_str().unwrap_or("?"),
                     project,
                     opts.backend,
@@ -420,7 +457,13 @@ fn dispatch(
                         .filter(|p| !p.is_empty())
                         .map(|p| format!(" pid={p}"))
                         .unwrap_or_default(),
+                    task_note,
                 );
+                if v["supervise_skipped"].as_bool() == Some(true) {
+                    eprintln!(
+                        "note: --supervise ignored (task store is local-only; target is remote)"
+                    );
+                }
             }
         }
         Err(e) => {
@@ -502,24 +545,67 @@ fn logs(reference: &str, follow: bool, json_out: bool) {
     }
 }
 
+/// `dev agent output` — the run's final result, beyond the scrolling log tail.
+fn output(reference: &str, full: bool, json_out: bool) {
+    let cfg = Config::load_or_default();
+    let lines = agent::final_output(&cfg, reference, full);
+    if json_out {
+        println!(
+            "{}",
+            serde_json::to_string(&json!({ "target": reference, "lines": lines })).unwrap()
+        );
+    } else {
+        for l in &lines {
+            println!("{l}");
+        }
+    }
+}
+
+/// `dev agent followup` — continue a run with a new instruction (background).
+fn followup(reference: &str, text: &[String], json_out: bool) {
+    let cfg = Config::load_or_default();
+    let instruction = text.join(" ");
+    if instruction.trim().is_empty() {
+        eprintln!("Usage: dev agent followup <project|run-id> <instruction...>");
+        std::process::exit(1);
+    }
+    match agent::followup(&cfg, reference, &instruction) {
+        Ok(v) => {
+            if json_out {
+                println!("{}", serde_json::to_string(&v).unwrap());
+            } else {
+                println!(
+                    "followup dispatched {} on {}",
+                    v["id"].as_str().unwrap_or("?"),
+                    v["target"].as_str().unwrap_or(reference),
+                );
+            }
+        }
+        Err(e) => {
+            eprintln!("dev agent followup: {e:#}");
+            std::process::exit(1);
+        }
+    }
+}
+
 /// `-f` streaming — exec `tail -f` on the run's log (local or over ssh), which
 /// inherits stdio and streams. claude logs to its own store, so we short-circuit.
 fn follow_tail(cfg: &Config, reference: &str) {
-    let Some(target) = cfg.resolve(reference) else {
-        eprintln!("dev agent logs: unknown target '{reference}'");
+    let Some((target, _)) = agent::resolve_run(cfg, reference) else {
+        eprintln!("dev agent logs: unknown target/run '{reference}'");
         std::process::exit(1);
     };
     // claude has no `~/.dev/runs/*.log` to `tail -f`; it keeps a JSONL transcript.
-    // There's no clean line-stream to follow, so print the distilled transcript
-    // snapshot and stop (attach for a live view). Non-claude backends fall through
-    // to a real `tail -f` on their run log.
+    // Codex interactive sessions are the same shape: readable transcript, but no
+    // dev-owned file descriptor to stream. Print the current activity snapshot
+    // and stop; the TUI polls these transcript-backed backends.
     let Some(log) = agent::run_log_name(cfg, reference) else {
         for l in agent::recent_activity(cfg, reference, None) {
             println!("{l}");
         }
         eprintln!(
-            "dev agent logs: no streamable log for '{reference}' (claude transcript shown above; \
-             `dev agent attach {reference}` for a live session)"
+            "dev agent logs: no streamable dev run log for '{reference}' \
+             (transcript snapshot shown above; `dev agent attach {reference}` for a live session)"
         );
         return;
     };

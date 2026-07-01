@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -31,15 +31,16 @@ impl App {
             Mode::Normal => return self.key_normal(key, term),
             Mode::Help => self.mode = Mode::Normal,
             Mode::Filter => self.key_filter(key),
-            Mode::Dispatch => self.key_dispatch(key, term),
+            Mode::Dispatch => self.key_dispatch(key),
             Mode::ConfirmKill => self.key_confirm(key),
             Mode::LogView => self.key_logview(key),
             Mode::ActionMenu => self.key_action_menu(key, term),
             Mode::ToolPick => self.key_tool_pick(key, term),
             Mode::BatchMenu => self.key_batch_menu(key, term),
             Mode::ResultView => self.key_result_view(key),
-            Mode::ModelPicker => self.key_model_picker(key),
+            Mode::ModelPicker => self.key_model_picker(key, term),
             Mode::TaskView => self.key_task_view(key),
+            Mode::Followup => self.key_followup(key),
             Mode::UsageView => self.key_usage_view(key),
             Mode::BoardModal => return self.key_board_modal(key, term),
         }
@@ -74,6 +75,16 @@ impl App {
             KeyCode::PageUp => {
                 self.log_follow = false;
                 self.log_scroll = self.log_scroll.saturating_sub(20);
+            }
+            // Continuation affordances — extract the run's result, or follow up.
+            KeyCode::Char('o') => {
+                let t = self.log_target.clone();
+                self.stop_tail();
+                self.request_output(t);
+            }
+            KeyCode::Char('f') => {
+                let t = self.log_target.clone();
+                self.begin_followup(t);
             }
             _ => {}
         }
@@ -255,6 +266,8 @@ impl App {
                 if let Some(t) = self.selected_env_name() {
                     self.dispatch_target = t;
                     self.dispatch_tool = String::new();
+                    self.dispatch_model.clear();
+                    self.dispatch_effort.clear();
                     self.tool_index = 0;
                     self.tool_purpose = ToolPurpose::Dispatch;
                     self.tool_prev_mode = Mode::Normal;
@@ -372,7 +385,7 @@ impl App {
         }
     }
 
-    fn key_dispatch(&mut self, key: KeyEvent, term: &mut Term) {
+    fn key_dispatch(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Esc => {
                 self.dispatch_targets.clear();
@@ -395,30 +408,56 @@ impl App {
                         extra.push("--effort".into());
                         extra.push(effort.clone());
                     }
+                    // `--json` marks these as non-interactive `dev` calls so the
+                    // CLI never pops an fzf model picker into the pane/terminal.
+                    let supervise = self.dispatch_supervise;
                     if !self.dispatch_targets.is_empty() {
                         let targets = std::mem::take(&mut self.dispatch_targets);
                         for t in &targets {
-                            let mut args = vec!["agent", "dispatch", t];
+                            let mut args = vec!["agent", "dispatch", t, "--json"];
                             if !tool.is_empty() {
                                 args.extend_from_slice(&["--backend", &tool]);
+                            }
+                            if supervise {
+                                args.push("--supervise");
                             }
                             let extra_refs: Vec<&str> = extra.iter().map(|s| s.as_str()).collect();
                             args.extend_from_slice(&extra_refs);
                             args.push(&task);
-                            run_dev(&args, term);
+                            // Fire-and-forget: detach with output to /dev/null so it
+                            // neither blocks nor scribbles over the live TUI (and the
+                            // null stdout keeps `dev` non-interactive too). One pane
+                            // per marked target would be too noisy for a batch.
+                            let _ = Command::new("dev")
+                                .args(&args)
+                                .stdout(Stdio::null())
+                                .stderr(Stdio::null())
+                                .spawn();
                             self.record_task(t, &tool, &model, &task);
                         }
                         self.set_flash(&format!("dispatched → {} envs", targets.len()));
                     } else {
                         let target = self.dispatch_target.clone();
-                        let mut args = vec!["agent", "dispatch", &target];
+                        let mut args = vec!["agent", "dispatch", &target, "--json"];
                         if !tool.is_empty() {
                             args.extend_from_slice(&["--backend", &tool]);
+                        }
+                        if supervise {
+                            args.push("--supervise");
                         }
                         let extra_refs: Vec<&str> = extra.iter().map(|s| s.as_str()).collect();
                         args.extend_from_slice(&extra_refs);
                         args.push(&task);
-                        run_dev(&args, term);
+                        // `dev agent dispatch` is a fire-and-forget background launch
+                        // that prints its JSON and returns at once — running it in a
+                        // `--close-on-exit` Zellij pane just flashes a pane open and
+                        // shut. Spawn it detached (like the batch path above) so the
+                        // agent starts and the fleet TUI stays live, no flickering pane.
+                        let _ = Command::new("dev")
+                            .args(&args)
+                            .stdout(Stdio::null())
+                            .stderr(Stdio::null())
+                            .spawn();
                         self.set_flash(&format!("dispatched → {target}"));
                         self.record_task(&target, &tool, &model, &task);
                     }
@@ -427,6 +466,10 @@ impl App {
             }
             KeyCode::Backspace => {
                 self.dispatch_input.pop();
+            }
+            // Tab toggles supervised dispatch (task-tracked → agent can ask into Inbox).
+            KeyCode::Tab => {
+                self.dispatch_supervise = !self.dispatch_supervise;
             }
             KeyCode::Char(c) => self.dispatch_input.push(c),
             _ => {}
@@ -481,8 +524,24 @@ impl App {
                     }
                 };
                 let tool = self.selected_tool();
+                // Arms are ordered to match `ACTION_MENU_ITEMS` in render.rs:
+                // session (0-2) · dispatch (3-4) · inspect (5-6) · destructive (7).
+                // `new`/`dispatch`/`review` all go backend picker → model picker →
+                // run, so each clears any stale model override before entering.
                 match self.menu_index {
+                    // --- session ---
                     0 => {
+                        // new (fresh interactive session) → tool picker → model
+                        self.dispatch_target = target;
+                        self.dispatch_tool = String::new();
+                        self.dispatch_model.clear();
+                        self.dispatch_effort.clear();
+                        self.tool_index = 0;
+                        self.tool_purpose = ToolPurpose::Start;
+                        self.tool_prev_mode = Mode::ActionMenu;
+                        self.mode = Mode::ToolPick;
+                    }
+                    1 => {
                         // attach — reconnect via the unified `dev agent attach`,
                         // which computes the per-backend resume command from the
                         // core registry (no hardcoded per-tool arms here). On an
@@ -500,59 +559,52 @@ impl App {
                         run_dev_pane(&format!("attach:{target}"), &args, term);
                         self.after_action();
                     }
-                    1 => {
+                    2 => {
                         // open in VS Code
                         self.mode = Mode::Normal;
                         run_dev(&["code", &target], term);
                         self.after_action();
                     }
-                    2 => {
-                        // dispatch → tool picker
+                    // --- dispatch ---
+                    3 => {
+                        // dispatch → tool picker → model picker → task input
                         self.dispatch_target = target;
                         self.dispatch_tool = String::new();
+                        self.dispatch_model.clear();
+                        self.dispatch_effort.clear();
                         self.tool_index = 0;
                         self.tool_purpose = ToolPurpose::Dispatch;
                         self.tool_prev_mode = Mode::ActionMenu;
                         self.mode = Mode::ToolPick;
                     }
-                    3 => {
-                        // start tool (interactive)
-                        self.dispatch_target = target;
-                        self.tool_index = 0;
-                        self.tool_purpose = ToolPurpose::Start;
-                        self.tool_prev_mode = Mode::ActionMenu;
-                        self.mode = Mode::ToolPick;
-                    }
                     4 => {
-                        // review — tool picker or direct streaming execution
+                        // review → tool picker → model picker → run. On an agent
+                        // row the backend is fixed to that agent's tool, so skip
+                        // the tool picker and go straight to the model picker.
+                        self.dispatch_target = target;
+                        self.dispatch_model.clear();
+                        self.dispatch_effort.clear();
+                        self.tool_index = 0;
+                        self.tool_purpose = ToolPurpose::Review;
+                        self.tool_prev_mode = Mode::ActionMenu;
                         match self.selected_item_cloned() {
                             Some(Item::AgentRow(i, j)) => {
-                                // Agent row: dispatch a review with that agent's tool,
-                                // then follow it (start_review_process sets the mode).
-                                let agent_tool = self.envs[i].agents[j].tool.clone();
-                                self.start_review_process(&target, &agent_tool, term);
+                                self.dispatch_tool = self.envs[i].agents[j].tool.clone();
+                                self.model_pick_index = 0;
+                                self.mode = Mode::ModelPicker;
                             }
                             _ => {
-                                // Env row: show tool picker for review
-                                self.dispatch_target = target;
-                                self.tool_index = 0;
-                                self.tool_purpose = ToolPurpose::Review;
-                                self.tool_prev_mode = Mode::ActionMenu;
+                                self.dispatch_tool = String::new();
                                 self.mode = Mode::ToolPick;
                             }
                         }
                     }
+                    // --- inspect ---
                     5 => {
-                        // model picker for next dispatch
-                        self.dispatch_target = target.clone();
-                        self.model_pick_index = 0;
-                        self.mode = Mode::ModelPicker;
-                    }
-                    6 => {
                         // logs (TUI内)
                         self.open_log_view(target, tool);
                     }
-                    7 => {
+                    6 => {
                         // diff
                         self.mode = Mode::Normal;
                         run_shell_pane(
@@ -562,7 +614,8 @@ impl App {
                         );
                         self.after_action();
                     }
-                    8 => {
+                    // --- destructive ---
+                    7 => {
                         // kill
                         self.mode = Mode::ConfirmKill;
                     }
@@ -589,32 +642,61 @@ impl App {
                 };
             }
             KeyCode::Enter => {
-                let tool = tools.get(self.tool_index).cloned().unwrap_or_default();
-                let target = self.dispatch_target.clone();
-                match self.tool_purpose {
-                    ToolPurpose::Start => {
-                        // "new session" = the merged `dev agent attach --fresh`.
-                        self.mode = Mode::Normal;
-                        run_dev_pane(
-                            &format!("{tool}:{target}"),
-                            &["agent", "attach", &target, "--backend", &tool, "--fresh"],
-                            term,
-                        );
-                        self.after_action();
-                    }
-                    ToolPurpose::Dispatch => {
-                        self.dispatch_tool = tool;
-                        self.dispatch_input.clear();
-                        self.mode = Mode::Dispatch;
-                    }
-                    ToolPurpose::Review => {
-                        // Dispatch the review agent, then attach to it
-                        // (start_review_process sets the mode).
-                        self.start_review_process(&target, &tool, term);
-                    }
+                // Backend chosen → pick a model next (the backend's own list).
+                // If the backend exposes no models, run the action straight away.
+                self.dispatch_tool = tools.get(self.tool_index).cloned().unwrap_or_default();
+                self.model_pick_index = 0;
+                if self.models_for_picker(&self.dispatch_tool).is_empty() {
+                    self.run_tool_action(term);
+                } else {
+                    self.mode = Mode::ModelPicker;
                 }
             }
             _ => {}
+        }
+    }
+
+    /// Run the action set up by the tool + model pickers, per `tool_purpose`.
+    /// Reads `dispatch_target`/`dispatch_tool`/`dispatch_model` (and, for
+    /// dispatch, `dispatch_targets`/`dispatch_effort`). Called once a model has
+    /// been chosen (or skipped) — the single exit for new/dispatch/review.
+    fn run_tool_action(&mut self, term: &mut Term) {
+        let tool = self.dispatch_tool.clone();
+        let target = self.dispatch_target.clone();
+        let model = self.dispatch_model.clone();
+        match self.tool_purpose {
+            ToolPurpose::Start => {
+                // new = the merged `dev agent attach --fresh`. The model rides in
+                // as trailing `extra`, which the CLI appends verbatim to the
+                // interactive launch (`--model` is accepted by every backend).
+                self.mode = Mode::Normal;
+                let mut args: Vec<String> = vec![
+                    "agent".into(),
+                    "attach".into(),
+                    target.clone(),
+                    "--backend".into(),
+                    tool.clone(),
+                    "--fresh".into(),
+                ];
+                if !model.is_empty() {
+                    args.push("--model".into());
+                    args.push(model.clone());
+                }
+                let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+                run_dev_pane(&format!("{tool}:{target}"), &arg_refs, term);
+                self.after_action();
+            }
+            ToolPurpose::Dispatch => {
+                // Task text is entered on the next screen; key_dispatch applies
+                // dispatch_tool/model/effort when it fires.
+                self.dispatch_input.clear();
+                self.dispatch_supervise = false;
+                self.mode = Mode::Dispatch;
+            }
+            ToolPurpose::Review => {
+                // Dispatch the review agent (with model/effort) and follow it.
+                self.start_review_process(&target, &tool, term);
+            }
         }
     }
 
@@ -645,11 +727,49 @@ impl App {
             KeyCode::Char('G') | KeyCode::End => {
                 self.result_scroll = self.result_lines.len().saturating_sub(1);
             }
+            // Follow up on the run this output belongs to.
+            KeyCode::Char('f') => {
+                let t = self.result_target.clone();
+                self.begin_followup(t);
+            }
             _ => {}
         }
     }
 
-    fn key_model_picker(&mut self, key: KeyEvent) {
+    /// Follow-up instruction editor — Enter dispatches `dev agent followup`
+    /// (detached, like the batch dispatch path), Esc cancels.
+    fn key_followup(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => {
+                self.mode = Mode::Normal;
+            }
+            KeyCode::Enter => {
+                let text = self.followup_input.trim().to_string();
+                let target = self.followup_target.clone();
+                self.mode = Mode::Normal;
+                if text.is_empty() || target.is_empty() {
+                    return;
+                }
+                // Fire-and-forget: `dev agent followup` re-dispatches a background
+                // agent and returns at once (like the dispatch path), so detach it
+                // and keep the TUI live.
+                let _ = Command::new("dev")
+                    .args(["agent", "followup", &target, &text])
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn();
+                self.set_flash(&format!("followup → {target}"));
+                self.after_action();
+            }
+            KeyCode::Backspace => {
+                self.followup_input.pop();
+            }
+            KeyCode::Char(c) => self.followup_input.push(c),
+            _ => {}
+        }
+    }
+
+    fn key_model_picker(&mut self, key: KeyEvent, term: &mut Term) {
         let tool = self.dispatch_tool.clone();
         let tool = if tool.is_empty() {
             "claude".to_string()
@@ -660,7 +780,8 @@ impl App {
         let n = models.len().max(1);
         match key.code {
             KeyCode::Esc => {
-                self.mode = Mode::ActionMenu;
+                // Back to the backend picker to re-choose the tool.
+                self.mode = Mode::ToolPick;
             }
             KeyCode::Char('j') | KeyCode::Down => {
                 self.model_pick_index = (self.model_pick_index + 1) % n;
@@ -673,25 +794,17 @@ impl App {
                 };
             }
             KeyCode::Enter => {
+                // Selected model → run the configured action.
                 if let Some((_, model_id)) = models.get(self.model_pick_index) {
                     self.dispatch_model = model_id.clone();
-                    self.set_flash(&format!(
-                        "model → {}",
-                        if model_id.is_empty() {
-                            "default"
-                        } else {
-                            model_id
-                        }
-                    ));
                 }
-                self.mode = Mode::Normal;
+                self.run_tool_action(term);
             }
             KeyCode::Delete | KeyCode::Char('c') => {
-                // Clear model override.
+                // Skip the override — run with the backend's own default model.
                 self.dispatch_model.clear();
                 self.dispatch_effort.clear();
-                self.set_flash("model cleared (next dispatch uses tool default)");
-                self.mode = Mode::Normal;
+                self.run_tool_action(term);
             }
             _ => {}
         }
@@ -713,11 +826,13 @@ impl App {
             }
             KeyCode::Enter => match self.batch_menu_index {
                 0 => {
-                    // dispatch → ToolPick → Dispatch (batch mode)
+                    // dispatch → ToolPick → ModelPicker → Dispatch (batch mode)
                     let mut targets: Vec<String> = self.marked.iter().cloned().collect();
                     targets.sort();
                     self.dispatch_targets = targets;
                     self.dispatch_tool = String::new();
+                    self.dispatch_model.clear();
+                    self.dispatch_effort.clear();
                     self.dispatch_input.clear();
                     self.tool_index = 0;
                     self.tool_purpose = ToolPurpose::Dispatch;
@@ -920,7 +1035,15 @@ impl App {
                     .get(self.board_sel)
                     .map(|t| t.id.clone());
                 if let Some(id) = id {
-                    run_dev(&["task", "diff", &id, "--stat"], term);
+                    // A one-shot `dev task diff` printed via `run_dev` is wiped the
+                    // instant the TUI re-enters the alt-screen (its output is never
+                    // readable). Page it through `less` in a pane, like the fleet-side
+                    // diff actions (`D` / action-menu / batch) all do.
+                    run_shell_pane(
+                        &format!("task-diff:{id}"),
+                        &format!("dev task diff {} --stat | less -R", sh_quote(&id)),
+                        term,
+                    );
                     self.after_action();
                 }
             }

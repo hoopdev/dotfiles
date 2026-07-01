@@ -17,6 +17,7 @@ pub enum Req {
     /// so the worker reads that agent's transcript without rediscovering it.
     Logs {
         target: String,
+        tool: String,
         session: Option<String>,
     },
     Tools,
@@ -26,6 +27,12 @@ pub enum Req {
     TaskDetail(String),
     /// `dev git diff <target>` snapshot for the Fleet inspector Diff view.
     Diff(String),
+    /// An agent run's final result (`dev agent output`), for the ResultView overlay.
+    /// `full` fetches the whole run log instead of the tail / last message.
+    Output {
+        target: String,
+        full: bool,
+    },
 }
 
 #[allow(dead_code)]
@@ -196,8 +203,12 @@ pub fn worker(req_rx: Receiver<Req>, msg_tx: Sender<Msg>) {
             let msg = match req {
                 Req::Refresh => Msg::State(fetch_state()),
                 Req::Git => Msg::Git(fetch_git()),
-                Req::Logs { target, session } => {
-                    let lines = fetch_logs(&target, session.as_deref());
+                Req::Logs {
+                    target,
+                    tool,
+                    session,
+                } => {
+                    let lines = fetch_logs(&target, &tool, session.as_deref());
                     Msg::Logs { target, lines }
                 }
                 Req::Tools => Msg::Tools(fetch_tools()),
@@ -214,6 +225,19 @@ pub fn worker(req_rx: Receiver<Req>, msg_tx: Sender<Msg>) {
                 Req::Diff(target) => {
                     let lines = fetch_diff(&target);
                     Msg::Diff { target, lines }
+                }
+                Req::Output { target, full } => {
+                    // In-process (was `dev agent output --json`): the run's final
+                    // result, richer than the scrolling log tail.
+                    let cfg = dev_core::config::Config::load_or_default();
+                    let mut lines = dev_core::agent::final_output(&cfg, &target, full);
+                    if lines.is_empty() {
+                        lines.push("(no output yet)".to_string());
+                    }
+                    Msg::Result {
+                        title: format!("output: {target}"),
+                        lines,
+                    }
                 }
             };
             let _ = tx.send(msg);
@@ -319,14 +343,14 @@ fn fetch_git() -> HashMap<String, GitState> {
     m
 }
 
-fn fetch_logs(target: &str, session: Option<&str>) -> Vec<String> {
+fn fetch_logs(target: &str, tool: &str, session: Option<&str>) -> Vec<String> {
     // In-process recent activity: claude → distilled transcript, other backends →
     // run-log tail (see `dev_core::agent::recent_activity`). Strip ANSI so an
     // agent's default (formatted, colorized) output renders cleanly in the ratatui
     // detail pane instead of showing escape-code garbage. The live-tail path
     // already strips ANSI in `App::start_tail`.
     let cfg = dev_core::config::Config::load_or_default();
-    dev_core::agent::recent_activity(&cfg, target, session)
+    dev_core::agent::recent_activity_for_tool(&cfg, target, tool, session)
         .iter()
         .map(|l| strip_ansi(l))
         .collect()

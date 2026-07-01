@@ -23,5 +23,6 @@ pub use store::{
     blocking_questions_open, event_append, find_project_dir_for_question,
     find_project_dir_for_task, find_task_dir, handoff_write, next_question_id, next_review_id,
     next_review_id_in, next_task_id, next_test_run_id, next_test_run_id_in, now_iso, plan_approve,
-    plan_write, question_answer, question_new, task_new, task_phase_set, task_update_field,
+    plan_write, question_answer, question_new, task_new, task_phase_set, task_set_link,
+    task_update_field,
 };

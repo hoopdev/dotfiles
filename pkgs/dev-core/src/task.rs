@@ -135,6 +135,90 @@ fn vs(v: &Value, key: &str) -> Option<String> {
         .map(|s| s.to_string())
 }
 
+// ── dispatched-run cards (Layer 1: dispatch → board) ─────────────────────────
+//
+// A plain `dev agent dispatch` writes only a run record (`~/.dev/runs/*.meta`),
+// never a task, so the board never grew from a dispatch. To close that gap the
+// board also surfaces *bare* runs — ones not yet bound to a task via
+// `links.run_id` — as lightweight cards in the existing `implementing`/"Running"
+// lane. This is a file-only reader (no Config/ssh) so it stays usable from the
+// always-on `task` module.
+
+/// Local run registry dir (`~/.dev/runs`).
+fn runs_dir() -> Option<std::path::PathBuf> {
+    let home = std::env::var("HOME").ok()?;
+    Some(std::path::PathBuf::from(home).join(".dev").join("runs"))
+}
+
+/// Trailing epoch of a `<tool>-<project>-<epoch>` run id.
+fn run_epoch(id: &str) -> Option<u64> {
+    id.rsplit('-').next().and_then(|s| s.parse::<u64>().ok())
+}
+
+/// Bare dispatched runs surfaced as `implementing` board cards. `linked` is the
+/// set of run ids already owned by a task (so they aren't shown twice). Only runs
+/// from the last 48h are shown, so the board doesn't accrete every historical run
+/// (`dev agent prune` still GCs the metas).
+fn runs_as_tasks(linked: &std::collections::HashSet<String>) -> Vec<DevTask> {
+    const RECENT_SECS: u64 = 48 * 3600;
+    let now = {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0)
+    };
+    let dir = match runs_dir() {
+        Some(d) => d,
+        None => return Vec::new(),
+    };
+    let rd = match std::fs::read_dir(&dir) {
+        Ok(r) => r,
+        Err(_) => return Vec::new(),
+    };
+    let mut out = Vec::new();
+    for e in rd.flatten() {
+        if e.path().extension().map(|x| x != "meta").unwrap_or(true) {
+            continue;
+        }
+        let Ok(text) = std::fs::read_to_string(e.path()) else {
+            continue;
+        };
+        let Ok(v) = serde_json::from_str::<Value>(&text) else {
+            continue;
+        };
+        let id = vs(&v, "id").unwrap_or_default();
+        if id.is_empty() || linked.contains(&id) {
+            continue;
+        }
+        if let Some(ep) = run_epoch(&id) {
+            if now.saturating_sub(ep) > RECENT_SECS {
+                continue;
+            }
+        }
+        let title: String = vs(&v, "task")
+            .unwrap_or_default()
+            .chars()
+            .take(120)
+            .collect();
+        let started = vs(&v, "started").unwrap_or_default();
+        out.push(DevTask {
+            id,
+            project_id: vs(&v, "project").unwrap_or_default(),
+            title,
+            phase: "implementing".into(),
+            priority: "normal".into(),
+            created_at: started.clone(),
+            updated_at: started,
+            assigned_tool: vs(&v, "tool"),
+            review_status: "none".into(),
+            test_status: "unknown".into(),
+            diff_files_count: 0,
+        });
+    }
+    out
+}
+
 /// Load all tasks and open questions from ~/.dev/projects/.
 pub fn load_dev_tasks() -> (Vec<DevTask>, Vec<DevQuestion>) {
     let store = match dev_store_path() {
@@ -143,6 +227,8 @@ pub fn load_dev_tasks() -> (Vec<DevTask>, Vec<DevQuestion>) {
     };
     let mut tasks = Vec::new();
     let mut questions = Vec::new();
+    // Run ids already owned by a task — used to dedupe the bare-run cards below.
+    let mut linked_runs: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     let entries = match std::fs::read_dir(&store) {
         Ok(e) => e,
@@ -208,6 +294,13 @@ pub fn load_dev_tasks() -> (Vec<DevTask>, Vec<DevQuestion>) {
                 let task_json_path = task_path.join("task.json");
                 if let Ok(content) = std::fs::read_to_string(&task_json_path) {
                     if let Ok(v) = serde_json::from_str::<Value>(&content) {
+                        if let Some(rid) = v
+                            .pointer("/links/run_id")
+                            .and_then(|x| x.as_str())
+                            .filter(|s| !s.is_empty())
+                        {
+                            linked_runs.insert(rid.to_string());
+                        }
                         tasks.push(DevTask {
                             id: vs(&v, "id").unwrap_or_default(),
                             project_id: vs(&v, "project_id").unwrap_or_default(),
@@ -238,6 +331,9 @@ pub fn load_dev_tasks() -> (Vec<DevTask>, Vec<DevQuestion>) {
             }
         }
     }
+
+    // Surface bare dispatched runs (not owned by any task) as board cards.
+    tasks.extend(runs_as_tasks(&linked_runs));
 
     tasks.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
     (tasks, questions)

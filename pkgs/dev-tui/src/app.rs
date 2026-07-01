@@ -96,6 +96,8 @@ pub(crate) enum Mode {
     ModelPicker,
     /// Task dispatch history view.
     TaskView,
+    /// Follow-up instruction input — continues a run via `dev agent followup`.
+    Followup,
     /// Usage dashboard with sparklines.
     UsageView,
     /// Full 7-lane kanban board, opened on demand with `b`.
@@ -183,6 +185,11 @@ pub(crate) struct App {
     pub(crate) result_title: String,
     pub(crate) result_lines: Vec<String>,
     pub(crate) result_scroll: usize,
+    /// Run the ResultView is showing output for — the follow-up (`f`) target.
+    pub(crate) result_target: String,
+    /// Followup mode: the run being continued + the instruction being typed.
+    pub(crate) followup_target: String,
+    pub(crate) followup_input: String,
     /// true while a background Req::Review (etc.) is in flight.
     pub(crate) result_inflight: bool,
     /// true when the user dismissed the result view before it completed.
@@ -191,6 +198,9 @@ pub(crate) struct App {
     /// Dispatch model override (set by ModelPicker, applied to next dispatch).
     pub(crate) dispatch_model: String,
     pub(crate) dispatch_effort: String,
+    /// Supervised dispatch toggle (Tab in the dispatch box): track as a task so the
+    /// agent can raise blocking questions into the Inbox.
+    pub(crate) dispatch_supervise: bool,
     /// Index within the model picker list.
     pub(crate) model_pick_index: usize,
 
@@ -292,10 +302,14 @@ impl App {
             result_title: String::new(),
             result_lines: Vec::new(),
             result_scroll: 0,
+            result_target: String::new(),
+            followup_target: String::new(),
+            followup_input: String::new(),
             result_inflight: false,
             result_cancelled: false,
             dispatch_model: String::new(),
             dispatch_effort: String::new(),
+            dispatch_supervise: false,
             model_pick_index: 0,
             flash: None,
             spinner: 0,
@@ -928,34 +942,67 @@ impl App {
             match &self.log_wanted {
                 Some((t, since)) if *t == target => {
                     if since.elapsed() >= Duration::from_millis(250) {
-                        self.send_log_req(target, session);
+                        self.send_log_req(target, tool, session);
                     }
                 }
                 _ => self.log_wanted = Some((target, Instant::now())),
             }
         } else if is_stale {
-            self.send_log_req(target, session);
+            self.send_log_req(target, tool, session);
         }
     }
 
-    pub(crate) fn send_log_req(&mut self, target: String, session: Option<String>) {
+    pub(crate) fn send_log_req(&mut self, target: String, tool: String, session: Option<String>) {
         self.log_inflight = Some(target.clone());
         self.log_wanted = None;
-        let _ = self.req_tx.send(Req::Logs { target, session });
+        let _ = self.req_tx.send(Req::Logs {
+            target,
+            tool,
+            session,
+        });
     }
 
-    /// Open the in-TUI log view for a target. Non-claude backends stream their run
-    /// log via `tail -f`; claude has no streamable log, so its transcript is polled
-    /// by `maybe_request_logs` (which keeps running in LogView mode). We backdate
+    /// Fetch a run's final result (`dev agent output --full`) into the ResultView
+    /// overlay. Shows a placeholder immediately; the worker replaces it on arrival.
+    pub(crate) fn request_output(&mut self, target: String) {
+        if target.is_empty() {
+            self.set_flash("no target");
+            return;
+        }
+        self.result_inflight = true;
+        self.result_cancelled = false;
+        self.result_target = target.clone();
+        self.result_title = format!("output: {target}");
+        self.result_lines = vec!["(loading output…)".into()];
+        self.result_scroll = 0;
+        self.mode = Mode::ResultView;
+        let _ = self.req_tx.send(Req::Output { target, full: true });
+    }
+
+    /// Enter follow-up input for `target` — a typed instruction that continues the
+    /// run in the background via `dev agent followup`.
+    pub(crate) fn begin_followup(&mut self, target: String) {
+        if target.is_empty() {
+            self.set_flash("no target");
+            return;
+        }
+        self.followup_target = target;
+        self.followup_input.clear();
+        self.mode = Mode::Followup;
+    }
+
+    /// Open the in-TUI log view for a target. Backends with a dev-owned run log
+    /// stream via `tail -f`; transcript-backed backends are polled by
+    /// `maybe_request_logs` (which keeps running in LogView mode). We backdate
     /// `last_log` so the first poll fires immediately instead of after the 4 s gate.
     pub(crate) fn open_log_view(&mut self, target: String, tool: String) {
         self.log_follow = true;
         self.log_scroll = 0;
         self.log_wanted = None;
-        if tool == "claude" {
+        if matches!(tool.as_str(), "claude" | "codex") {
             if self.log_target != target {
                 self.log_target = target;
-                self.log_lines = vec!["(loading transcript…)".into()];
+                self.log_lines = vec![format!("(loading {tool} transcript…)")];
             }
             self.last_log = Instant::now()
                 .checked_sub(Duration::from_secs(5))
@@ -983,10 +1030,18 @@ impl App {
     pub(crate) fn start_review_process(&mut self, target: &str, tool: &str, term: &mut Term) {
         self.stop_tail();
 
+        let model = self.dispatch_model.clone();
+        let effort = self.dispatch_effort.clone();
         let mut cmd = std::process::Command::new("dev");
         cmd.args(["agent", "review", target]);
         if !tool.is_empty() {
             cmd.args(["--backend", tool]);
+        }
+        if !model.is_empty() {
+            cmd.args(["--model", &model]);
+        }
+        if !effort.is_empty() {
+            cmd.args(["--effort", &effort]);
         }
         let output = cmd.stdin(std::process::Stdio::null()).output();
 

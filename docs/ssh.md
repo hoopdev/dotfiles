@@ -83,7 +83,7 @@ fi
 ```
 
 この repo の macOS 設定も同じ方針にしている。`home/mac/default.nix` はローカル
-端末だけ 1Password socket を補完し、`home/mac/coder.nix` の `dev` helper も SSH
+端末だけ 1Password socket を補完し、`home/mac/dev.nix` で導入される `dev` も SSH
 セッション内では補完しない。
 
 ## Verification

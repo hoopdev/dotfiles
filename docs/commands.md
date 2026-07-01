@@ -27,7 +27,8 @@ nix develop                             # Dev shell (Python + Nix tools)
 
 ## Rust workspace (`pkgs/`)
 
-`dev-core` / `dev-cli` / `dev-tui` / `dev-zellij` — see [pkgs/CLAUDE.md](../pkgs/CLAUDE.md).
+`dev-core` / `dev-cli` / `dev-tui` / `dev-zellij` — see
+[dev-rust-workspace.md](dev-rust-workspace.md).
 
 ```bash
 nix develop .#rust -c just -f pkgs/justfile ci   # cargo check + test

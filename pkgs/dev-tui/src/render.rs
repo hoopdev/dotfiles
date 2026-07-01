@@ -49,6 +49,7 @@ pub(crate) fn ui(f: &mut Frame, app: &mut App) {
         Mode::ToolPick => render_tool_pick(f, app),
         Mode::BatchMenu => render_batch_menu(f, app),
         Mode::ResultView => render_result_view(f, app),
+        Mode::Followup => render_followup(f, app),
         Mode::ModelPicker => render_model_picker(f, app),
         Mode::TaskView => render_task_view(f, app),
         Mode::UsageView => render_usage_view(f, app),
@@ -703,7 +704,8 @@ fn render_bottom(f: &mut Frame, area: Rect, app: &App) {
 
 fn help_line(app: &App) -> Line<'static> {
     let hint: &'static str = match app.mode {
-        Mode::LogView => " j/k scroll · g top · G follow · PgDn/PgUp · esc/q back",
+        Mode::LogView => " j/k scroll · G follow · o output · f followup · esc/q back",
+        Mode::Followup => " type instruction · enter send · esc cancel",
         Mode::ActionMenu => " j/k move · enter execute · esc cancel",
         Mode::ToolPick => " j/k select backend · enter confirm · esc back",
         Mode::BatchMenu => " j/k move · enter execute · esc cancel",
@@ -769,7 +771,7 @@ fn render_help(f: &mut Frame) {
         )),
         kv(
             "enter",
-            "action menu (attach/code/dispatch/start/logs/diff/kill)",
+            "action menu (new/attach/code · dispatch/review · logs/diff/kill)",
         ),
         kv("l", "follow logs (dev logs -f, outside TUI)"),
         kv("a", "attach (dev attach)"),
@@ -817,17 +819,31 @@ fn render_help(f: &mut Frame) {
 
 /// Single source of truth for the per-env action menu.
 /// `key_action_menu` and `render_action_menu` both derive N from `.len()`.
-pub(crate) const ACTION_MENU_ITEMS: [(&str, &str); 9] = [
+// Grouped by concern; `key_action_menu` matches these indices in the same
+// order, and `render_action_menu` inserts separators at the group boundaries
+// (after index 2 and 4). Keep all three in sync when editing.
+//
+// `new`, `dispatch` and `review` all route through the backend picker, then the
+// model picker (per-backend model list) before running — there is no standalone
+// model item; model selection lives in the setup flow for each.
+pub(crate) const ACTION_MENU_ITEMS: [(&str, &str); 8] = [
+    // session — connect to or open a workspace
+    ("new  (backend → model)", "dev agent attach --fresh"),
     ("attach  (reconnect / resume)", "dev agent attach"),
     ("open in VS Code", "dev code"),
-    ("dispatch  (backend → task)", "dev dispatch --backend"),
-    ("new session  (interactive)", "dev agent attach --fresh"),
-    ("review  (code review)", "dev review"),
-    ("model picker  (next dispatch)", "set --model flag"),
+    // dispatch — run agent work (backend → model → run)
+    ("dispatch  (backend → model → task)", "dev dispatch"),
+    ("review  (backend → model)", "dev review"),
+    // inspect
     ("logs", "show logs in TUI"),
     ("diff", "dev diff | less"),
+    // destructive
     ("kill", "dev kill / kill <pid>"),
 ];
+
+/// Indices after which `render_action_menu` draws a blank separator line so the
+/// [session | dispatch | inspect] groups read as distinct blocks.
+const ACTION_MENU_GROUP_BREAKS: [usize; 2] = [2, 4];
 
 fn render_action_menu(f: &mut Frame, app: &App) {
     let target = app.selected_env_name().unwrap_or_else(|| "?".into());
@@ -847,6 +863,9 @@ fn render_action_menu(f: &mut Frame, app: &App) {
             Span::styled(format!("{}{}", prefix, lbl), sty),
             Span::styled(format!("   {}", hint), Style::default().fg(Color::DarkGray)),
         ]));
+        if ACTION_MENU_GROUP_BREAKS.contains(&i) {
+            lines.push(Line::from(""));
+        }
     }
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
@@ -866,7 +885,7 @@ fn render_action_menu(f: &mut Frame, app: &App) {
 
 fn render_tool_pick(f: &mut Frame, app: &App) {
     let purpose_label = match app.tool_purpose {
-        ToolPurpose::Start => "new session",
+        ToolPurpose::Start => "new",
         ToolPurpose::Dispatch => "dispatch",
         ToolPurpose::Review => "review",
     };
@@ -897,6 +916,42 @@ fn render_tool_pick(f: &mut Frame, app: &App) {
                 .borders(Borders::ALL)
                 .title(format!(" {} → {} ", purpose_label, app.dispatch_target)),
         ),
+        area,
+    );
+}
+
+fn render_followup(f: &mut Frame, app: &App) {
+    let area = centered_rect(64, 28, f.area());
+    f.render_widget(Clear, area);
+    let lines = vec![
+        Line::from(vec![
+            Span::styled("followup → ", Style::default().fg(Color::Cyan)),
+            Span::styled(
+                app.followup_target.clone(),
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "continues the run in the background, seeded with its prior result",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("say:    ", Style::default().fg(Color::DarkGray)),
+            Span::raw(app.followup_input.clone()),
+            Span::styled("▏", Style::default().fg(Color::Cyan)),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "enter: send    esc: cancel",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+    f.render_widget(
+        Paragraph::new(lines)
+            .block(Block::default().borders(Borders::ALL).title(" followup "))
+            .wrap(Wrap { trim: false }),
         area,
     );
 }
@@ -947,9 +1002,20 @@ fn render_dispatch(f: &mut Frame, app: &App) {
             Span::raw(app.dispatch_input.clone()),
             Span::styled("▏", Style::default().fg(Color::Cyan)),
         ]),
+        Line::from(vec![
+            Span::styled("track:  ", Style::default().fg(Color::DarkGray)),
+            if app.dispatch_supervise {
+                Span::styled(
+                    "supervised (agent can ask → Inbox)",
+                    Style::default().fg(Color::Green),
+                )
+            } else {
+                Span::styled("off (quick dispatch)", Style::default().fg(Color::DarkGray))
+            },
+        ]),
         Line::from(""),
         Line::from(Span::styled(
-            "enter: run    esc: cancel",
+            "enter: run    tab: toggle track    esc: cancel",
             Style::default().fg(Color::DarkGray),
         )),
     ];
@@ -1130,8 +1196,14 @@ fn render_result_view(f: &mut Frame, app: &App) {
     let hint = if app.result_inflight {
         "(running…)".to_string()
     } else {
+        let followup = if app.result_target.is_empty() {
+            ""
+        } else {
+            "   f: followup"
+        };
         format!(
-            "q/esc: close   j/k: scroll   {}/{} lines",
+            "q/esc: close   j/k: scroll{}   {}/{} lines",
+            followup,
             top + 1,
             total.max(1)
         )
@@ -1181,16 +1253,20 @@ fn render_model_picker(f: &mut Frame, app: &App) {
     }
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
-        " j/k: move  enter: select  c: clear  esc: back",
+        " j/k move · enter select · c backend default · esc back",
         Style::default().fg(Color::DarkGray),
     )));
 
+    let purpose = match app.tool_purpose {
+        ToolPurpose::Start => "new",
+        ToolPurpose::Dispatch => "dispatch",
+        ToolPurpose::Review => "review",
+    };
     f.render_widget(
-        Paragraph::new(lines).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(format!(" model picker — {} ", tool)),
-        ),
+        Paragraph::new(lines).block(Block::default().borders(Borders::ALL).title(format!(
+            " {} → {} · model ({}) ",
+            purpose, app.dispatch_target, tool
+        ))),
         area,
     );
 }

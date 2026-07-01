@@ -361,6 +361,24 @@ pub fn task_update_field(task_dir: &Path, key: &str, value: Value) -> Result<(),
     Ok(())
 }
 
+/// Set a nested field under the task's `links` object (e.g. `run_id`,
+/// `session_id`, `pr_url`). This is how a dispatched agent's run is bound back to
+/// its task, which lets the board dedupe the run's synthetic card and lets
+/// follow-up/attach find the right session. Creates `links` if missing.
+pub fn task_set_link(task_dir: &Path, key: &str, value: Value) -> Result<(), std::io::Error> {
+    let json_path = task_dir.join("task.json");
+    let content = std::fs::read_to_string(&json_path)?;
+    let mut v: Value = serde_json::from_str(&content)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    if !v.get("links").map(|l| l.is_object()).unwrap_or(false) {
+        v["links"] = serde_json::json!({});
+    }
+    v["links"][key] = value;
+    v["updated_at"] = Value::String(now_iso());
+    write_json_atomic(&json_path, &v)?;
+    Ok(())
+}
+
 // ── plan ──────────────────────────────────────────────────────────────────────
 
 pub fn plan_write(task_dir: &Path, content: &str) -> Result<(), std::io::Error> {

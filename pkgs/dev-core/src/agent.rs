@@ -864,6 +864,28 @@ pub struct DispatchOpts<'a> {
     pub effort: Option<&'a str>,
     pub sandbox: Option<&'a str>,
     pub worktree: Option<&'a str>,
+    /// Supervised dispatch: create a task in the local store, inject the
+    /// ask/handoff protocol into the prompt, and link the run back to the task —
+    /// so the agent can raise blocking questions into the human's Inbox. Only
+    /// meaningful for local targets (the task store lives on the control machine);
+    /// silently skipped for remote targets.
+    pub supervise: bool,
+}
+
+/// Wrap a user task with the supervision protocol so a dispatched agent can raise
+/// blocking questions (→ Inbox) and leave a handoff, all keyed to `task_id`.
+fn supervised_prompt(task_id: &str, project: &str, user_task: &str) -> String {
+    format!(
+        "You are working on dev task {task_id} (project {project}).\n\n\
+         ── Task ──\n{user_task}\n\n\
+         ── Protocol ──\n\
+         - If behavior/scope/compatibility/API/UX is ambiguous, or you are blocked, run:\n\
+             dev task ask {task_id} \"<question>\" --severity blocking\n\
+           then STOP and wait — the answer arrives in the human's Inbox.\n\
+         - Read shared context any time: dev task context {task_id} --markdown\n\
+         - When finished, write a handoff:  dev task write-handoff {task_id}\n\
+           (changed files, tests run + results, risks, follow-up)."
+    )
 }
 
 /// Launch a background agent and record it in `~/.dev/runs`. Returns
@@ -893,7 +915,34 @@ pub fn dispatch(cfg: &Config, project: &str, opts: &DispatchOpts) -> anyhow::Res
         cwd = wt.clone();
     }
     let id = format!("{}-{}-{}", opts.backend, project, epoch());
-    let qtask = ssh::sh_quote(opts.task);
+    // Supervised dispatch (local only — the task store lives on the control
+    // machine): create a task so the agent can raise blocking questions into the
+    // Inbox, and wrap the prompt with the ask/handoff protocol.
+    let is_local = matches!(target, Target::Local { .. });
+    let supervise = opts.supervise && is_local;
+    let supervise_skipped = opts.supervise && !is_local;
+    let mut task_id = String::new();
+    let effective_task = if supervise {
+        let title: String = opts
+            .task
+            .lines()
+            .map(str::trim)
+            .find(|l| !l.is_empty())
+            .unwrap_or("dispatched task")
+            .chars()
+            .take(80)
+            .collect();
+        match crate::store::task_new(project, &title, Some(opts.task), None) {
+            Ok(t) => {
+                task_id = t.id;
+                supervised_prompt(&task_id, project, opts.task)
+            }
+            Err(_) => opts.task.to_string(),
+        }
+    } else {
+        opts.task.to_string()
+    };
+    let qtask = ssh::sh_quote(&effective_task);
     let (mut pid, mut session) = (String::new(), String::new());
 
     if opts.backend == "claude" {
@@ -949,7 +998,11 @@ pub fn dispatch(cfg: &Config, project: &str, opts: &DispatchOpts) -> anyhow::Res
                 if let Some(s) = opts.sandbox {
                     extra.push_str(&format!(" --sandbox {}", ssh::sh_quote(s)));
                 }
-                extra.push_str(" --ask-for-approval never");
+                // `codex exec` has no `--ask-for-approval` flag (that's a
+                // top-level interactive-only option); set the policy via a
+                // config override instead — `never` is the recommended policy
+                // for non-interactive runs.
+                extra.push_str(" -c approval_policy=never");
             }
             "opencode" => {
                 if let Some(m) = opts.model {
@@ -960,6 +1013,13 @@ pub fn dispatch(cfg: &Config, project: &str, opts: &DispatchOpts) -> anyhow::Res
                 // nothing decodes opencode's JSON event stream, so raw events
                 // are just an unreadable wall. (If a structured transcript view
                 // is ever added, re-add `--format json` and decode it there.)
+            }
+            "agy" => {
+                // antigravity: `agy -p <task>` non-interactive; `--model` selects
+                // the session model (see `agy models`).
+                if let Some(m) = opts.model {
+                    extra.push_str(&format!(" --model {}", ssh::sh_quote(m)));
+                }
             }
             _ => {}
         }
@@ -987,9 +1047,23 @@ pub fn dispatch(cfg: &Config, project: &str, opts: &DispatchOpts) -> anyhow::Res
         &format!("{id}.meta"),
         &serde_json::to_string(&meta)?,
     );
+    // Bind the run to its supervised task (dedupes the board's bare-run card and
+    // lets follow-up/attach find it). Recorded after the run meta exists.
+    if !task_id.is_empty() {
+        if let Some(tdir) = crate::store::find_task_dir(&task_id) {
+            let _ = crate::store::task_set_link(&tdir, "run_id", json!(id));
+            let _ = crate::store::task_update_field(&tdir, "assigned_tool", json!(opts.backend));
+            if !branch.is_empty() {
+                let _ = crate::store::task_update_field(&tdir, "worktree_branch", json!(branch));
+            }
+            let _ =
+                crate::store::task_phase_set(&tdir, "implementing", "dev", "supervised dispatch");
+        }
+    }
     Ok(json!({
         "id": id, "target": project, "tool": opts.backend, "pid": pid,
-        "session": session, "branch": branch, "worktree": wt, "ok": true,
+        "session": session, "branch": branch, "worktree": wt,
+        "task_id": task_id, "supervise_skipped": supervise_skipped, "ok": true,
     }))
 }
 
@@ -1064,6 +1138,13 @@ pub fn run_log_name(cfg: &Config, reference: &str) -> Option<String> {
 /// Tail (last 200 lines) of the resolved run's log (project newest, or a run id).
 /// claude logs to its own store, so it returns a hint line instead.
 pub fn logs_snapshot(cfg: &Config, reference: &str) -> Vec<String> {
+    log_lines(cfg, reference, Some(200))
+}
+
+/// Lines of the resolved run's log. `tail = Some(n)` returns only the last `n`
+/// lines (the scrolling log view); `None` returns the whole log (`dev agent
+/// output --full`). claude keeps no `~/.dev/runs/*.log`, so it returns a hint.
+fn log_lines(cfg: &Config, reference: &str, tail: Option<usize>) -> Vec<String> {
     let Some((target, Some(meta))) = resolve_run(cfg, reference) else {
         return Vec::new();
     };
@@ -1083,24 +1164,130 @@ pub fn logs_snapshot(cfg: &Config, reference: &str) -> Vec<String> {
             std::fs::read_to_string(dir.join(log))
                 .map(|s| {
                     let all: Vec<&str> = s.lines().collect();
-                    let start = all.len().saturating_sub(200);
+                    let start = tail.map(|n| all.len().saturating_sub(n)).unwrap_or(0);
                     all[start..].iter().map(|s| s.to_string()).collect()
                 })
                 .unwrap_or_default()
         }
-        Target::Remote { env, .. } => cfg
-            .env(env)
-            .and_then(|e| {
-                ssh::exec_stdout(
-                    e,
-                    "",
-                    &format!("tail -n 200 \"$HOME/.dev/runs/{log}\" 2>/dev/null"),
-                )
-            })
-            .map(|s| s.lines().map(String::from).collect())
-            .unwrap_or_default(),
+        Target::Remote { env, .. } => {
+            let cmd = match tail {
+                Some(n) => format!("tail -n {n} \"$HOME/.dev/runs/{log}\" 2>/dev/null"),
+                None => format!("cat \"$HOME/.dev/runs/{log}\" 2>/dev/null"),
+            };
+            cfg.env(env)
+                .and_then(|e| ssh::exec_stdout(e, "", &cmd))
+                .map(|s| s.lines().map(String::from).collect())
+                .unwrap_or_default()
+        }
         Target::Env { .. } => Vec::new(),
     }
+}
+
+/// The agent's *result* for `reference` — the extraction primitive behind `dev
+/// agent output`, richer than the scrolling log. For claude it's the last
+/// assistant prose turn from the transcript (what the agent concluded); for other
+/// backends it's the run log (`full` ⇒ whole log, else the 200-line tail). This
+/// is what makes a dispatched run's outcome retrievable as text/JSON instead of
+/// only through `dev agent logs`.
+pub fn final_output(cfg: &Config, reference: &str, full: bool) -> Vec<String> {
+    // Accept a project name OR a run id (like logs/kill/attach). Using the
+    // name-only `cfg.resolve` here meant `dev agent output <run-id>` returned
+    // nothing and followup-by-run-id lost its context seed.
+    let Some((target, meta)) = resolve_run(cfg, reference) else {
+        return Vec::new();
+    };
+    let tool = meta
+        .as_ref()
+        .and_then(|m| m.get("tool"))
+        .and_then(|v| v.as_str());
+    // claude → last assistant message from the transcript.
+    let claude_run = tool == Some("claude") || (tool.is_none() && meta.is_none());
+    if claude_run {
+        let sess = meta
+            .as_ref()
+            .and_then(|m| m.get("session"))
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .or_else(|| live_claude_session(cfg, reference));
+        if let Some(s) = sess.filter(|s| is_session_id(s)) {
+            let raw = claude_transcript_raw(cfg, &target, &s);
+            let msg = last_assistant_message(&raw);
+            if !msg.is_empty() {
+                return msg;
+            }
+        }
+    }
+    if tool == Some("codex")
+        || (tool.is_none()
+            && live_tool(cfg, target_name(&target).unwrap_or(reference)).as_deref()
+                == Some("codex"))
+    {
+        if tool == Some("codex") {
+            let lines = log_lines(cfg, reference, (!full).then_some(200));
+            if !lines.is_empty() {
+                return lines;
+            }
+        }
+        let raw = codex_transcript_raw(cfg, &target);
+        let msg = last_codex_assistant_message(&raw);
+        if !msg.is_empty() {
+            return msg;
+        }
+    }
+    // non-claude, or claude with no transcript yet: the run log.
+    log_lines(cfg, reference, (!full).then_some(200))
+}
+
+/// Re-dispatch a follow-up agent for `reference`, seeded with the previous run's
+/// result plus a new `text` instruction, on the same project / backend / worktree.
+/// This is the non-interactive "continue from the output" primitive (interactive
+/// continuation is `dev agent attach`). Returns the new [`dispatch`] receipt.
+pub fn followup(cfg: &Config, reference: &str, text: &str) -> anyhow::Result<Value> {
+    let (target, meta) = resolve_run(cfg, reference)
+        .ok_or_else(|| anyhow::anyhow!("no run found for '{reference}'"))?;
+    let project = match &target {
+        Target::Local { name, .. } | Target::Remote { name, .. } => name.clone(),
+        Target::Env { .. } => anyhow::bail!("cannot follow up on an env"),
+    };
+    let tool = meta
+        .as_ref()
+        .and_then(|m| m.get("tool"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .unwrap_or_else(|| default_backend(cfg, &project, meta.as_ref()));
+    // Continue in the same worktree branch if the prior run used one.
+    let worktree = meta
+        .as_ref()
+        .and_then(|m| m.get("branch"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from);
+    // Seed continuity with the previous result (bounded so the prompt stays sane).
+    let prior: String = final_output(cfg, reference, false)
+        .join("\n")
+        .chars()
+        .take(4000)
+        .collect();
+    let prompt = if prior.trim().is_empty() {
+        format!("Continue the previous task on project {project}.\n\n── New instruction ──\n{text}")
+    } else {
+        format!(
+            "You are continuing a previous {tool} agent run on project {project}.\n\n\
+             ── Previous result ──\n{prior}\n\n── New instruction ──\n{text}"
+        )
+    };
+    let opts = DispatchOpts {
+        backend: &tool,
+        task: &prompt,
+        model: None,
+        effort: None,
+        sandbox: None,
+        worktree: worktree.as_deref(),
+        supervise: false,
+    };
+    dispatch(cfg, &project, &opts)
 }
 
 // ── claude transcript activity ───────────────────────────────────────────────
@@ -1120,19 +1307,36 @@ pub fn logs_snapshot(cfg: &Config, reference: &str) -> Vec<String> {
 /// no rediscovery is needed); when `None` we infer it from the newest recorded
 /// run, then from a live `ps` lookup.
 pub fn recent_activity(cfg: &Config, reference: &str, session: Option<&str>) -> Vec<String> {
-    let Some(target) = cfg.resolve(reference) else {
+    let Some((target, meta)) = resolve_run(cfg, reference) else {
         return Vec::new();
     };
+    let project = target_name(&target).unwrap_or(reference);
     // Fast path: the caller already knows the claude session (TUI hot loop).
     if let Some(s) = session {
         return claude_activity(cfg, &target, s);
     }
-    // Otherwise infer from the newest recorded run, falling back to a live claude.
-    let meta = newest_meta(cfg, &target);
+    // Codex interactive sessions do not have a ~/.dev/runs log. Read Codex's
+    // own session transcript when the selected live process is codex, or when
+    // the resolved run meta says this is a codex run.
     let meta_tool = meta
         .as_ref()
         .and_then(|m| m.get("tool"))
         .and_then(|v| v.as_str());
+    if meta_tool == Some("codex")
+        || (meta.is_none() && live_tool(cfg, project).as_deref() == Some("codex"))
+    {
+        if meta.is_some() {
+            let lines = logs_snapshot(cfg, reference);
+            if !lines.is_empty() {
+                return lines;
+            }
+        }
+        let activity = codex_activity(cfg, &target);
+        if !activity.is_empty() {
+            return activity;
+        }
+        return logs_snapshot(cfg, reference);
+    }
     if meta.is_some() && meta_tool != Some("claude") {
         // A non-claude run is the newest thing here — show its log.
         return logs_snapshot(cfg, reference);
@@ -1144,11 +1348,96 @@ pub fn recent_activity(cfg: &Config, reference: &str, session: Option<&str>) -> 
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
         .map(String::from)
-        .or_else(|| live_claude_session(cfg, reference));
+        .or_else(|| live_claude_session(cfg, project));
     match sess {
         Some(s) => claude_activity(cfg, &target, &s),
         None => logs_snapshot(cfg, reference),
     }
+}
+
+/// Recent activity for a specific selected backend on a project. The TUI uses
+/// this when the user highlights an agent row; otherwise a project-level lookup
+/// can accidentally show another backend's newest run for the same project.
+pub fn recent_activity_for_tool(
+    cfg: &Config,
+    reference: &str,
+    tool: &str,
+    session: Option<&str>,
+) -> Vec<String> {
+    if tool.is_empty() || tool == "-" {
+        return recent_activity(cfg, reference, session);
+    }
+    let Some((target, meta)) = resolve_run(cfg, reference) else {
+        return Vec::new();
+    };
+    if tool == "claude" {
+        if let Some(s) = session {
+            return claude_activity(cfg, &target, s);
+        }
+        let project = target_name(&target).unwrap_or(reference);
+        let sess = meta
+            .as_ref()
+            .filter(|m| m.get("tool").and_then(|v| v.as_str()) == Some("claude"))
+            .and_then(|m| m.get("session"))
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .or_else(|| live_claude_session(cfg, project));
+        return sess
+            .map(|s| claude_activity(cfg, &target, &s))
+            .unwrap_or_default();
+    }
+    if tool == "codex" {
+        if meta
+            .as_ref()
+            .and_then(|m| m.get("tool"))
+            .and_then(|v| v.as_str())
+            == Some("codex")
+        {
+            let lines = logs_snapshot(cfg, reference);
+            if !lines.is_empty() {
+                return lines;
+            }
+        }
+        return codex_activity(cfg, &target);
+    }
+    if meta
+        .as_ref()
+        .and_then(|m| m.get("tool"))
+        .and_then(|v| v.as_str())
+        == Some(tool)
+    {
+        return logs_snapshot(cfg, reference);
+    }
+    Vec::new()
+}
+
+fn target_name(target: &Target) -> Option<&str> {
+    match target {
+        Target::Local { name, .. } | Target::Remote { name, .. } => Some(name),
+        Target::Env { .. } => None,
+    }
+}
+
+fn target_cwd(target: &Target) -> Option<&str> {
+    match target {
+        Target::Local { path, .. } | Target::Remote { path, .. } => Some(path),
+        Target::Env { .. } => None,
+    }
+}
+
+fn live_tool(cfg: &Config, project: &str) -> Option<String> {
+    ps_project(cfg, project).into_iter().find_map(|r| {
+        let has_pid = r.get("pid").map(|v| !v.is_null()).unwrap_or(false);
+        has_pid
+            .then(|| {
+                r.get("tool")
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
+                    .map(String::from)
+            })
+            .flatten()
+    })
 }
 
 /// First live claude session on `reference`. Interactive claude records no run
@@ -1171,30 +1460,44 @@ fn claude_activity(cfg: &Config, target: &Target, session: &str) -> Vec<String> 
     if !is_session_id(session) {
         return Vec::new();
     }
-    let raw = match target {
+    let raw = claude_transcript_raw(cfg, target, session);
+    if raw.is_empty() {
+        if let Target::Local { .. } = target {
+            return vec!["(no claude transcript yet — attach to view)".to_string()];
+        }
+    }
+    let lines = distill_transcript(&raw);
+    if lines.is_empty() {
+        vec!["(claude session has no readable activity yet)".to_string()]
+    } else {
+        lines
+    }
+}
+
+/// Raw transcript JSONL tail for a claude `session` on `target`. Empty string if
+/// none is found yet. Shared by [`claude_activity`] (distilled view) and
+/// [`final_output`] (last-message extraction). `session` is validated UUID-ish so
+/// it's safe to interpolate into the ssh glob.
+fn claude_transcript_raw(cfg: &Config, target: &Target, session: &str) -> String {
+    if !is_session_id(session) {
+        return String::new();
+    }
+    match target {
         Target::Local { .. } => match claude_transcript_local(session) {
             Some(p) => read_tail_bytes(&p, 512 * 1024),
-            None => return vec!["(no claude transcript yet — attach to view)".to_string()],
+            None => String::new(),
         },
         Target::Remote { env, .. } => {
             let Some(e) = cfg.env(env) else {
-                return Vec::new();
+                return String::new();
             };
-            // Glob by (unique) session id, then tail the last events. `session` is
-            // validated as UUID-ish above, so it's safe to interpolate.
             let script = format!(
                 "f=$(ls -t \"$HOME/.claude/projects\"/*/{session}.jsonl 2>/dev/null | head -1); \
                  [ -n \"$f\" ] && tail -n 400 \"$f\""
             );
             ssh::exec_stdout(e, "", &script).unwrap_or_default()
         }
-        Target::Env { .. } => return Vec::new(),
-    };
-    let lines = distill_transcript(&raw);
-    if lines.is_empty() {
-        vec!["(claude session has no readable activity yet)".to_string()]
-    } else {
-        lines
+        Target::Env { .. } => String::new(),
     }
 }
 
@@ -1214,6 +1517,116 @@ fn claude_transcript_local(session: &str) -> Option<PathBuf> {
         }
     }
     best.map(|(_, p)| p)
+}
+
+// ── codex transcript activity ───────────────────────────────────────────────
+
+fn codex_activity(cfg: &Config, target: &Target) -> Vec<String> {
+    let raw = codex_transcript_raw(cfg, target);
+    if raw.is_empty() {
+        return Vec::new();
+    }
+    distill_codex_transcript(&raw)
+}
+
+fn codex_transcript_raw(cfg: &Config, target: &Target) -> String {
+    let Some(cwd) = target_cwd(target) else {
+        return String::new();
+    };
+    match target {
+        Target::Local { .. } => match codex_transcript_local(cwd) {
+            Some(p) => read_tail_bytes(&p, 512 * 1024),
+            None => String::new(),
+        },
+        Target::Remote { env, .. } => {
+            let Some(e) = cfg.env(env) else {
+                return String::new();
+            };
+            let needle = json_cwd_fragment(cwd);
+            let script = format!(
+                "needle={needle}; \
+                 f=$(find \"$HOME/.codex/sessions\" \"$HOME/.codex/archived_sessions\" \
+                      -type f -name 'rollout-*.jsonl' 2>/dev/null | \
+                    while IFS= read -r p; do \
+                      head -20 \"$p\" 2>/dev/null | grep -F \"$needle\" >/dev/null || continue; \
+                      mt=$(stat -c %Y \"$p\" 2>/dev/null || stat -f %m \"$p\" 2>/dev/null || echo 0); \
+                      printf '%s\t%s\n' \"$mt\" \"$p\"; \
+                    done | sort -nr | head -1 | cut -f2-); \
+                 [ -n \"$f\" ] && tail -n 400 \"$f\"",
+                needle = ssh::sh_quote(&needle),
+            );
+            ssh::exec_stdout(e, "", &script).unwrap_or_default()
+        }
+        Target::Env { .. } => String::new(),
+    }
+}
+
+fn codex_transcript_local(cwd: &str) -> Option<PathBuf> {
+    let home = std::env::var("HOME").ok()?;
+    let roots = [
+        PathBuf::from(&home).join(".codex").join("sessions"),
+        PathBuf::from(&home)
+            .join(".codex")
+            .join("archived_sessions"),
+    ];
+    let mut files = Vec::new();
+    for root in roots {
+        collect_codex_session_files(&root, &mut files);
+    }
+    files.sort_by_key(|(mtime, _)| std::cmp::Reverse(*mtime));
+    files
+        .into_iter()
+        .map(|(_, p)| p)
+        .find(|p| codex_session_matches_cwd(p, cwd))
+}
+
+fn collect_codex_session_files(
+    dir: &std::path::Path,
+    out: &mut Vec<(std::time::SystemTime, PathBuf)>,
+) {
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in rd.flatten() {
+        let p = entry.path();
+        if p.is_dir() {
+            collect_codex_session_files(&p, out);
+            continue;
+        }
+        let is_rollout = p
+            .file_name()
+            .and_then(|s| s.to_str())
+            .map(|s| s.starts_with("rollout-") && s.ends_with(".jsonl"))
+            .unwrap_or(false);
+        if !is_rollout {
+            continue;
+        }
+        if let Ok(mtime) = entry.metadata().and_then(|m| m.modified()) {
+            out.push((mtime, p));
+        }
+    }
+}
+
+fn codex_session_matches_cwd(path: &std::path::Path, cwd: &str) -> bool {
+    let Ok(text) = read_first_bytes(path, 128 * 1024) else {
+        return false;
+    };
+    text.lines().take(20).any(|line| {
+        serde_json::from_str::<Value>(line)
+            .ok()
+            .and_then(|v| {
+                v.pointer("/payload/cwd")
+                    .and_then(|x| x.as_str())
+                    .map(str::to_string)
+            })
+            .as_deref()
+            == Some(cwd)
+    })
+}
+
+fn json_cwd_fragment(cwd: &str) -> String {
+    let encoded = serde_json::to_string(cwd).unwrap_or_else(|_| "\"\"".to_string());
+    format!("\"cwd\":{encoded}")
 }
 
 /// Read the last `cap` bytes of a file as UTF-8, dropping a leading partial line.
@@ -1239,6 +1652,14 @@ fn read_tail_bytes(path: &std::path::Path, cap: u64) -> String {
         }
     }
     s
+}
+
+fn read_first_bytes(path: &std::path::Path, cap: usize) -> std::io::Result<String> {
+    use std::io::Read;
+    let mut f = std::fs::File::open(path)?;
+    let mut buf = Vec::new();
+    f.by_ref().take(cap as u64).read_to_end(&mut buf)?;
+    Ok(String::from_utf8_lossy(&buf).into_owned())
 }
 
 /// A plausible claude session id (UUID-ish) — guards ssh/path interpolation.
@@ -1273,6 +1694,205 @@ pub fn distill_transcript(raw: &str) -> Vec<String> {
         out.drain(..out.len() - KEEP);
     }
     out
+}
+
+/// The text of the *last* assistant turn in a transcript — the agent's final
+/// answer/summary. Concatenates that turn's text blocks; ignores tool calls,
+/// thinking, and sidechains. A tool-only turn does not clobber the last textual
+/// answer. Returns `[]` if the transcript has no assistant prose.
+pub fn last_assistant_message(raw: &str) -> Vec<String> {
+    let mut last: Vec<String> = Vec::new();
+    for line in raw.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let Ok(v) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        if v.get("isSidechain").and_then(|x| x.as_bool()) == Some(true) {
+            continue;
+        }
+        if v.get("type").and_then(|t| t.as_str()) != Some("assistant") {
+            continue;
+        }
+        let content = v.pointer("/message/content");
+        let mut texts: Vec<String> = Vec::new();
+        if let Some(s) = content.and_then(|c| c.as_str()) {
+            texts.extend(s.lines().map(|l| l.to_string()));
+        } else if let Some(arr) = content.and_then(|c| c.as_array()) {
+            for c in arr {
+                if c.get("type").and_then(|t| t.as_str()) == Some("text") {
+                    if let Some(t) = c.get("text").and_then(|x| x.as_str()) {
+                        texts.extend(t.lines().map(|l| l.to_string()));
+                    }
+                }
+            }
+        }
+        if texts.iter().any(|l| !l.trim().is_empty()) {
+            last = texts;
+        }
+    }
+    last.into_iter()
+        .map(|l| l.trim_end().to_string())
+        .filter(|l| !l.is_empty())
+        .collect()
+}
+
+pub fn distill_codex_transcript(raw: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for line in raw.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let Ok(v) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        match v.get("type").and_then(|t| t.as_str()) {
+            Some("response_item") => distill_codex_response_item(&v, &mut out),
+            Some("event_msg") => distill_codex_event(&v, &mut out),
+            _ => {}
+        }
+    }
+    const KEEP: usize = 120;
+    if out.len() > KEEP {
+        out.drain(..out.len() - KEEP);
+    }
+    out
+}
+
+pub fn last_codex_assistant_message(raw: &str) -> Vec<String> {
+    let mut last = Vec::new();
+    for line in raw.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let Ok(v) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        if v.get("type").and_then(|t| t.as_str()) != Some("response_item") {
+            continue;
+        }
+        let payload = v.get("payload").unwrap_or(&Value::Null);
+        if payload.get("type").and_then(|t| t.as_str()) != Some("message")
+            || payload.get("role").and_then(|r| r.as_str()) != Some("assistant")
+        {
+            continue;
+        }
+        let mut texts = Vec::new();
+        if let Some(content) = payload.get("content").and_then(|c| c.as_array()) {
+            for c in content {
+                if matches!(
+                    c.get("type").and_then(|t| t.as_str()),
+                    Some("output_text" | "text")
+                ) {
+                    if let Some(text) = c.get("text").and_then(|x| x.as_str()) {
+                        texts.extend(text.lines().map(|l| l.trim_end().to_string()));
+                    }
+                }
+            }
+        }
+        if texts.iter().any(|l| !l.trim().is_empty()) {
+            last = texts;
+        }
+    }
+    last.into_iter().filter(|l| !l.trim().is_empty()).collect()
+}
+
+fn distill_codex_response_item(v: &Value, out: &mut Vec<String>) {
+    let payload = v.get("payload").unwrap_or(&Value::Null);
+    match payload.get("type").and_then(|t| t.as_str()) {
+        Some("message") => {
+            let role = payload
+                .get("role")
+                .and_then(|r| r.as_str())
+                .unwrap_or("assistant");
+            let prefix = if role == "user" { "user: " } else { "" };
+            if let Some(content) = payload.get("content").and_then(|c| c.as_array()) {
+                for c in content {
+                    if matches!(
+                        c.get("type").and_then(|t| t.as_str()),
+                        Some("output_text" | "input_text" | "text")
+                    ) {
+                        if let Some(text) = c.get("text").and_then(|x| x.as_str()) {
+                            push_prefixed_prose(out, prefix, text);
+                        }
+                    }
+                }
+            }
+        }
+        Some("function_call") => {
+            let name = payload
+                .get("name")
+                .and_then(|n| n.as_str())
+                .unwrap_or("tool");
+            let args = payload
+                .get("arguments")
+                .and_then(|a| a.as_str())
+                .unwrap_or("");
+            out.push(format!("tool {name}: {}", clip_codex_args(args)));
+        }
+        Some("function_call_output") => {
+            let text = payload
+                .get("output")
+                .and_then(|o| o.as_str())
+                .map(first_meaningful_line)
+                .unwrap_or_default();
+            if !text.is_empty() {
+                out.push(format!("  -> {}", clip(&text, 120)));
+            }
+        }
+        _ => {}
+    }
+}
+
+fn distill_codex_event(v: &Value, out: &mut Vec<String>) {
+    let payload = v.get("payload").unwrap_or(&Value::Null);
+    if payload.get("type").and_then(|t| t.as_str()) != Some("agent_message") {
+        return;
+    }
+    if let Some(message) = payload.get("message").and_then(|m| m.as_str()) {
+        push_prefixed_prose(out, "", message);
+    }
+}
+
+fn push_prefixed_prose(out: &mut Vec<String>, prefix: &str, text: &str) {
+    for l in text
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .take(8)
+    {
+        out.push(format!("{prefix}{}", clip(l, 200)));
+    }
+}
+
+fn clip_codex_args(args: &str) -> String {
+    if args.trim().is_empty() {
+        return "(no args)".to_string();
+    }
+    let summary = serde_json::from_str::<Value>(args)
+        .ok()
+        .and_then(|v| {
+            for key in ["cmd", "command", "path", "file_path", "pattern", "query"] {
+                if let Some(s) = v.get(key).and_then(|x| x.as_str()) {
+                    return Some(s.lines().next().unwrap_or("").to_string());
+                }
+            }
+            None
+        })
+        .unwrap_or_else(|| args.lines().next().unwrap_or("").to_string());
+    clip(&summary, 120)
+}
+
+fn first_meaningful_line(text: &str) -> String {
+    text.lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty())
+        .unwrap_or("")
+        .to_string()
 }
 
 fn distill_assistant(v: &Value, out: &mut Vec<String>) {
@@ -1513,5 +2133,87 @@ mod tests {
         assert!(!is_session_id("a; rm -rf /"));
         assert!(!is_session_id("a/../b"));
         assert!(!is_session_id(""));
+    }
+
+    #[test]
+    fn last_assistant_message_picks_final_prose() {
+        // Two assistant prose turns with a tool-only turn last: the tool turn must
+        // not clobber the final textual answer; multi-line prose is split.
+        let raw = concat!(
+            r#"{"type":"assistant","message":{"content":[{"type":"text","text":"first answer"}]}}"#,
+            "\n",
+            r#"{"type":"user","message":{"content":[{"type":"tool_result","content":"ok"}]}}"#,
+            "\n",
+            r#"{"type":"assistant","message":{"content":[{"type":"text","text":"final line 1\nfinal line 2"}]}}"#,
+            "\n",
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"echo hi"}}]}}"#,
+            "\n",
+        );
+        assert_eq!(
+            last_assistant_message(raw),
+            vec!["final line 1".to_string(), "final line 2".to_string()]
+        );
+    }
+
+    #[test]
+    fn last_assistant_message_ignores_sidechain_and_handles_string_content() {
+        // Sidechain (subagent) turns are skipped; a plain-string message body works.
+        let raw = concat!(
+            r#"{"type":"assistant","message":{"content":"the answer"}}"#,
+            "\n",
+            r#"{"type":"assistant","isSidechain":true,"message":{"content":[{"type":"text","text":"subagent noise"}]}}"#,
+            "\n",
+        );
+        assert_eq!(last_assistant_message(raw), vec!["the answer".to_string()]);
+    }
+
+    #[test]
+    fn last_assistant_message_empty_when_no_prose() {
+        let raw = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{}}]}}"#;
+        assert!(last_assistant_message(raw).is_empty());
+    }
+
+    #[test]
+    fn distill_codex_transcript_extracts_activity() {
+        let raw = concat!(
+            r#"{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"fix the logs"}]}}"#,
+            "\n",
+            r#"{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"I will inspect the log path."}]}}"#,
+            "\n",
+            r#"{"type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"rg logs\"}"}}"#,
+            "\n",
+            r#"{"type":"response_item","payload":{"type":"function_call_output","output":"Chunk ID: abc\nOutput:\nfound it"}}"#,
+            "\n",
+            r#"{"type":"event_msg","payload":{"type":"token_count","info":{}}}"#,
+            "\n",
+        );
+        let out = distill_codex_transcript(raw);
+        assert!(out.contains(&"user: fix the logs".to_string()), "{out:?}");
+        assert!(
+            out.contains(&"I will inspect the log path.".to_string()),
+            "{out:?}"
+        );
+        assert!(
+            out.contains(&"tool exec_command: rg logs".to_string()),
+            "{out:?}"
+        );
+        assert!(out.contains(&"  -> Chunk ID: abc".to_string()), "{out:?}");
+        assert!(!out.iter().any(|l| l.contains("token_count")), "{out:?}");
+    }
+
+    #[test]
+    fn last_codex_assistant_message_picks_final_text() {
+        let raw = concat!(
+            r#"{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"first"}]}}"#,
+            "\n",
+            r#"{"type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{}"}}"#,
+            "\n",
+            r#"{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"final 1\nfinal 2"}]}}"#,
+            "\n",
+        );
+        assert_eq!(
+            last_codex_assistant_message(raw),
+            vec!["final 1".to_string(), "final 2".to_string()]
+        );
     }
 }

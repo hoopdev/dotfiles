@@ -5,9 +5,8 @@
 //! `~/.config/zsh/local.zsh`. Secrets (CODER_URL, Telegram tokens) stay in the
 //! shell — this file only describes *where* targets are, never credentials.
 //!
-//! During the bash→Rust migration the shell `dev` bridges to this via
-//! `dev config export-sh` (emits the old `DEV_*` arrays for `eval`), so there is
-//! exactly one source of truth even while some subcommands are still bash.
+//! `dev config export-sh` still emits the old `DEV_*` arrays for compatibility
+//! bridges, but `config.toml` is the source of truth.
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -94,7 +93,7 @@ impl Env {
 // ── resolved target ─────────────────────────────────────────────────────────
 
 /// Result of resolving a name against the config — the three kinds a `dev`
-/// command can act on (see the bash `_dev_target_kind`).
+/// command can act on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Target {
     Local {
@@ -184,7 +183,7 @@ impl Config {
     }
 }
 
-// ── resolution (mirrors the bash `_*_get_*` helpers) ────────────────────────
+// ── resolution ───────────────────────────────────────────────────────────────
 
 impl Config {
     pub fn local_path(&self, name: &str) -> Option<&str> {
@@ -291,13 +290,12 @@ impl Config {
     }
 }
 
-// ── machine-readable surface (parity with bash `_dev_targets_json`) ──────────
+// ── machine-readable surface ─────────────────────────────────────────────────
 
 impl Config {
     /// Flat array of every project + env — the schema `dev targets --json`
-    /// produces and that `dev-tui` / `dev run` consume. Structurally identical
-    /// to the bash `_dev_targets_json` (key *order* may differ; every consumer
-    /// parses the JSON, so only the schema matters).
+    /// produces and that `dev-tui` / `dev run` consume. Key order may differ;
+    /// every consumer parses the JSON, so only the schema matters.
     pub fn targets_json(&self) -> Value {
         let mut arr: Vec<Value> = Vec::new();
         for l in &self.local {
@@ -354,9 +352,7 @@ fn sh_squote(s: &str) -> String {
 }
 
 impl Config {
-    /// Emit the `DEV_*` bash arrays so the migration-era shell `dev` can
-    /// `eval "$(dev config export-sh)"` and read exactly this config. The
-    /// inverse of [`Config::from_export_sh`].
+    /// Emit the legacy `DEV_*` arrays for compatibility bridges.
     pub fn to_export_sh(&self) -> String {
         let mut out = String::new();
 
