@@ -307,10 +307,7 @@ fn review(
     base: Option<&str>,
     json_out: bool,
 ) {
-    let prompt = format!(
-        "Review the current changes{} for correctness bugs and concrete improvements. Be specific with file:line.",
-        base.map(|b| format!(" against {b}")).unwrap_or_default()
-    );
+    let prompt = agent::review_prompt(base);
     dispatch(
         project,
         backend,

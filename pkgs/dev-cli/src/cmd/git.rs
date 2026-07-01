@@ -189,25 +189,40 @@ pub fn worktree_rm(name: String, branch: String) {
     }
 }
 
-pub fn pr(name: String, title: Option<String>, base: Option<String>, draft: bool, json_out: bool) {
-    let cfg = Config::load_or_default();
-    let t = resolve_project(&cfg, &name);
+/// Push HEAD and open a PR; returns `(ok, extracted_url, combined_output)`. The
+/// url is the last `https://` line from the `git push` + `gh pr create` output.
+/// Both `dev git pr` and `dev task pr` build on this so PR creation lives in one
+/// place instead of `dev task` shelling out to a `dev git pr` self-subprocess.
+pub fn pr_capture(
+    cfg: &Config,
+    name: &str,
+    title: Option<&str>,
+    base: Option<&str>,
+    draft: bool,
+) -> (bool, Option<String>, String) {
+    let t = resolve_project(cfg, name);
     let mut gh = String::from("gh pr create --fill");
-    if let Some(b) = &base {
+    if let Some(b) = base {
         gh.push_str(&format!(" --base {}", ssh::sh_quote(b)));
     }
-    if let Some(ti) = &title {
+    if let Some(ti) = title {
         gh.push_str(&format!(" --title {}", ssh::sh_quote(ti)));
     }
     if draft {
         gh.push_str(" --draft");
     }
-    let (ok, out) = run_at(&cfg, &t, &format!("git push -u origin HEAD 2>&1; {gh}"));
+    let (ok, out) = run_at(cfg, &t, &format!("git push -u origin HEAD 2>&1; {gh}"));
     let url = out
         .lines()
         .rev()
         .find(|l| l.trim_start().starts_with("https://"))
         .map(|l| l.trim().to_string());
+    (ok, url, out)
+}
+
+pub fn pr(name: String, title: Option<String>, base: Option<String>, draft: bool, json_out: bool) {
+    let cfg = Config::load_or_default();
+    let (ok, url, out) = pr_capture(&cfg, &name, title.as_deref(), base.as_deref(), draft);
     if json_out {
         println!(
             "{}",

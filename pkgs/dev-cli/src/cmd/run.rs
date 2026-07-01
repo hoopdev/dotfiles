@@ -11,6 +11,19 @@ pub fn run(args: &[String], json: bool) -> anyhow::Result<()> {
     rt.block_on(run_async(args, json))
 }
 
+/// Run a single command on a single target, synchronously, returning the same
+/// `{target,ok,exit,stdout,stderr}` row `dev run` produces for one target. Lets
+/// `dev task test` execute validation in-process instead of shelling out to a
+/// `dev run` subprocess.
+pub fn run_one(target: &str, cmd: &str, timeout_secs: u64) -> anyhow::Result<Value> {
+    let rt = tokio::runtime::Runtime::new()?;
+    Ok(rt.block_on(run_on_target(
+        target,
+        cmd,
+        Duration::from_secs(timeout_secs),
+    )))
+}
+
 async fn run_async(args: &[String], json: bool) -> anyhow::Result<()> {
     let mut target_arg = String::new();
     let mut cmd_parts: Vec<String> = Vec::new();

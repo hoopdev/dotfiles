@@ -11,6 +11,8 @@ pub mod ssh;
 pub mod statusline;
 pub mod store;
 pub mod task;
+#[cfg(feature = "config")]
+pub mod task_service;
 #[cfg(feature = "windows")]
 pub mod windows;
 
