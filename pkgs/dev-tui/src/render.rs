@@ -4,10 +4,10 @@ use std::time::Duration;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Sparkline, Wrap};
 
-use crate::app::{truncate, wrap_line, App, Mode, SPIN};
+use crate::app::{truncate, wrap_line, App, Focus, InspectorView, Mode, SPIN};
 use crate::model::{
-    env_dominant_status, env_status_label, remote_meta_label, status_style, Env,
-    GitState, GroupInfo, Item, Tab, ToolPurpose,
+    env_dominant_status, env_status_label, remote_meta_label, status_style, Env, GitState,
+    GroupInfo, Item, ToolPurpose,
 };
 
 fn centered_rect(px: u16, py: u16, area: Rect) -> Rect {
@@ -27,27 +27,18 @@ fn centered_rect(px: u16, py: u16, area: Rect) -> Rect {
 
 pub(crate) fn ui(f: &mut Frame, app: &mut App) {
     let v = Layout::vertical([
-        Constraint::Length(1),       // summary
-        Constraint::Length(1),       // tab bar
-        Constraint::Percentage(95),  // main content
-        Constraint::Length(1),       // bottom
+        Constraint::Length(1), // summary
+        Constraint::Length(1), // focus bar
+        Constraint::Min(0),    // cockpit
+        Constraint::Length(1), // bottom
     ])
     .split(f.area());
     render_summary(f, v[0], app);
-    render_tab_bar(f, v[1], app);
-    match app.active_tab {
-        Tab::Agents => {
-            if app.mode == Mode::LogView {
-                render_log_view(f, v[2], app);
-            } else {
-                let h = Layout::horizontal([Constraint::Percentage(40), Constraint::Percentage(60)])
-                    .split(v[2]);
-                render_fleet(f, h[0], app);
-                render_detail(f, h[1], app);
-            }
-        }
-        Tab::TaskBoard => render_task_board(f, v[2], app),
-        Tab::Inbox => render_inbox(f, v[2], app),
+    render_focus_bar(f, v[1], app);
+    if app.mode == Mode::LogView {
+        render_log_view(f, v[2], app);
+    } else {
+        render_cockpit(f, v[2], app);
     }
     render_bottom(f, v[3], app);
     match app.mode {
@@ -61,8 +52,137 @@ pub(crate) fn ui(f: &mut Frame, app: &mut App) {
         Mode::ModelPicker => render_model_picker(f, app),
         Mode::TaskView => render_task_view(f, app),
         Mode::UsageView => render_usage_view(f, app),
+        Mode::BoardModal => render_board_modal(f, app),
         _ => {}
     }
+}
+
+/// The unified cockpit: left column (Fleet / Inbox / Tasks vertical stack) +
+/// a universal inspector on the right that follows the focused panel.
+fn render_cockpit(f: &mut Frame, area: Rect, app: &mut App) {
+    let cols =
+        Layout::horizontal([Constraint::Percentage(38), Constraint::Percentage(62)]).split(area);
+    render_left_column(f, cols[0], app);
+    render_inspector(f, cols[1], app);
+}
+
+/// Content-aware vertical stack: Inbox/Tasks size to their content (capped) so
+/// Fleet reclaims the empty space when there are few questions/tasks.
+fn render_left_column(f: &mut Frame, area: Rect, app: &mut App) {
+    let q = app
+        .dev_questions
+        .iter()
+        .filter(|x| x.severity == "blocking")
+        .count();
+    let t = app.active_tasks().len();
+    let inbox_h = if q == 0 { 3 } else { (q.min(5) as u16) + 2 };
+    let tasks_h = if t == 0 { 3 } else { (t.min(6) as u16) + 2 };
+    let rows = Layout::vertical([
+        Constraint::Min(6), // Fleet grows to fill
+        Constraint::Length(inbox_h),
+        Constraint::Length(tasks_h),
+    ])
+    .split(area);
+    let focus = app.focus;
+    render_fleet(f, rows[0], app, focus == Focus::Fleet);
+    render_inbox_panel(f, rows[1], app, focus == Focus::Inbox);
+    render_tasks_panel(f, rows[2], app, focus == Focus::Tasks);
+}
+
+/// Right pane: whatever the focused left panel + its selection points at.
+fn render_inspector(f: &mut Frame, area: Rect, app: &App) {
+    match app.focus {
+        Focus::Fleet => match app.fleet_view {
+            InspectorView::Detail => render_detail(f, area, app),
+            InspectorView::Diff => render_fleet_diff(f, area, app),
+        },
+        Focus::Inbox => render_inbox_detail(f, area, app),
+        Focus::Tasks => {
+            let tasks = app.active_tasks();
+            match tasks.get(app.tasks_sel) {
+                Some(t) => render_task_detail_body(f, area, app, t),
+                None => {
+                    let block = Block::default().borders(Borders::ALL).title(" task ");
+                    f.render_widget(
+                        Paragraph::new(Span::styled(
+                            "(no task selected)",
+                            Style::default().fg(Color::DarkGray),
+                        ))
+                        .block(block),
+                        area,
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// A bordered panel whose border turns cyan when focused, dim otherwise —
+/// the "one pane is live" cue borrowed from Claude Squad.
+fn panel_block(title: &str, focused: bool) -> Block<'static> {
+    let border = if focused {
+        Color::Cyan
+    } else {
+        Color::DarkGray
+    };
+    Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(border))
+        .title(title.to_string())
+}
+
+fn diff_line_style(l: &str) -> Style {
+    if l.starts_with("+++") || l.starts_with("---") {
+        Style::default().fg(Color::DarkGray)
+    } else if l.starts_with('+') {
+        Style::default().fg(Color::Green)
+    } else if l.starts_with('-') {
+        Style::default().fg(Color::Red)
+    } else if l.starts_with("@@") {
+        Style::default().fg(Color::Cyan)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    }
+}
+
+/// Fleet inspector Diff view — cached `dev git diff <env>` with scroll + color.
+fn render_fleet_diff(f: &mut Frame, area: Rect, app: &App) {
+    let target = app.selected_env_name().unwrap_or_default();
+    let title = if target.is_empty() {
+        " diff  (v: back) ".to_string()
+    } else {
+        format!(" diff: {}  (v: back) ", target)
+    };
+    let block = Block::default().borders(Borders::ALL).title(title);
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let dim = Style::default().fg(Color::DarkGray);
+    let h = inner.height as usize;
+    let w = inner.width as usize;
+    if target.is_empty() {
+        f.render_widget(Paragraph::new(Span::styled("no selection", dim)), inner);
+        return;
+    }
+    if app.fleet_diff_target != target {
+        f.render_widget(
+            Paragraph::new(Span::styled("(loading… press v to refresh)", dim)),
+            inner,
+        );
+        return;
+    }
+    let rows: Vec<String> = app
+        .fleet_diff_lines
+        .iter()
+        .flat_map(|l| wrap_line(l, w))
+        .collect();
+    let total = rows.len();
+    let top = app.fleet_diff_scroll.min(total.saturating_sub(h));
+    let lines: Vec<Line> = rows[top..(top + h).min(total)]
+        .iter()
+        .map(|l| Line::from(Span::styled(l.clone(), diff_line_style(l))))
+        .collect();
+    f.render_widget(Paragraph::new(lines), inner);
 }
 
 fn render_summary(f: &mut Frame, area: Rect, app: &App) {
@@ -77,20 +197,29 @@ fn render_summary(f: &mut Frame, area: Rect, app: &App) {
     let mut total_agents = 0usize;
     for env in &app.envs {
         for a in &env.agents {
-            let k = if a.status == "busy" { "running" } else { a.status.as_str() };
+            let k = if a.status == "busy" {
+                "running"
+            } else {
+                a.status.as_str()
+            };
             *counts.entry(k).or_insert(0) += 1;
             total_agents += 1;
         }
     }
     let usage_spans: Vec<Span<'static>> = if let Some(u) = &app.claude_usage {
         let pct_style = |pct: u32| -> Style {
-            if pct >= 85 { Style::default().fg(Color::Red) }
-            else if pct >= 70 { Style::default().fg(Color::Yellow) }
-            else { Style::default().fg(Color::Green) }
+            if pct >= 85 {
+                Style::default().fg(Color::Red)
+            } else if pct >= 70 {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default().fg(Color::Green)
+            }
         };
-        let mut s: Vec<Span<'static>> = vec![
-            Span::styled("│ claude ", Style::default().fg(Color::DarkGray)),
-        ];
+        let mut s: Vec<Span<'static>> = vec![Span::styled(
+            "│ claude ",
+            Style::default().fg(Color::DarkGray),
+        )];
         if let Some(p) = u.five_hour_pct {
             s.push(Span::styled("5h:", Style::default().fg(Color::DarkGray)));
             s.push(Span::styled(format!("{p}%"), pct_style(p)));
@@ -136,7 +265,9 @@ fn render_summary(f: &mut Frame, area: Rect, app: &App) {
         let n = app.marked.len();
         spans.push(Span::styled(
             format!("✓{n} marked "),
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
         ));
     }
     if app.refreshing || app.git_inflight {
@@ -158,19 +289,29 @@ fn render_summary(f: &mut Frame, area: Rect, app: &App) {
     // agy usage
     if let Some(u) = &app.agy_usage {
         let pct_style = |pct: u32| -> Style {
-            if pct >= 85 { Style::default().fg(Color::Red) }
-            else if pct >= 70 { Style::default().fg(Color::Yellow) }
-            else { Style::default().fg(Color::Green) }
+            if pct >= 85 {
+                Style::default().fg(Color::Red)
+            } else if pct >= 70 {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default().fg(Color::Green)
+            }
         };
         spans.push(Span::styled("│ agy ", Style::default().fg(Color::DarkGray)));
         if let (Some(avail), Some(monthly)) = (u.available_credits, u.monthly_credits) {
             let used_pct = ((monthly.saturating_sub(avail)) * 100 / monthly.max(1)) as u32;
             spans.push(Span::styled(format!("{used_pct}%"), pct_style(used_pct)));
-            spans.push(Span::styled(format!(" ({avail}cr) "), Style::default().fg(Color::DarkGray)));
+            spans.push(Span::styled(
+                format!(" ({avail}cr) "),
+                Style::default().fg(Color::DarkGray),
+            ));
         } else if !u.models.is_empty() {
             for (label, pct) in u.models.iter().take(2) {
                 let short = label.split_whitespace().next().unwrap_or(label);
-                spans.push(Span::styled(format!("{short}:"), Style::default().fg(Color::DarkGray)));
+                spans.push(Span::styled(
+                    format!("{short}:"),
+                    Style::default().fg(Color::DarkGray),
+                ));
                 spans.push(Span::styled(format!("{pct}% "), pct_style(*pct)));
             }
         }
@@ -179,11 +320,18 @@ fn render_summary(f: &mut Frame, area: Rect, app: &App) {
     // codex usage
     if let Some(u) = &app.codex_usage {
         let pct_style = |pct: f64| -> Style {
-            if pct >= 85.0 { Style::default().fg(Color::Red) }
-            else if pct >= 70.0 { Style::default().fg(Color::Yellow) }
-            else { Style::default().fg(Color::Green) }
+            if pct >= 85.0 {
+                Style::default().fg(Color::Red)
+            } else if pct >= 70.0 {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default().fg(Color::Green)
+            }
         };
-        spans.push(Span::styled("│ codex ", Style::default().fg(Color::DarkGray)));
+        spans.push(Span::styled(
+            "│ codex ",
+            Style::default().fg(Color::DarkGray),
+        ));
         if let Some(p) = u.primary_used_pct {
             spans.push(Span::styled("5h:", Style::default().fg(Color::DarkGray)));
             spans.push(Span::styled(format!("{p:.0}%"), pct_style(p)));
@@ -228,7 +376,9 @@ fn make_fleet_items(
                 };
                 ListItem::new(Line::from(Span::styled(
                     label,
-                    Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::Blue)
+                        .add_modifier(Modifier::BOLD),
                 )))
             }
             Item::EnvRow(i) => {
@@ -259,7 +409,12 @@ fn make_fleet_items(
                 let status_padded = format!("{:<17}", label);
                 let is_marked = marked.contains(&env.name);
                 let dot_span = if is_marked {
-                    Span::styled("✓ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+                    Span::styled(
+                        "✓ ",
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    )
                 } else {
                     Span::styled("● ", status_style(dom))
                 };
@@ -289,7 +444,10 @@ fn make_fleet_items(
                         Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled(format!("{:<7}", tool), Style::default().fg(Color::Cyan)),
-                    Span::styled(format!(" {:<9}", pid_s), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" {:<9}", pid_s),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                     Span::styled("● ", status_style(&a.status)),
                     Span::styled(a.status.clone(), status_style(&a.status)),
                 ]))
@@ -298,8 +456,8 @@ fn make_fleet_items(
         .collect()
 }
 
-fn render_fleet(f: &mut Frame, area: Rect, app: &mut App) {
-    let block = Block::default().borders(Borders::ALL).title(" fleet ");
+fn render_fleet(f: &mut Frame, area: Rect, app: &mut App, focused: bool) {
+    let block = panel_block(" fleet ", focused);
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -312,9 +470,15 @@ fn render_fleet(f: &mut Frame, area: Rect, app: &mut App) {
         &app.marked,
         inner.width,
     );
-    let list = List::new(items)
-        .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
-        .highlight_symbol("▶ ");
+    // Keep a 2-char highlight symbol in both states (make_fleet_items reserves
+    // its width); only the focused panel shows the reverse-video cursor.
+    let list = if focused {
+        List::new(items)
+            .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
+            .highlight_symbol("▶ ")
+    } else {
+        List::new(items).highlight_symbol("  ")
+    };
     f.render_stateful_widget(list, inner, &mut app.list_state);
 }
 
@@ -325,12 +489,18 @@ fn render_detail(f: &mut Frame, area: Rect, app: &App) {
 
     let dim = Style::default().fg(Color::DarkGray);
     let label = Style::default().fg(Color::DarkGray);
-    let section = Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD);
+    let section = Style::default()
+        .fg(Color::Blue)
+        .add_modifier(Modifier::BOLD);
     let w = inner.width as usize;
 
     let mut lines: Vec<Line<'static>> = Vec::new();
 
-    let sel = app.list_state.selected().and_then(|s| app.view.get(s)).cloned();
+    let sel = app
+        .list_state
+        .selected()
+        .and_then(|s| app.view.get(s))
+        .cloned();
 
     let log_env_name = match &sel {
         Some(Item::EnvRow(i)) => app.envs[*i].name.clone(),
@@ -340,10 +510,7 @@ fn render_detail(f: &mut Frame, area: Rect, app: &App) {
 
     match sel {
         None | Some(Item::GroupHeader(_)) => {
-            f.render_widget(
-                Paragraph::new(Span::styled("no selection", dim)),
-                inner,
-            );
+            f.render_widget(Paragraph::new(Span::styled("no selection", dim)), inner);
             return;
         }
         Some(Item::EnvRow(i)) => {
@@ -351,7 +518,9 @@ fn render_detail(f: &mut Frame, area: Rect, app: &App) {
             let dom = env_dominant_status(env);
             lines.push(Line::from(Span::styled(
                 env.name.clone(),
-                Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
             )));
             lines.push(Line::from(vec![
                 Span::styled("● ", status_style(dom)),
@@ -414,7 +583,11 @@ fn render_detail(f: &mut Frame, area: Rect, app: &App) {
                 };
                 lines.push(Line::from(vec![
                     Span::styled("branch ", label),
-                    Span::raw(if g.branch.is_empty() { "-".into() } else { g.branch.clone() }),
+                    Span::raw(if g.branch.is_empty() {
+                        "-".into()
+                    } else {
+                        g.branch.clone()
+                    }),
                     Span::raw("  "),
                     Span::styled(format!("Δ{}", g.changes), chstyle),
                 ]));
@@ -439,7 +612,9 @@ fn render_detail(f: &mut Frame, area: Rect, app: &App) {
             };
             lines.push(Line::from(Span::styled(
                 header_str,
-                Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
             )));
             lines.push(Line::from(vec![
                 Span::styled("● ", status_style(&a.status)),
@@ -504,7 +679,10 @@ fn render_detail(f: &mut Frame, area: Rect, app: &App) {
 fn render_bottom(f: &mut Frame, area: Rect, app: &App) {
     let line = if app.mode == Mode::Filter {
         Line::from(vec![
-            Span::styled(" filter ", Style::default().bg(Color::Cyan).fg(Color::Black)),
+            Span::styled(
+                " filter ",
+                Style::default().bg(Color::Cyan).fg(Color::Black),
+            ),
             Span::raw(format!(" /{}", app.filter)),
             Span::styled("▏", Style::default().fg(Color::Cyan)),
         ])
@@ -527,22 +705,35 @@ fn help_line(app: &App) -> Line<'static> {
     let hint: &'static str = match app.mode {
         Mode::LogView => " j/k scroll · g top · G follow · PgDn/PgUp · esc/q back",
         Mode::ActionMenu => " j/k move · enter execute · esc cancel",
-        Mode::ToolPick => " j/k select tool · enter confirm · esc back",
+        Mode::ToolPick => " j/k select backend · enter confirm · esc back",
         Mode::BatchMenu => " j/k move · enter execute · esc cancel",
         Mode::TaskView => " j/k scroll · g top · G end · PgDn/PgUp · esc/q back",
         Mode::UsageView => " r refresh · esc/q back",
-        _ => {
-            let sel = app.list_state.selected().and_then(|s| app.view.get(s)).cloned();
-            match sel {
-                Some(Item::GroupHeader(_)) => {
-                    " space expand/collapse · j/k move · / filter · w active · r refresh · ? help · q quit"
-                }
-                Some(Item::AgentRow(_, _)) => {
-                    " enter menu · space collapse · l logs-f · a attach · x kill pid · n/N next · r refresh · ? help · q quit"
-                }
-                _ => " enter menu · m mark · b batch · T tasks · u usage · n/N next · l logs-f · a attach · d dispatch · x kill · D diff · / filter · w active · r refresh · ? help · q quit",
+        Mode::BoardModal => " ←→ lane · j/k sel · i impl · a attach · l logs · r review · f fix · A approve · p plan · b/esc close",
+        _ => match app.focus {
+            Focus::Inbox => {
+                " j/k move · enter answer · tab focus · b board · r refresh · ? help · q quit"
             }
-        }
+            Focus::Tasks => {
+                " j/k move · enter open board · tab focus · b board · u usage · r refresh · ? help · q quit"
+            }
+            Focus::Fleet => {
+                let sel = app
+                    .list_state
+                    .selected()
+                    .and_then(|s| app.view.get(s))
+                    .cloned();
+                match sel {
+                    Some(Item::GroupHeader(_)) => {
+                        " space expand/collapse · j/k move · tab focus · / filter · w active · r refresh · ? help · q quit"
+                    }
+                    Some(Item::AgentRow(_, _)) => {
+                        " enter menu · space collapse · l logs-f · a attach · x kill · v diff · tab focus · b board · r refresh · ? help · q quit"
+                    }
+                    _ => " enter menu · m mark · B batch · v diff · b board · l logs · a attach · d dispatch · x kill · D diff · n/N next · T tasks · u usage · / filter · tab focus · ? help · q quit",
+                }
+            }
+        },
     };
     Line::from(Span::styled(hint, Style::default().fg(Color::DarkGray)))
 }
@@ -563,28 +754,49 @@ fn render_help(f: &mut Frame) {
             Style::default().add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
-        Line::from(Span::styled("  navigation", Style::default().fg(Color::Blue))),
-        kv("j/k ↑/↓", "move selection"),
+        Line::from(Span::styled(
+            "  navigation",
+            Style::default().fg(Color::Blue),
+        )),
+        kv("j/k ↑/↓", "move selection (focused panel)"),
         kv("g / G", "first / last"),
+        kv("tab", "cycle focus — Fleet / Inbox / Tasks"),
         kv("space", "expand/collapse group or env"),
         Line::from(""),
-        Line::from(Span::styled("  actions (enter = menu)", Style::default().fg(Color::Blue))),
-        kv("enter", "action menu (attach/code/dispatch/start/logs/diff/kill)"),
+        Line::from(Span::styled(
+            "  fleet actions (enter = menu)",
+            Style::default().fg(Color::Blue),
+        )),
+        kv(
+            "enter",
+            "action menu (attach/code/dispatch/start/logs/diff/kill)",
+        ),
         kv("l", "follow logs (dev logs -f, outside TUI)"),
         kv("a", "attach (dev attach)"),
         kv("c", "open in VS Code (dev code)"),
-        kv("d", "dispatch — select tool → enter task"),
+        kv("d", "dispatch — select backend → enter task"),
+        kv("v", "toggle inspector detail ↔ diff"),
         kv("x", "kill agents (dev kill / kill <pid>)"),
         kv("D", "view diff (dev diff | less)"),
         Line::from(""),
-        Line::from(Span::styled("  batch (env rows)", Style::default().fg(Color::Blue))),
+        Line::from(Span::styled(
+            "  batch (env rows)",
+            Style::default().fg(Color::Blue),
+        )),
         kv("m", "toggle mark on selected env"),
         kv("M", "clear all marks"),
-        kv("b", "batch menu (dispatch/diff/kill/clear)"),
+        kv("B", "batch menu (dispatch/diff/kill/clear)"),
         kv("n / N", "jump to next/prev waiting or error"),
         Line::from(""),
+        Line::from(Span::styled(
+            "  tasks / inbox",
+            Style::default().fg(Color::Blue),
+        )),
+        kv("b", "open full kanban board (b/esc close)"),
+        kv("enter", "Inbox: answer · Tasks: open board"),
+        Line::from(""),
         Line::from(Span::styled("  view", Style::default().fg(Color::Blue))),
-        kv("/", "filter by text"),
+        kv("/", "filter by text (fleet)"),
         kv("w", "toggle active-only"),
         kv("r", "refresh now"),
         kv("T", "task history view"),
@@ -606,10 +818,10 @@ fn render_help(f: &mut Frame) {
 /// Single source of truth for the per-env action menu.
 /// `key_action_menu` and `render_action_menu` both derive N from `.len()`.
 pub(crate) const ACTION_MENU_ITEMS: [(&str, &str); 9] = [
-    ("attach", "dev attach"),
+    ("attach  (reconnect / resume)", "dev agent attach"),
     ("open in VS Code", "dev code"),
-    ("dispatch  (tool → task)", "dev dispatch --tool"),
-    ("start tool  (interactive)", "dev <tool>"),
+    ("dispatch  (backend → task)", "dev dispatch --backend"),
+    ("new session  (interactive)", "dev agent attach --fresh"),
     ("review  (code review)", "dev review"),
     ("model picker  (next dispatch)", "set --model flag"),
     ("logs", "show logs in TUI"),
@@ -633,10 +845,7 @@ fn render_action_menu(f: &mut Frame, app: &App) {
         };
         lines.push(Line::from(vec![
             Span::styled(format!("{}{}", prefix, lbl), sty),
-            Span::styled(
-                format!("   {}", hint),
-                Style::default().fg(Color::DarkGray),
-            ),
+            Span::styled(format!("   {}", hint), Style::default().fg(Color::DarkGray)),
         ]));
     }
     lines.push(Line::from(""));
@@ -657,7 +866,7 @@ fn render_action_menu(f: &mut Frame, app: &App) {
 
 fn render_tool_pick(f: &mut Frame, app: &App) {
     let purpose_label = match app.tool_purpose {
-        ToolPurpose::Start => "start tool",
+        ToolPurpose::Start => "new session",
         ToolPurpose::Dispatch => "dispatch",
         ToolPurpose::Review => "review",
     };
@@ -674,10 +883,7 @@ fn render_tool_pick(f: &mut Frame, app: &App) {
         } else {
             Style::default()
         };
-        lines.push(Line::from(Span::styled(
-            format!("{}{}", prefix, tool),
-            sty,
-        )));
+        lines.push(Line::from(Span::styled(format!("{}{}", prefix, tool), sty)));
     }
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
@@ -709,7 +915,7 @@ fn render_dispatch(f: &mut Frame, app: &App) {
         app.dispatch_target.clone()
     };
     let model_display = if app.dispatch_model.is_empty() {
-        "(tool default)".to_string()
+        "(backend default)".to_string()
     } else {
         app.dispatch_model.clone()
     };
@@ -728,7 +934,7 @@ fn render_dispatch(f: &mut Frame, app: &App) {
         ]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("tool:   ", Style::default().fg(Color::DarkGray)),
+            Span::styled("backend:", Style::default().fg(Color::DarkGray)),
             Span::styled(tool_display, Style::default().fg(Color::Cyan)),
         ]),
         Line::from(vec![
@@ -756,7 +962,12 @@ fn render_dispatch(f: &mut Frame, app: &App) {
 }
 
 fn render_log_view(f: &mut Frame, area: Rect, app: &App) {
-    let title = if app.log_target.is_empty() {
+    let title = if app.tail_pid.is_some() {
+        // Live tail (review or logs): spinner + elapsed so it never looks frozen.
+        let spin = SPIN[(app.spinner as usize) % SPIN.len()];
+        let elapsed = app.tail_started.map(|t| t.elapsed().as_secs()).unwrap_or(0);
+        format!(" {} live: {} · {}s ", spin, app.log_target, elapsed)
+    } else if app.log_target.is_empty() {
         " log ".to_string()
     } else {
         format!(" log: {} ", app.log_target)
@@ -775,11 +986,7 @@ fn render_log_view(f: &mut Frame, area: Rect, app: &App) {
     }
 
     // Wrap all logical lines at inner width
-    let rows: Vec<String> = app
-        .log_lines
-        .iter()
-        .flat_map(|l| wrap_line(l, w))
-        .collect();
+    let rows: Vec<String> = app.log_lines.iter().flat_map(|l| wrap_line(l, w)).collect();
     let total = rows.len();
     let max_top = total.saturating_sub(h);
     let top = if app.log_follow {
@@ -799,7 +1006,11 @@ fn render_log_view(f: &mut Frame, area: Rect, app: &App) {
 fn render_confirm(f: &mut Frame, app: &App) {
     let area = centered_rect(52, 24, f.area());
     f.render_widget(Clear, area);
-    let sel = app.list_state.selected().and_then(|s| app.view.get(s)).cloned();
+    let sel = app
+        .list_state
+        .selected()
+        .and_then(|s| app.view.get(s))
+        .cloned();
     let (action, target) = match sel {
         Some(Item::EnvRow(i)) => ("kill all agents in", app.envs[i].name.clone()),
         Some(Item::AgentRow(i, j)) => ("kill pid", app.envs[i].agents[j].pid.clone()),
@@ -903,7 +1114,11 @@ fn render_result_view(f: &mut Frame, app: &App) {
     let h = inner.height as usize;
     let w = inner.width as usize;
 
-    let rows: Vec<String> = app.result_lines.iter().flat_map(|l| wrap_line(l, w)).collect();
+    let rows: Vec<String> = app
+        .result_lines
+        .iter()
+        .flat_map(|l| wrap_line(l, w))
+        .collect();
     let total = rows.len();
     let max_top = total.saturating_sub(h.saturating_sub(1));
     let top = app.result_scroll.min(max_top);
@@ -915,14 +1130,25 @@ fn render_result_view(f: &mut Frame, app: &App) {
     let hint = if app.result_inflight {
         "(running…)".to_string()
     } else {
-        format!("q/esc: close   j/k: scroll   {}/{} lines", top + 1, total.max(1))
+        format!(
+            "q/esc: close   j/k: scroll   {}/{} lines",
+            top + 1,
+            total.max(1)
+        )
     };
-    lines.push(Line::from(Span::styled(hint, Style::default().fg(Color::DarkGray))));
+    lines.push(Line::from(Span::styled(
+        hint,
+        Style::default().fg(Color::DarkGray),
+    )));
     f.render_widget(Paragraph::new(lines), inner);
 }
 
 fn render_model_picker(f: &mut Frame, app: &App) {
-    let tool = if app.dispatch_tool.is_empty() { "claude" } else { &app.dispatch_tool };
+    let tool = if app.dispatch_tool.is_empty() {
+        "claude"
+    } else {
+        &app.dispatch_tool
+    };
     let models = app.models_for_picker(tool);
     let area = centered_rect(56, 62, f.area());
     f.render_widget(Clear, area);
@@ -1026,9 +1252,15 @@ fn render_task_view(f: &mut Frame, app: &App) {
 
         lines.push(Line::from(vec![
             Span::styled(format!(" {} ", icon), icon_style),
-            Span::styled(format!("{:<16}", target_str), Style::default().fg(Color::Cyan)),
+            Span::styled(
+                format!("{:<16}", target_str),
+                Style::default().fg(Color::Cyan),
+            ),
             Span::styled(format!(" {:<8}", tool_str), dim),
-            Span::styled(format!(" {:>8} ", elapsed), Style::default().fg(Color::Yellow)),
+            Span::styled(
+                format!(" {:>8} ", elapsed),
+                Style::default().fg(Color::Yellow),
+            ),
             Span::styled(task_text, Style::default()),
         ]));
     }
@@ -1056,9 +1288,9 @@ fn render_usage_view(f: &mut Frame, app: &App) {
 
     // Split inner area into sections for each service
     let sections = Layout::vertical([
-        Constraint::Length(5),  // Claude
-        Constraint::Length(5),  // Codex
-        Constraint::Length(5),  // Agy
+        Constraint::Length(5), // Claude
+        Constraint::Length(5), // Codex
+        Constraint::Length(5), // Agy
         Constraint::Min(1),    // Current values + hint
     ])
     .split(inner);
@@ -1067,10 +1299,24 @@ fn render_usage_view(f: &mut Frame, app: &App) {
     {
         let data = app.usage_history.sparkline_data("claude_5h");
         let label_line = Line::from(vec![
-            Span::styled(" claude 5h ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                " claude 5h ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             if let Some(u) = &app.claude_usage {
                 if let Some(p) = u.five_hour_pct {
-                    Span::styled(format!("{}%", p), Style::default().fg(if p >= 85 { Color::Red } else if p >= 70 { Color::Yellow } else { Color::Green }))
+                    Span::styled(
+                        format!("{}%", p),
+                        Style::default().fg(if p >= 85 {
+                            Color::Red
+                        } else if p >= 70 {
+                            Color::Yellow
+                        } else {
+                            Color::Green
+                        }),
+                    )
                 } else {
                     Span::styled("-", dim)
                 }
@@ -1098,10 +1344,24 @@ fn render_usage_view(f: &mut Frame, app: &App) {
     {
         let data = app.usage_history.sparkline_data("codex_5h");
         let label_line = Line::from(vec![
-            Span::styled(" codex 5h ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                " codex 5h ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             if let Some(u) = &app.codex_usage {
                 if let Some(p) = u.primary_used_pct {
-                    Span::styled(format!("{:.0}%", p), Style::default().fg(if p >= 85.0 { Color::Red } else if p >= 70.0 { Color::Yellow } else { Color::Green }))
+                    Span::styled(
+                        format!("{:.0}%", p),
+                        Style::default().fg(if p >= 85.0 {
+                            Color::Red
+                        } else if p >= 70.0 {
+                            Color::Yellow
+                        } else {
+                            Color::Green
+                        }),
+                    )
                 } else {
                     Span::styled("-", dim)
                 }
@@ -1129,11 +1389,25 @@ fn render_usage_view(f: &mut Frame, app: &App) {
     {
         let data = app.usage_history.sparkline_data("agy_pct");
         let label_line = Line::from(vec![
-            Span::styled(" agy ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                " agy ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             if let Some(u) = &app.agy_usage {
                 if let (Some(avail), Some(monthly)) = (u.available_credits, u.monthly_credits) {
                     let pct = ((monthly.saturating_sub(avail)) * 100 / monthly.max(1)) as u32;
-                    Span::styled(format!("{}%", pct), Style::default().fg(if pct >= 85 { Color::Red } else if pct >= 70 { Color::Yellow } else { Color::Green }))
+                    Span::styled(
+                        format!("{}%", pct),
+                        Style::default().fg(if pct >= 85 {
+                            Color::Red
+                        } else if pct >= 70 {
+                            Color::Yellow
+                        } else {
+                            Color::Green
+                        }),
+                    )
                 } else {
                     Span::styled("-", dim)
                 }
@@ -1164,9 +1438,8 @@ fn render_usage_view(f: &mut Frame, app: &App) {
 
         // Claude 7d
         if let Some(u) = &app.claude_usage {
-            let mut spans: Vec<Span<'static>> = vec![
-                Span::styled("  claude ", Style::default().fg(Color::Cyan)),
-            ];
+            let mut spans: Vec<Span<'static>> =
+                vec![Span::styled("  claude ", Style::default().fg(Color::Cyan))];
             if let Some(p) = u.five_hour_pct {
                 spans.push(Span::styled(format!("5h:{p}%"), dim));
                 spans.push(Span::raw("  "));
@@ -1178,9 +1451,8 @@ fn render_usage_view(f: &mut Frame, app: &App) {
         }
         // Codex
         if let Some(u) = &app.codex_usage {
-            let mut spans: Vec<Span<'static>> = vec![
-                Span::styled("  codex  ", Style::default().fg(Color::Cyan)),
-            ];
+            let mut spans: Vec<Span<'static>> =
+                vec![Span::styled("  codex  ", Style::default().fg(Color::Cyan))];
             if let Some(p) = u.primary_used_pct {
                 spans.push(Span::styled(format!("5h:{p:.0}%"), dim));
                 spans.push(Span::raw("  "));
@@ -1192,9 +1464,8 @@ fn render_usage_view(f: &mut Frame, app: &App) {
         }
         // Agy
         if let Some(u) = &app.agy_usage {
-            let mut spans: Vec<Span<'static>> = vec![
-                Span::styled("  agy    ", Style::default().fg(Color::Cyan)),
-            ];
+            let mut spans: Vec<Span<'static>> =
+                vec![Span::styled("  agy    ", Style::default().fg(Color::Cyan))];
             if let (Some(avail), Some(monthly)) = (u.available_credits, u.monthly_credits) {
                 let pct = ((monthly.saturating_sub(avail)) * 100 / monthly.max(1)) as u32;
                 spans.push(Span::styled(format!("{pct}%"), dim));
@@ -1205,7 +1476,10 @@ fn render_usage_view(f: &mut Frame, app: &App) {
 
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
-            format!("  {} samples · r: refresh · esc/q: back", app.usage_history.samples.len()),
+            format!(
+                "  {} samples · r: refresh · esc/q: back",
+                app.usage_history.samples.len()
+            ),
             dim,
         )));
 
@@ -1215,34 +1489,64 @@ fn render_usage_view(f: &mut Frame, app: &App) {
 
 // ── Phase 2 renders ──────────────────────────────────────────────────────────
 
-fn render_tab_bar(f: &mut Frame, area: Rect, app: &App) {
-    let tabs = [Tab::Agents, Tab::TaskBoard, Tab::Inbox];
-    let blocking = app.dev_questions.iter().filter(|q| q.severity == "blocking").count();
+fn render_focus_bar(f: &mut Frame, area: Rect, app: &App) {
+    let blocking = app
+        .dev_questions
+        .iter()
+        .filter(|q| q.severity == "blocking")
+        .count();
+    let n_tasks = app.active_tasks().len();
+    let segs: [(Focus, String); 3] = [
+        (Focus::Fleet, " Fleet ".to_string()),
+        (
+            Focus::Inbox,
+            if blocking > 0 {
+                format!(" Inbox ⚠{} ", blocking)
+            } else {
+                " Inbox ".to_string()
+            },
+        ),
+        (
+            Focus::Tasks,
+            if n_tasks > 0 {
+                format!(" Tasks {} ", n_tasks)
+            } else {
+                " Tasks ".to_string()
+            },
+        ),
+    ];
     let mut spans: Vec<Span<'static>> = Vec::new();
-    for tab in tabs {
-        let active = app.active_tab == tab;
-        let label: String = match tab {
-            Tab::Inbox if blocking > 0 => format!(" {} ({}) ", tab.label(), blocking),
-            _ => format!(" {} ", tab.label()),
-        };
+    for (focus, label) in segs {
+        let active = app.focus == focus;
         let style = if active {
-            Style::default().fg(Color::Black).bg(Color::White).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::White)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::DarkGray)
         };
         spans.push(Span::styled(label, style));
         spans.push(Span::raw("  "));
     }
-    spans.push(Span::styled(" tab:switch ", Style::default().fg(Color::DarkGray)));
+    spans.push(Span::styled(
+        "tab:focus  b:board",
+        Style::default().fg(Color::DarkGray),
+    ));
     f.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
-fn render_task_board(f: &mut Frame, area: Rect, app: &App) {
-    let h = Layout::horizontal([
-        Constraint::Percentage(40),
-        Constraint::Percentage(60),
-    ])
-    .split(area);
+/// Full 7-lane kanban, opened on demand with `b` — a fullscreen overlay.
+fn render_board_modal(f: &mut Frame, app: &App) {
+    let area = centered_rect(94, 90, f.area());
+    f.render_widget(Clear, area);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" board — full kanban  (b/esc close) ");
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+    let h =
+        Layout::horizontal([Constraint::Percentage(40), Constraint::Percentage(60)]).split(inner);
     render_board_left(f, h[0], app);
     render_board_right(f, h[1], app);
 }
@@ -1255,10 +1559,17 @@ fn render_board_left(f: &mut Frame, area: Rect, app: &App) {
     let col = app.board_col;
     let mut lane_spans: Vec<Span<'static>> = Vec::new();
     for (i, (name, phase)) in App::BOARD_LANES.iter().enumerate() {
-        let count = app.dev_tasks.iter().filter(|t| t.phase.as_str() == *phase).count();
+        let count = app
+            .dev_tasks
+            .iter()
+            .filter(|t| t.phase.as_str() == *phase)
+            .count();
         let label = format!(" {name}({count}) ");
         let style = if i == col {
-            Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::DarkGray)
         };
@@ -1289,19 +1600,28 @@ fn render_board_left(f: &mut Frame, area: Rect, app: &App) {
             let id_short = task.id.clone();
             let title = truncate(&task.title, 32);
             let tool = task.assigned_tool.as_deref().unwrap_or("-").to_string();
-            let q_count = app.dev_questions.iter().filter(|q| q.task_id == task.id).count();
+            let q_count = app
+                .dev_questions
+                .iter()
+                .filter(|q| q.task_id == task.id)
+                .count();
             let project_id = task.project_id.clone();
             let line1 = if selected {
                 Line::from(vec![
                     Span::styled(
                         format!("{id_short}  "),
-                        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
                     ),
                     Span::styled(title, Style::default().add_modifier(Modifier::BOLD)),
                 ])
             } else {
                 Line::from(vec![
-                    Span::styled(format!("{id_short}  "), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!("{id_short}  "),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                     Span::raw(title),
                 ])
             };
@@ -1338,36 +1658,44 @@ fn render_board_left(f: &mut Frame, area: Rect, app: &App) {
 
 fn phase_style(phase: &str) -> Style {
     match phase {
-        "needs_spec"    => Style::default().fg(Color::Red),
-        "planned"       => Style::default().fg(Color::Blue),
-        "approved"      => Style::default().fg(Color::Green),
-        "implementing"  => Style::default().fg(Color::Yellow),
-        "review"        => Style::default().fg(Color::Magenta),
-        "needs_fix"     => Style::default().fg(Color::Red),
-        "mergeable"     => Style::default().fg(Color::Green),
-        "merged"        => Style::default().fg(Color::DarkGray),
-        _               => Style::default().fg(Color::DarkGray),
+        "needs_spec" => Style::default().fg(Color::Red),
+        "planned" => Style::default().fg(Color::Blue),
+        "approved" => Style::default().fg(Color::Green),
+        "implementing" => Style::default().fg(Color::Yellow),
+        "review" => Style::default().fg(Color::Magenta),
+        "needs_fix" => Style::default().fg(Color::Red),
+        "mergeable" => Style::default().fg(Color::Green),
+        "merged" => Style::default().fg(Color::DarkGray),
+        _ => Style::default().fg(Color::DarkGray),
     }
 }
 
 fn render_board_right(f: &mut Frame, area: Rect, app: &App) {
     let lanes = app.tasks_for_lane(app.board_col);
     let sel = app.board_sel.min(lanes.len().saturating_sub(1));
-    let task = match lanes.get(sel) {
-        Some(t) => t,
+    match lanes.get(sel) {
+        Some(t) => render_task_detail_body(f, area, app, t),
         None => {
-            let empty = Paragraph::new("(no task selected)")
-                .block(Block::default().borders(Borders::ALL).title(" Task Detail "));
+            let empty = Paragraph::new("(no task selected)").block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Task Detail "),
+            );
             f.render_widget(empty, area);
-            return;
         }
-    };
+    }
+}
 
+/// Render a single task's detail (brief/plan/handoff/review + action hints) into
+/// `area`. Shared by the board modal's right pane and the cockpit Tasks inspector.
+fn render_task_detail_body(f: &mut Frame, area: Rect, app: &App, task: &crate::task::DevTask) {
     let mut lines: Vec<Line<'static>> = vec![
         Line::from(vec![
             Span::styled(
                 task.id.clone(),
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::raw("  "),
             Span::styled(task.phase.clone(), phase_style(&task.phase)),
@@ -1451,65 +1779,82 @@ fn render_board_right(f: &mut Frame, area: Rect, app: &App) {
     )));
 
     let detail_widget = Paragraph::new(lines)
-        .block(Block::default().borders(Borders::ALL).title(" Task Detail "))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Task Detail "),
+        )
         .wrap(Wrap { trim: false });
     f.render_widget(detail_widget, area);
 }
 
-fn render_inbox(f: &mut Frame, area: Rect, app: &App) {
-    let v = Layout::vertical([Constraint::Min(0), Constraint::Length(6)]).split(area);
-
-    // Question list (top)
+/// Cockpit Inbox panel — compact 1-line-per-question list (left column).
+fn render_inbox_panel(f: &mut Frame, area: Rect, app: &App, focused: bool) {
     let questions = &app.dev_questions;
-    let sel = if questions.is_empty() { 0 } else { app.inbox_sel.min(questions.len().saturating_sub(1)) };
-    let height = v[0].height as usize;
-    let offset = sel.saturating_sub(height / 2);
+    let title = if questions.is_empty() {
+        " inbox ".to_string()
+    } else {
+        format!(" inbox ⚠{} ", questions.len())
+    };
+    let block = panel_block(&title, focused);
+    let inner = block.inner(area);
+    f.render_widget(block, area);
 
     if questions.is_empty() {
-        let msg = Paragraph::new("No open blocking questions.")
-            .style(Style::default().fg(Color::DarkGray))
-            .block(Block::default().borders(Borders::ALL).title("Inbox — Needs Spec"));
-        f.render_widget(msg, v[0]);
-    } else {
-        let mut items: Vec<ListItem<'static>> = Vec::new();
-        for (i, q) in questions.iter().enumerate().skip(offset).take(height) {
-            let selected = i == sel;
-            let sev_style = match q.severity.as_str() {
-                "blocking" => Style::default().fg(Color::Red),
-                "nonblocking" => Style::default().fg(Color::Yellow),
-                _ => Style::default().fg(Color::DarkGray),
-            };
-            let severity = q.severity.clone();
-            let qid = q.id.clone();
-            let task_id = q.task_id.clone();
-            let project_id = q.project_id.clone();
-            let question_text = truncate(&q.question, 70);
-            let line1 = Line::from(vec![
-                Span::styled(format!("[{}] ", severity), sev_style),
-                Span::styled(qid, Style::default().fg(Color::Cyan)),
-                Span::raw(format!("  {}", task_id)),
-                Span::styled(format!("  {}", project_id), Style::default().fg(Color::DarkGray)),
-            ]);
-            let line2 = Line::from(vec![
-                Span::raw(format!("  {}", question_text)),
-            ]);
-            let style = if selected {
-                Style::default().bg(Color::DarkGray)
-            } else {
-                Style::default()
-            };
-            items.push(ListItem::new(vec![line1, line2]).style(style));
-        }
-        let list = List::new(items)
-            .block(Block::default().borders(Borders::ALL).title(format!("Inbox — {} blocking question(s)", questions.len())));
-        f.render_widget(list, v[0]);
+        f.render_widget(
+            Paragraph::new(Span::styled(
+                "no blocking questions",
+                Style::default().fg(Color::DarkGray),
+            )),
+            inner,
+        );
+        return;
     }
 
-    // Selected question detail + answer input (bottom)
+    let sel = app.inbox_sel.min(questions.len().saturating_sub(1));
+    let height = inner.height as usize;
+    let offset = sel.saturating_sub(height.saturating_sub(1));
+    let w = inner.width as usize;
+    let mut items: Vec<ListItem<'static>> = Vec::new();
+    for (i, q) in questions.iter().enumerate().skip(offset).take(height) {
+        let selected = i == sel && focused;
+        let sev_style = match q.severity.as_str() {
+            "blocking" => Style::default().fg(Color::Red),
+            "nonblocking" => Style::default().fg(Color::Yellow),
+            _ => Style::default().fg(Color::DarkGray),
+        };
+        let marker = if selected { "▶ " } else { "  " };
+        let text_w = w.saturating_sub(marker.len() + 2 + q.id.len() + 1);
+        let text = truncate(&q.question, text_w.max(6));
+        let line = Line::from(vec![
+            Span::raw(marker),
+            Span::styled("● ", sev_style),
+            Span::styled(format!("{} ", q.id), Style::default().fg(Color::Cyan)),
+            Span::raw(text),
+        ]);
+        let style = if selected {
+            Style::default().bg(Color::DarkGray)
+        } else {
+            Style::default()
+        };
+        items.push(ListItem::new(line).style(style));
+    }
+    f.render_widget(List::new(items), inner);
+}
+
+/// Inbox inspector — selected question detail + inline answer input (right pane).
+fn render_inbox_detail(f: &mut Frame, area: Rect, app: &App) {
+    let questions = &app.dev_questions;
+    let sel = if questions.is_empty() {
+        0
+    } else {
+        app.inbox_sel.min(questions.len().saturating_sub(1))
+    };
     if let Some(q) = questions.get(sel) {
-        let mut detail_lines: Vec<Line<'static>> = vec![
-            Line::from(Span::styled(format!("Q: {}", q.question.clone()), Style::default().add_modifier(Modifier::BOLD))),
-        ];
+        let mut detail_lines: Vec<Line<'static>> = vec![Line::from(Span::styled(
+            format!("Q: {}", q.question.clone()),
+            Style::default().add_modifier(Modifier::BOLD),
+        ))];
         if let Some(rec) = &q.agent_recommendation {
             detail_lines.push(Line::from(Span::styled(
                 format!("recommendation: {rec}"),
@@ -1523,7 +1868,10 @@ fn render_inbox(f: &mut Frame, area: Rect, app: &App) {
             )));
         }
         for opt in &q.options {
-            detail_lines.push(Line::from(Span::raw(format!("  [{}] {} — {}", opt.id, opt.label, opt.impact))));
+            detail_lines.push(Line::from(Span::raw(format!(
+                "  [{}] {} — {}",
+                opt.id, opt.label, opt.impact
+            ))));
         }
         if app.inbox_answering {
             detail_lines.push(Line::from(vec![
@@ -1538,15 +1886,81 @@ fn render_inbox(f: &mut Frame, area: Rect, app: &App) {
             )));
         }
         let detail = Paragraph::new(detail_lines)
-            .block(Block::default().borders(Borders::ALL).title("Question Detail"))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Question Detail "),
+            )
             .wrap(Wrap { trim: false });
-        f.render_widget(detail, v[1]);
+        f.render_widget(detail, area);
     } else {
-        let empty = Paragraph::new("No question selected.")
-            .block(Block::default().borders(Borders::ALL).title("Question Detail"));
-        f.render_widget(empty, v[1]);
+        let empty = Paragraph::new("No question selected.").block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Question Detail "),
+        );
+        f.render_widget(empty, area);
     }
 }
 
-// ── End of file ────────────────────────────────────────────────────────────────
+/// Cockpit Tasks panel — compact 1-line-per-task list over `active_tasks()`.
+fn render_tasks_panel(f: &mut Frame, area: Rect, app: &App, focused: bool) {
+    let tasks = app.active_tasks();
+    let title = if tasks.is_empty() {
+        " tasks ".to_string()
+    } else {
+        format!(" tasks {} ", tasks.len())
+    };
+    let block = panel_block(&title, focused);
+    let inner = block.inner(area);
+    f.render_widget(block, area);
 
+    if tasks.is_empty() {
+        f.render_widget(
+            Paragraph::new(Span::styled(
+                "no active tasks",
+                Style::default().fg(Color::DarkGray),
+            )),
+            inner,
+        );
+        return;
+    }
+
+    let sel = app.tasks_sel.min(tasks.len().saturating_sub(1));
+    let height = inner.height as usize;
+    let offset = sel.saturating_sub(height.saturating_sub(1));
+    let w = inner.width as usize;
+    let mut items: Vec<ListItem<'static>> = Vec::new();
+    for (i, t) in tasks.iter().enumerate().skip(offset).take(height) {
+        let selected = i == sel && focused;
+        let marker = if selected { "▶ " } else { "  " };
+        let q_count = app
+            .dev_questions
+            .iter()
+            .filter(|q| q.task_id == t.id)
+            .count();
+        let qsuffix = if q_count > 0 {
+            format!(" q:{}", q_count)
+        } else {
+            String::new()
+        };
+        let title_w = w.saturating_sub(marker.len() + 2 + t.id.len() + 1 + qsuffix.len());
+        let title_txt = truncate(&t.title, title_w.max(6));
+        let line = Line::from(vec![
+            Span::raw(marker),
+            Span::styled("● ", phase_style(&t.phase)),
+            Span::styled(format!("{} ", t.id), Style::default().fg(Color::DarkGray)),
+            Span::raw(title_txt),
+            Span::styled(qsuffix, Style::default().fg(Color::Yellow)),
+        ]);
+        let style = if selected {
+            Style::default().bg(Color::DarkGray)
+        } else {
+            Style::default()
+        };
+        items.push(ListItem::new(line).style(style));
+    }
+    f.render_widget(List::new(items), inner);
+}
+
+// ── End of file ────────────────────────────────────────────────────────────────

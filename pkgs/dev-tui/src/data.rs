@@ -13,31 +13,52 @@ use crate::usage::{fetch_claude_usage, ClaudeUsage};
 pub enum Req {
     Refresh,
     Git,
-    Logs(String),
+    /// Recent activity for `target`. `session` pins a claude session (from `ps`)
+    /// so the worker reads that agent's transcript without rediscovering it.
+    Logs {
+        target: String,
+        session: Option<String>,
+    },
     Tools,
     Usage,
     AgyUsage,
     DevTasks,
     TaskDetail(String),
+    /// `dev git diff <target>` snapshot for the Fleet inspector Diff view.
+    Diff(String),
 }
 
 #[allow(dead_code)]
 pub enum Msg {
     State(Vec<Env>),
     Git(HashMap<String, GitState>),
-    Logs { target: String, lines: Vec<String> },
+    Logs {
+        target: String,
+        lines: Vec<String>,
+    },
     Tools(Vec<Tool>),
     /// Generic text result (review, worktree list, session list, etc.)
-    Result { title: String, lines: Vec<String> },
+    Result {
+        title: String,
+        lines: Vec<String>,
+    },
     Usage(Option<ClaudeUsage>),
     AgyUsage(Option<AgyUsage>),
     CodexUsage(Option<CodexUsage>),
     /// Real-time log line from `dev logs -f` tail.
-    LogLine { target: String, line: String },
+    LogLine {
+        target: String,
+        line: String,
+    },
     /// Error message to display as flash.
     Error(String),
     DevTasks(Vec<crate::task::DevTask>, Vec<crate::task::DevQuestion>),
     TaskDetail(Option<crate::task::TaskDetail>),
+    /// `dev git diff <target>` snapshot for the Fleet inspector Diff view.
+    Diff {
+        target: String,
+        lines: Vec<String>,
+    },
 }
 
 /// Codex rate-limit data via JSON-RPC to `codex app-server`.
@@ -175,9 +196,9 @@ pub fn worker(req_rx: Receiver<Req>, msg_tx: Sender<Msg>) {
             let msg = match req {
                 Req::Refresh => Msg::State(fetch_state()),
                 Req::Git => Msg::Git(fetch_git()),
-                Req::Logs(t) => {
-                    let lines = fetch_logs(&t);
-                    Msg::Logs { target: t, lines }
+                Req::Logs { target, session } => {
+                    let lines = fetch_logs(&target, session.as_deref());
+                    Msg::Logs { target, lines }
                 }
                 Req::Tools => Msg::Tools(fetch_tools()),
                 Req::Usage => Msg::Usage(fetch_claude_usage()),
@@ -190,6 +211,10 @@ pub fn worker(req_rx: Receiver<Req>, msg_tx: Sender<Msg>) {
                     let detail = crate::task::load_task_detail(&task_id);
                     Msg::TaskDetail(detail)
                 }
+                Req::Diff(target) => {
+                    let lines = fetch_diff(&target);
+                    Msg::Diff { target, lines }
+                }
             };
             let _ = tx.send(msg);
         });
@@ -197,62 +222,46 @@ pub fn worker(req_rx: Receiver<Req>, msg_tx: Sender<Msg>) {
 }
 
 fn fetch_envs_base() -> Vec<Env> {
-    let out = match Command::new("dev")
-        .args(["ls", "--json"])
-        .stdin(Stdio::null())
-        .output()
-    {
-        Ok(o) => o,
-        Err(_) => return Vec::new(),
-    };
+    // In-process: read config.toml directly via dev-core (was `dev ls --json`).
+    let cfg = dev_core::config::Config::load_or_default();
     let mut envs = Vec::new();
-    if let Ok(val) = serde_json::from_slice::<Value>(&out.stdout) {
-        if let Some(Value::Array(locals)) = val.get("local") {
-            for l in locals {
-                envs.push(Env {
-                    name: sget(l, "name").unwrap_or_default(),
-                    group: "local".into(),
-                    host: String::new(),
-                    shell: String::new(),
-                    os: String::new(),
-                    path: sget(l, "path").unwrap_or_default(),
-                    base_status: "stopped".into(),
-                    agents: Vec::new(),
-                    expanded: false,
-                });
-            }
-        }
-        if let Some(Value::Array(remotes)) = val.get("remote") {
-            for r in remotes {
-                let env_name = sget(r, "env").unwrap_or_else(|| "remote".into());
-                envs.push(Env {
-                    name: sget(r, "name").unwrap_or_default(),
-                    group: env_name,
-                    host: sget(r, "host").unwrap_or_default(),
-                    shell: sget(r, "shell").unwrap_or_default(),
-                    os: sget(r, "os").unwrap_or_default(),
-                    path: sget(r, "path").unwrap_or_default(),
-                    base_status: "stopped".into(),
-                    agents: Vec::new(),
-                    expanded: false,
-                });
-            }
-        }
+    for l in &cfg.local {
+        envs.push(Env {
+            name: l.name.clone(),
+            group: "local".into(),
+            host: String::new(),
+            shell: String::new(),
+            os: String::new(),
+            path: l.path.clone(),
+            base_status: "stopped".into(),
+            agents: Vec::new(),
+            expanded: false,
+        });
+    }
+    for r in &cfg.remote {
+        let e = cfg.env(&r.env);
+        envs.push(Env {
+            name: r.name.clone(),
+            group: r.env.clone(),
+            host: e.map(|e| e.host.clone()).unwrap_or_default(),
+            shell: e.map(|e| e.shell.clone()).unwrap_or_default(),
+            os: cfg.env_os(&r.env, &r.path),
+            path: r.path.clone(),
+            base_status: "stopped".into(),
+            agents: Vec::new(),
+            expanded: false,
+        });
     }
     envs
 }
 
 fn fetch_state() -> Vec<Env> {
     let mut envs = fetch_envs_base();
-    let out = match Command::new("dev")
-        .args(["agent", "ps", "--json"])
-        .stdin(Stdio::null())
-        .output()
+    // In-process agent discovery (was `dev agent ps --json`). Runs on the worker
+    // thread; dev-core parallelizes across projects internally.
+    let cfg = dev_core::config::Config::load_or_default();
+    let arr = dev_core::agent::ps(&cfg);
     {
-        Ok(o) => o,
-        Err(_) => return envs,
-    };
-    if let Ok(Value::Array(arr)) = serde_json::from_slice::<Value>(&out.stdout) {
         for a in &arr {
             let target = match sget(a, "target") {
                 Some(t) => t,
@@ -262,7 +271,10 @@ fn fetch_state() -> Vec<Env> {
                 Some(e) => e,
                 None => continue,
             };
-            let has_pid = matches!(a.get("pid"), Some(Value::Number(_)) | Some(Value::String(_)));
+            let has_pid = matches!(
+                a.get("pid"),
+                Some(Value::Number(_)) | Some(Value::String(_))
+            );
             let status = sget(a, "status").unwrap_or_else(|| "?".into());
             if has_pid {
                 let session_id = sget(a, "session_id").filter(|s| !s.is_empty());
@@ -286,57 +298,64 @@ fn fetch_state() -> Vec<Env> {
 }
 
 fn fetch_git() -> HashMap<String, GitState> {
-    let (tx, rx) = mpsc::channel();
-    thread::spawn(move || {
-        let mut m = HashMap::new();
-        let out = match Command::new("dev")
-            .args(["git", "status", "--json"])
-            .stdin(Stdio::null())
-            .output()
-        {
-            Ok(o) => o,
-            Err(_) => {
-                let _ = tx.send(m);
-                return;
-            }
-        };
-        if let Ok(Value::Array(arr)) = serde_json::from_slice::<Value>(&out.stdout) {
-            for g in &arr {
-                if let Some(t) = sget(g, "target") {
-                    m.insert(
-                        t,
-                        GitState {
-                            branch: sget(g, "branch").unwrap_or_default(),
-                            head: sget(g, "head").unwrap_or_default(),
-                            changes: g.get("changes").and_then(|x| x.as_i64()).unwrap_or(0),
-                        },
-                    );
-                }
-            }
-        }
-        let _ = tx.send(m);
-    });
-    rx.recv_timeout(Duration::from_secs(10)).unwrap_or_default()
-}
-
-fn fetch_logs(target: &str) -> Vec<String> {
-    let out = match Command::new("dev")
-        .args(["agent", "logs", target, "--json"])
-        .stdin(Stdio::null())
-        .output()
-    {
-        Ok(o) => o,
-        Err(_) => return Vec::new(),
-    };
-    if let Ok(v) = serde_json::from_slice::<Value>(&out.stdout) {
-        if let Some(Value::Array(lines)) = v.get("lines") {
-            return lines
-                .iter()
-                .filter_map(|l| l.as_str().map(|s| s.to_string()))
-                .collect();
+    // In-process: dev-core parallelizes status across targets internally
+    // (was `dev git status --json`). This already runs on the worker thread.
+    let cfg = dev_core::config::Config::load_or_default();
+    let targets = cfg.list_projects();
+    let rows = dev_core::git::status_all(&cfg, &targets);
+    let mut m = HashMap::new();
+    for g in &rows {
+        if let Some(t) = sget(g, "target") {
+            m.insert(
+                t,
+                GitState {
+                    branch: sget(g, "branch").unwrap_or_default(),
+                    head: sget(g, "head").unwrap_or_default(),
+                    changes: g.get("changes").and_then(|x| x.as_i64()).unwrap_or(0),
+                },
+            );
         }
     }
-    Vec::new()
+    m
+}
+
+fn fetch_logs(target: &str, session: Option<&str>) -> Vec<String> {
+    // In-process recent activity: claude → distilled transcript, other backends →
+    // run-log tail (see `dev_core::agent::recent_activity`). Strip ANSI so an
+    // agent's default (formatted, colorized) output renders cleanly in the ratatui
+    // detail pane instead of showing escape-code garbage. The live-tail path
+    // already strips ANSI in `App::start_tail`.
+    let cfg = dev_core::config::Config::load_or_default();
+    dev_core::agent::recent_activity(&cfg, target, session)
+        .iter()
+        .map(|l| strip_ansi(l))
+        .collect()
+}
+
+/// Snapshot of `dev git diff <target>` for the Fleet inspector Diff view.
+/// Shells `dev` (rather than git2 in-process) so it works for remote envs too,
+/// matching what the `D` key shows in the external pager.
+fn fetch_diff(target: &str) -> Vec<String> {
+    let out = Command::new("dev")
+        .args(["git", "diff", target])
+        .stdin(Stdio::null())
+        .output();
+    match out {
+        Ok(o) => {
+            let text = if o.stdout.is_empty() && !o.status.success() {
+                String::from_utf8_lossy(&o.stderr).into_owned()
+            } else {
+                String::from_utf8_lossy(&o.stdout).into_owned()
+            };
+            let lines: Vec<String> = text.lines().map(strip_ansi).collect();
+            if lines.is_empty() {
+                vec!["(no changes)".into()]
+            } else {
+                lines
+            }
+        }
+        Err(e) => vec![format!("(diff failed: {e})")],
+    }
 }
 
 pub(crate) fn strip_ansi(s: &str) -> String {
@@ -348,7 +367,9 @@ pub(crate) fn strip_ansi(s: &str) -> String {
                 chars.next();
                 // consume until a letter terminator
                 for ch in chars.by_ref() {
-                    if ch.is_ascii_alphabetic() { break; }
+                    if ch.is_ascii_alphabetic() {
+                        break;
+                    }
                 }
             }
         } else {
@@ -359,33 +380,15 @@ pub(crate) fn strip_ansi(s: &str) -> String {
 }
 
 fn fetch_tools() -> Vec<Tool> {
-    let out = match Command::new("dev")
-        .args(["tools", "--json"])
-        .stdin(Stdio::null())
-        .output()
-    {
-        Ok(o) => o,
-        Err(_) => return Vec::new(),
-    };
-    if let Ok(Value::Array(arr)) = serde_json::from_slice::<Value>(&out.stdout) {
-        return arr
-            .iter()
-            .filter_map(|t| {
-                let name = sget(t, "name")?;
-                let dispatchable = t
-                    .get("dispatchable")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
-                let review = t.get("review").and_then(|v| v.as_bool()).unwrap_or(false);
-                Some(Tool {
-                    name,
-                    dispatchable,
-                    review,
-                })
-            })
-            .collect();
-    }
-    Vec::new()
+    // In-process: the backend registry lives in dev-core (was `dev backends --json`).
+    dev_core::agent::BACKENDS
+        .iter()
+        .map(|t| Tool {
+            name: t.name.to_string(),
+            dispatchable: t.dispatchable,
+            review: t.review,
+        })
+        .collect()
 }
 
 fn fetch_agy_usage() -> Option<AgyUsage> {

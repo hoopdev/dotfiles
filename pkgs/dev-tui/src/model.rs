@@ -65,32 +65,6 @@ pub struct GitState {
     pub changes: i64,
 }
 
-/// Active main tab in the TUI.
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
-pub enum Tab {
-    #[default]
-    Agents,
-    TaskBoard,
-    Inbox,
-}
-
-impl Tab {
-    pub fn next(self) -> Self {
-        match self {
-            Tab::Agents => Tab::TaskBoard,
-            Tab::TaskBoard => Tab::Inbox,
-            Tab::Inbox => Tab::Agents,
-        }
-    }
-    pub fn label(self) -> &'static str {
-        match self {
-            Tab::Agents => "Agents",
-            Tab::TaskBoard => "Tasks",
-            Tab::Inbox => "Inbox",
-        }
-    }
-}
-
 pub fn status_rank(s: &str) -> u8 {
     match s {
         "waiting" => 0,
