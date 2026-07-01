@@ -9,7 +9,6 @@
   ];
 
   home.sessionVariables = {
-    # OneDrive = "/Users/ktaga/Library/CloudStorage/OneDrive-KyotoUniversity";
     USE_SYMENGINE = "1";
     OLLAMA_HOST = "0.0.0.0";
   };
@@ -47,8 +46,6 @@
           cat > ~/.op-secrets <<EOF
       export BRAVE_API_KEY=$(op read "op://Personal/BraveAPI/credential")
       export TELEGRAM_BOT_TOKEN=$(op read "op://Personal/Telegram/credential")
-      export GATEWAY_AUTH_TOKEN=$(op read "op://Personal/OpenclawGateway/credential")
-      export OPENROUTER_API_KEY=$(op read "op://Personal/Openrouter/credential")
       EOF
           chmod 600 ~/.op-secrets
         }
