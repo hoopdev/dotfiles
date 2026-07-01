@@ -888,6 +888,17 @@ fn supervised_prompt(task_id: &str, project: &str, user_task: &str) -> String {
     )
 }
 
+/// The canned prompt `dev agent review` / `dev task review` hand to a
+/// review-capable backend. `base` (when set) scopes the review to changes
+/// against that ref. Kept here so the CLI review command and the task review
+/// flow build byte-identical prompts.
+pub fn review_prompt(base: Option<&str>) -> String {
+    format!(
+        "Review the current changes{} for correctness bugs and concrete improvements. Be specific with file:line.",
+        base.map(|b| format!(" against {b}")).unwrap_or_default()
+    )
+}
+
 /// Launch a background agent and record it in `~/.dev/runs`. Returns
 /// `{id,target,tool,pid,session,branch,worktree,ok}`. Port of `_dev_dispatch`.
 pub fn dispatch(cfg: &Config, project: &str, opts: &DispatchOpts) -> anyhow::Result<Value> {

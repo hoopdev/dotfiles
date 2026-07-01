@@ -52,15 +52,15 @@ fn truncate_chars(s: &str, max: usize) -> String {
     s.chars().take(max).collect()
 }
 
-/// Launch a background agent via `dev agent dispatch` and return its run id.
+/// Launch a background agent in-process via [`dev_core::agent::dispatch`] and
+/// return its run id.
 ///
 /// This is the one bridge from the task store (`~/.dev/projects`) to the run
-/// registry (`~/.dev/runs`). It calls `dev agent dispatch … --backend <tool> …
-/// --json <prompt>` and parses the JSON receipt, so callers can (a) know whether
-/// the launch actually succeeded — instead of the old `let _ = cmd.status()`
-/// that flipped the task phase even when clap rejected the flags — and (b) record
-/// `links.run_id` back onto the task. `--json` also marks the call non-interactive
-/// so the CLI never pops an fzf backend/model picker into the caller's terminal.
+/// registry (`~/.dev/runs`). Callers launch first and only mutate task state
+/// (phase/links/events) when the launch actually succeeded, then record
+/// `links.run_id` back onto the task. `supervise` is `false`: the task already
+/// exists, so dispatch must not create a second one. (This replaced a
+/// `dev agent dispatch --json` self-subprocess.)
 fn spawn_dispatch(
     project_id: &str,
     tool: &str,
@@ -68,77 +68,20 @@ fn spawn_dispatch(
     model: Option<&str>,
     prompt: &str,
 ) -> Result<String, String> {
-    let mut cmd = std::process::Command::new("dev");
-    cmd.args(["agent", "dispatch", project_id, "--backend", tool]);
-    if let Some(w) = worktree {
-        cmd.args(["--worktree", w]);
+    let cfg = dev_core::config::Config::load_or_default();
+    let opts = dev_core::agent::DispatchOpts {
+        backend: tool,
+        task: prompt,
+        model,
+        effort: None,
+        sandbox: None,
+        worktree,
+        supervise: false,
+    };
+    match dev_core::agent::dispatch(&cfg, project_id, &opts) {
+        Ok(v) => Ok(vs(&v, "id")),
+        Err(e) => Err(format!("{e:#}")),
     }
-    if let Some(m) = model {
-        cmd.args(["--model", m]);
-    }
-    // `--json` (a global flag) must precede the trailing-var-arg prompt.
-    cmd.arg("--json");
-    cmd.arg(prompt);
-    let out = cmd
-        .stdin(std::process::Stdio::null())
-        .output()
-        .map_err(|e| format!("could not run dev agent dispatch: {e}"))?;
-    if !out.status.success() {
-        let err = String::from_utf8_lossy(&out.stderr);
-        let first = err
-            .lines()
-            .map(str::trim)
-            .find(|l| !l.is_empty())
-            .unwrap_or("dispatch failed");
-        return Err(first.to_string());
-    }
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    let v: Value = serde_json::from_str(stdout.trim())
-        .map_err(|e| format!("could not parse dispatch receipt: {e}"))?;
-    if v.get("ok").and_then(|x| x.as_bool()) != Some(true) {
-        return Err(v
-            .get("error")
-            .and_then(|x| x.as_str())
-            .unwrap_or("dispatch reported failure")
-            .to_string());
-    }
-    Ok(vs(&v, "id"))
-}
-
-fn review_recommendation(output: &str, ok: bool) -> &'static str {
-    if !ok {
-        return "failed";
-    }
-
-    let lower = output.to_lowercase();
-    if lower.contains("needs_fix") || lower.contains("needs fix") || lower.contains("needs-fix") {
-        return "needs_fix";
-    }
-    if lower.contains("reject") || lower.contains("rejected") {
-        return "reject";
-    }
-
-    let mergeable_negated = [
-        "not mergeable",
-        "isn't mergeable",
-        "is not mergeable",
-        "not yet mergeable",
-        "not ready to merge",
-        "should not merge",
-    ]
-    .iter()
-    .any(|needle| lower.contains(needle));
-    if !mergeable_negated
-        && (lower.contains("recommendation: mergeable")
-            || lower.contains("recommendation\": \"mergeable")
-            || lower.contains("→ mergeable")
-            || lower.contains("no findings")
-            || lower.contains("no issues found"))
-    {
-        return "mergeable";
-    }
-
-    "unknown"
 }
 
 // ── clap subcommand tree ──────────────────────────────────────────────────────
@@ -705,7 +648,7 @@ fn cmd_answer(
             let v = read_task_json(&tdir);
             let project_id = vs(&v, "project_id");
             let phase = vs(&v, "phase");
-            if remaining == 0 && phase == "needs_spec" {
+            if dev_core::task_service::phase_after_answer(remaining, &phase).is_some() {
                 task_phase_set(&tdir, "planning", "dev", "blocking questions resolved").ok();
                 if json_out {
                     json_ok(
@@ -780,11 +723,7 @@ fn cmd_write_plan(
     });
 
     let remaining = blocking_questions_open(&pdir, &task_id);
-    let new_phase = if remaining > 0 {
-        "needs_spec"
-    } else {
-        "planned"
-    };
+    let new_phase = dev_core::task_service::phase_after_plan(remaining);
     task_phase_set(&tdir, new_phase, "agent", "plan written").unwrap_or_else(|e| {
         eprintln!("error: {e}");
         std::process::exit(1);
@@ -911,20 +850,7 @@ fn cmd_plan(
     let v = read_task_json(&tdir);
     let project_id = vs(&v, "project_id");
 
-    let prompt = format!(
-        "You are planning dev task {task_id} for project {project_id}.\n\n\
-         Rules:\n\
-         - Do not edit files.\n\
-         - Read the shared task context: dev task context {task_id} --markdown\n\
-         - If behavior, scope, compatibility, API, UX, migration, release, or validation is ambiguous, run:\n\
-             dev task ask {task_id} \"<question>\" --category <category> --severity blocking\n\
-           and stop.\n\
-         - If there are no blocking questions, write the plan:\n\
-             dev task write-plan {task_id}\n\
-         - The plan must include: understanding, proposed behavior, files to touch, \
-         files not to touch, implementation steps, validation, risks, rollback.\n\
-         - Do not implement until the task is approved."
-    );
+    let prompt = dev_core::task_service::plan_prompt(&task_id, &project_id);
 
     // Launch first; only transition the task if the agent actually started.
     let run_id = match spawn_dispatch(&project_id, &tool, None, model.as_deref(), &prompt) {
@@ -1011,20 +937,7 @@ fn cmd_dispatch(
     let wt_branch = worktree
         .unwrap_or_else(|| format!("task/{}", task_id.to_lowercase().replace(['_', ' '], "-")));
 
-    let prompt = format!(
-        "You are implementing approved dev task {task_id} for project {project_id}.\n\n\
-         Rules:\n\
-         - Read `dev task context {task_id} --markdown`.\n\
-         - Implement only the approved plan.\n\
-         - Do not broaden scope.\n\
-         - If the approved plan is insufficient, run:\n\
-             dev task ask {task_id} \"<question>\" --category <category> --severity blocking\n\
-           and stop.\n\
-         - Run the declared validation commands when feasible.\n\
-         - At the end, write a handoff:\n\
-             dev task write-handoff {task_id}\n\
-           Include: changed files, tests run, results, risks, follow-up."
-    );
+    let prompt = dev_core::task_service::dispatch_prompt(&task_id, &project_id);
 
     // Launch first; only mutate task state if the agent actually started.
     let run_id = match spawn_dispatch(
@@ -1137,9 +1050,8 @@ fn cmd_kill(task_id: Option<String>, json_out: bool) -> anyhow::Result<()> {
     });
     let v = read_task_json(&tdir);
     let project_id = vs(&v, "project_id");
-    let _ = std::process::Command::new("dev")
-        .args(["agent", "kill", &project_id])
-        .status();
+    let cfg = dev_core::config::Config::load_or_default();
+    let _ = dev_core::agent::kill(&cfg, &project_id);
     event_append(&tdir, "task_killed", "human", "agent killed", None).ok();
     task_phase_set(&tdir, "killed", "human", "agent killed").ok();
     if json_out {
@@ -1189,11 +1101,7 @@ fn cmd_write_handoff(
     });
 
     let remaining = blocking_questions_open(&pdir, &task_id);
-    let new_phase = if remaining > 0 {
-        "needs_spec"
-    } else {
-        "review"
-    };
+    let new_phase = dev_core::task_service::phase_after_handoff(remaining);
     task_phase_set(&tdir, new_phase, "agent", "handoff written").ok();
 
     if json_out {
@@ -1253,45 +1161,26 @@ fn cmd_harvest(task_id: Option<String>, json_out: bool) -> anyhow::Result<()> {
     let v = read_task_json(&tdir);
     let project_id = vs(&v, "project_id");
 
-    // Try git2 if worktree_path is set
+    // Diff HEAD..workdir with git2 — prefer the recorded worktree_path, else the
+    // project's local checkout resolved via config. (Replaced a `dev git diff
+    // <project> --json` self-subprocess; a remote project, which git2 cannot read
+    // from the control machine, now yields an empty file list.)
     let files = {
         let wt_path = vs(&v, "worktree_path");
-        if !wt_path.is_empty() {
-            let path = std::path::Path::new(&wt_path);
-            dev_core::git::diff_head_to_workdir(path)
-                .ok()
-                .map(|r| r.files)
+        let repo_path = if !wt_path.is_empty() {
+            Some(std::path::PathBuf::from(wt_path))
         } else {
-            None
-        }
-    };
-
-    let files = if let Some(f) = files {
-        f
-    } else {
-        // Fallback: call dev git diff --json
-        let diff_output = std::process::Command::new("dev")
-            .args(["git", "diff", &project_id, "--json"])
-            .output()
-            .ok()
-            .and_then(|o| String::from_utf8(o.stdout).ok())
-            .unwrap_or_default();
-
-        if let Ok(diff_v) = serde_json::from_str::<Value>(&diff_output) {
-            if let Some(arr) = diff_v.get("files").and_then(|x| x.as_array()) {
-                arr.iter()
-                    .filter_map(|f| {
-                        f.get("path")
-                            .and_then(|x| x.as_str())
-                            .map(|s| s.to_string())
-                    })
-                    .collect()
-            } else {
-                Vec::new()
+            match dev_core::config::Config::load_or_default().resolve(&project_id) {
+                Some(dev_core::config::Target::Local { path, .. }) => {
+                    Some(std::path::PathBuf::from(path))
+                }
+                _ => None,
             }
-        } else {
-            Vec::new()
-        }
+        };
+        repo_path
+            .and_then(|p| dev_core::git::diff_head_to_workdir(&p).ok())
+            .map(|r| r.files)
+            .unwrap_or_default()
     };
 
     // Update task.json summary
@@ -1348,6 +1237,10 @@ fn cmd_diff(task_id: Option<String>, stat: bool, json_out: bool) -> anyhow::Resu
     });
     let v = read_task_json(&tdir);
     let project_id = vs(&v, "project_id");
+    // NOTE: kept as a subprocess — this is a terminal/pager passthrough. `.status()`
+    // inherits stdio so git can page the diff for the user; there is no in-process
+    // git-diff *printer* in dev-core (only file-list helpers), so this is a display
+    // handoff, not a data call.
     let mut cmd = std::process::Command::new("dev");
     cmd.args(["git", "diff", &project_id]);
     if stat {
@@ -1409,14 +1302,11 @@ fn cmd_test(
     let mut passed = 0usize;
     let mut failed = 0usize;
     for c in &cmds {
-        let out = std::process::Command::new("dev")
-            .args(["run", &project_id, c])
-            .output();
-        let (ok, output) = match out {
-            Ok(o) => (
-                o.status.success(),
-                String::from_utf8_lossy(&o.stdout).to_string()
-                    + &String::from_utf8_lossy(&o.stderr),
+        let (ok, output) = match super::run::run_one(&project_id, c, 120) {
+            Ok(v) => (
+                v.get("ok").and_then(|x| x.as_bool()).unwrap_or(false),
+                v.get("stdout").and_then(|x| x.as_str()).unwrap_or("").to_string()
+                    + v.get("stderr").and_then(|x| x.as_str()).unwrap_or(""),
             ),
             Err(e) => (false, e.to_string()),
         };
@@ -1429,13 +1319,7 @@ fn cmd_test(
             .push(serde_json::json!({"cmd": c, "ok": ok, "output": truncate_chars(&output, 500)}));
     }
 
-    let test_status = if failed == 0 {
-        "passed"
-    } else if passed == 0 {
-        "failed"
-    } else {
-        "partial"
-    };
+    let test_status = dev_core::task_service::test_status(passed, failed);
     let ts = now_iso();
     let result_json = serde_json::json!({
         "id": vid, "task_id": task_id, "commands": cmds,
@@ -1450,7 +1334,11 @@ fn cmd_test(
     let json_path = tdir.join("task.json");
     if let Ok(content) = std::fs::read_to_string(&json_path) {
         if let Ok(mut tv) = serde_json::from_str::<Value>(&content) {
-            tv["summary"]["test_status"] = serde_json::json!(test_status);
+            dev_core::task_service::set_summary_field(
+                &mut tv,
+                "test_status",
+                serde_json::json!(test_status),
+            );
             tv["updated_at"] = serde_json::json!(now_iso());
             let _ = std::fs::write(&json_path, serde_json::to_string_pretty(&tv)?);
         }
@@ -1490,21 +1378,43 @@ fn cmd_review(task_id: Option<String>, tool: Option<String>, json_out: bool) -> 
     let v = read_task_json(&tdir);
     let project_id = vs(&v, "project_id");
 
-    let mut cmd = std::process::Command::new("dev");
-    cmd.args(["agent", "review", &project_id]);
-    if let Some(t) = &tool {
-        cmd.args(["--backend", t]);
-    }
-    let out = cmd.output().unwrap_or_else(|e| {
-        eprintln!("error: {e}");
-        std::process::exit(1);
-    });
-    let review_ok = out.status.success();
-    let review_exit = out.status.code().unwrap_or(1);
-    let output =
-        String::from_utf8_lossy(&out.stdout).to_string() + &String::from_utf8_lossy(&out.stderr);
+    // Dispatch a review agent in-process (was a `dev agent review` self-subprocess,
+    // itself a background dispatch). Reconstruct the same receipt text the
+    // subprocess printed and this command captured, so the recorded review
+    // artifact and JSON stay shaped as before.
+    let cfg = dev_core::config::Config::load_or_default();
+    let backend = tool
+        .clone()
+        .unwrap_or_else(|| dev_core::agent::default_backend(&cfg, &project_id, None));
+    let prompt = dev_core::agent::review_prompt(None);
+    let opts = dev_core::agent::DispatchOpts {
+        backend: &backend,
+        task: &prompt,
+        model: None,
+        effort: None,
+        sandbox: None,
+        worktree: None,
+        supervise: false,
+    };
+    let (review_ok, review_exit, output) = match dev_core::agent::dispatch(&cfg, &project_id, &opts) {
+        Ok(v) => {
+            let id = v.get("id").and_then(|x| x.as_str()).unwrap_or("?");
+            let pid_note = v
+                .get("pid")
+                .and_then(|x| x.as_str())
+                .filter(|p| !p.is_empty())
+                .map(|p| format!(" pid={p}"))
+                .unwrap_or_default();
+            (
+                true,
+                0,
+                format!("dispatched {id} on {project_id} (backend={backend}{pid_note})\n"),
+            )
+        }
+        Err(e) => (false, 1, format!("dev agent dispatch: {e:#}\n")),
+    };
 
-    let recommendation = review_recommendation(&output, review_ok);
+    let recommendation = dev_core::task_service::review_recommendation(&output, review_ok);
 
     let reviews_dir = tdir.join("reviews");
     let rid = next_review_id_in(&reviews_dir).unwrap_or_else(|_| "R-unknown".to_string());
@@ -1543,18 +1453,17 @@ fn cmd_review(task_id: Option<String>, tool: Option<String>, json_out: bool) -> 
     let json_path = tdir.join("task.json");
     if let Ok(content) = std::fs::read_to_string(&json_path) {
         if let Ok(mut tv) = serde_json::from_str::<Value>(&content) {
-            tv["summary"]["review_status"] = serde_json::json!(recommendation);
+            dev_core::task_service::set_summary_field(
+                &mut tv,
+                "review_status",
+                serde_json::json!(recommendation),
+            );
             tv["updated_at"] = serde_json::json!(now_iso());
             let _ = std::fs::write(&json_path, serde_json::to_string_pretty(&tv)?);
         }
     }
     let old_phase = vs(&v, "phase");
-    let new_phase = match recommendation {
-        "reject" => "rejected",
-        "needs_fix" => "needs_fix",
-        "mergeable" => "mergeable",
-        _ => &old_phase,
-    };
+    let new_phase = dev_core::task_service::phase_after_review(recommendation, &old_phase);
     if new_phase != old_phase {
         task_phase_set(
             &tdir,
@@ -1615,15 +1524,7 @@ fn cmd_fix(
     }
     let wt_branch = vs(&v, "worktree_branch");
 
-    let prompt = format!(
-        "You are fixing dev task {task_id} (phase: needs_fix) for project {project_id}.\n\n\
-         Rules:\n\
-         - Read `dev task context {task_id} --markdown` for the approved plan.\n\
-         - Read `dev task handoff {task_id} --markdown` for the last handoff and review feedback.\n\
-         - Fix only the reported issues. Do not change unrelated code.\n\
-         - Run declared validation commands.\n\
-         - At the end, write a new handoff: dev task write-handoff {task_id}"
-    );
+    let prompt = dev_core::task_service::fix_prompt(&task_id, &project_id);
 
     let wt = (!wt_branch.is_empty()).then_some(wt_branch.as_str());
     let run_id = match spawn_dispatch(&project_id, &tool, wt, model.as_deref(), &prompt) {
@@ -1697,22 +1598,23 @@ fn cmd_pr(
         std::process::exit(1);
     }
 
-    let mut cmd = std::process::Command::new("dev");
-    cmd.args(["git", "pr", &project_id, "--base", &base]);
-    if let Some(t) = &title {
-        cmd.args(["--title", t]);
-    }
-    if draft {
-        cmd.arg("--draft");
-    }
-    if json_out {
-        cmd.arg("--json");
-    }
-    let out = cmd.output().unwrap_or_else(|e| {
-        eprintln!("error: {e}");
-        std::process::exit(1);
-    });
-    let output = String::from_utf8_lossy(&out.stdout).to_string();
+    // Create the PR in-process (was a `dev git pr` self-subprocess). Rebuild the
+    // exact stdout the subprocess produced — the `--json` receipt or the raw
+    // git/gh output — so URL extraction and the echoed output are unchanged.
+    let cfg = dev_core::config::Config::load_or_default();
+    let (pr_ok, pr_url, raw_out) =
+        super::git::pr_capture(&cfg, &project_id, title.as_deref(), Some(base.as_str()), draft);
+    let output = if json_out {
+        format!(
+            "{}\n",
+            serde_json::to_string(
+                &serde_json::json!({ "target": project_id, "ok": pr_ok, "url": pr_url })
+            )
+            .unwrap_or_default()
+        )
+    } else {
+        raw_out
+    };
 
     // Extract PR URL
     let url: String = output
@@ -1722,15 +1624,8 @@ fn cmd_pr(
         .unwrap_or("")
         .to_string();
 
-    // Update task.json
-    let json_path = tdir.join("task.json");
-    if let Ok(content) = std::fs::read_to_string(&json_path) {
-        if let Ok(mut tv) = serde_json::from_str::<Value>(&content) {
-            tv["links"]["pr_url"] = serde_json::json!(url);
-            tv["updated_at"] = serde_json::json!(now_iso());
-            let _ = std::fs::write(&json_path, serde_json::to_string_pretty(&tv)?);
-        }
-    }
+    // Update task.json (links.pr_url + updated_at, atomically via the store).
+    task_set_link(&tdir, "pr_url", serde_json::json!(url)).ok();
     event_append(
         &tdir,
         "pr_created",
