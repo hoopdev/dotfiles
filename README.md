@@ -150,7 +150,8 @@ A unified development environment is available via `nix develop`.
 │   ├── nixos.nix             # nixosConfigurations (auto-built from hosts/*/meta.nix)
 │   ├── darwin.nix            # darwinConfigurations
 │   ├── home.nix              # homeConfigurations (standalone home-manager)
-│   └── per-system.nix        # devShells, formatter, treefmt
+│   ├── per-system.nix        # devShells, formatter, treefmt
+│   └── dev.nix               # re-exports the standalone dev fleet-tool flake
 ├── modules/nixos/             # Self-exported NixOS modules
 │   ├── default.nix           # Aggregate (imports the three below)
 │   ├── nix-ld.nix            # nix-ld for unpatched binaries
@@ -201,6 +202,7 @@ Each `hosts/<name>/meta.nix` declares `{ type, system?, users?, configFrom? }`; 
 | wezterm | Terminal emulator |
 | flake-parts | Modular flake structure |
 | treefmt-nix | Multi-formatter integration (nixfmt + statix + deadnix) |
+| dev | Standalone `dev` fleet tool; builds on both systems, installed via `home/mac` only. Consumed from `~/git/dev` |
 
 ### Platform-Specific Features
 

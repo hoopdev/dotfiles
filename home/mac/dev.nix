@@ -1,4 +1,5 @@
 {
+  inputs,
   pkgs,
   lib,
   ...
@@ -11,7 +12,7 @@ let
   # local.zsh (untracked) holds only the secrets these wrappers source:
   # TELEGRAM_* for `dev notify`, LLM_CF_TOKEN for opencode. Fleet topology
   # (envs / local / remote projects) lives in ~/.config/dev/config.toml, managed
-  # by `dev config` (see pkgs/dev-core); migrate old DEV_* arrays with
+  # by `dev config`; migrate old DEV_* arrays with
   # `dev config import`.
   localZsh = "$HOME/.config/zsh/local.zsh";
 
@@ -32,17 +33,16 @@ let
     fi
   '';
 
-  # dev-cli (`dev`), dev-tui (`dev tui`) and dev-zellij (`dev board`, Wasm) build
-  # definitions live in pkgs/default.nix — the single source of truth, also
-  # exposed as flake packages by flake-modules/rust.nix (`nix build .#dev`).
-  devPkgs = import ../../pkgs { inherit pkgs; };
+  # dev-cli (`dev`), dev-tui (`dev tui`) and dev-zellij (`dev board`, Wasm)
+  # are built by the standalone dev flake and consumed here as packages.
+  devPkgs = inputs.dev.packages.${pkgs.stdenv.hostPlatform.system};
   inherit (devPkgs) dev-tui dev-zellij;
 
-  # `dev` is the Rust binary (pkgs/dev-cli). This thin wrapper only sets up the
-  # runtime env the binary expects — the SSH agent socket and secrets sourced
-  # from local.zsh (Telegram token) — then execs it. All fleet logic (target
-  # resolution, SSH, git, agent lifecycle, TUI/board data) lives in Rust; see
-  # pkgs/dev-core and pkgs/dev-cli.
+  # `dev` is the Rust binary from the standalone dev flake. This thin wrapper
+  # only sets up the runtime env the binary expects — the SSH agent socket and
+  # secrets sourced from local.zsh (Telegram token) — then execs it. All fleet
+  # logic (target resolution, SSH, git, agent lifecycle, TUI/board data) lives
+  # in Rust, in the dev repo.
   devCmd = pkgs.writeShellScriptBin "dev" ''
     ${loadConfig}
     exec ${devPkgs.dev-cli}/bin/dev "$@"

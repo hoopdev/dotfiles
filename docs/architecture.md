@@ -4,7 +4,7 @@
 
 - **flake.nix**: Thin entry point — calls `flake-parts.lib.mkFlake` and imports modules from `flake-modules/`
 - **flake-modules/**: Per-subsystem flake-parts modules (the real outputs live here)
-- **Inputs**: flake-parts, treefmt-nix, home-manager, nix-darwin, nixos-hardware, nixos-wsl, stylix, hyprland, hyprpanel, xremap, wezterm, nixvim
+- **Inputs**: nixpkgs, flake-parts, treefmt-nix, home-manager, nix-darwin, nixos-hardware, nixos-wsl, stylix, hyprland, hyprpanel, xremap, wezterm, nixvim, dev (standalone fleet tool)
 
 ## Directory Layout
 
@@ -17,7 +17,7 @@
 │   ├── darwin.nix            # darwinConfigurations
 │   ├── home.nix              # homeConfigurations (standalone home-manager)
 │   ├── per-system.nix        # devShells, formatter, treefmt
-│   └── rust.nix              # flake packages for the pkgs/ dev tool (dev / dev-tui / dev-zellij)
+│   └── dev.nix               # re-exports packages from the standalone dev flake
 ├── modules/nixos/             # Self-exported NixOS modules
 │   ├── default.nix           # Kitchen-sink (imports the three below)
 │   ├── nix-ld.nix            # nix-ld for unpatched binaries
@@ -78,6 +78,7 @@ Each `hosts/<name>/meta.nix` declares `{ type, system?, users?, configFrom? }`; 
 | nix-ld | Run unpatched binaries on NixOS (uv, Python wheels) |
 | 1Password CLI | Secret management |
 | Chezmoi | Supplementary dotfile sync for non-Nix environments |
+| dev | Standalone fleet tool flake consumed from `~/git/dev` (installed on macOS via `home/mac`) |
 
 ## Development Shell (`nix develop`)
 

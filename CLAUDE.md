@@ -2,7 +2,7 @@
 
 Nix Flakes dotfiles. NixOS / macOS (nix-darwin) / standalone home-manager.
 
-Apply changes with `nh {os,darwin,home} switch` — full command reference (apply, bootstrap, maintenance, Rust workspace) in [docs/commands.md](docs/commands.md).
+Apply changes with `nh {os,darwin,home} switch` — full command reference (apply, bootstrap, maintenance, dev fleet tool) in [docs/commands.md](docs/commands.md).
 
 ## Design Guidelines
 

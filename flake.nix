@@ -32,6 +32,10 @@
       url = "github:nix-community/nixvim";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    dev = {
+      url = "path:/Users/ktaga/git/dev";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     nixos-wsl.url = "github:nix-community/nixos-wsl";
     hyprland.url = "github:hyprwm/Hyprland";
     xremap.url = "github:xremap/nix-flake";
@@ -52,7 +56,7 @@
         ./flake-modules/darwin.nix
         ./flake-modules/home.nix
         ./flake-modules/per-system.nix
-        ./flake-modules/rust.nix
+        ./flake-modules/dev.nix
       ];
     };
 }

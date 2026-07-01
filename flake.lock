@@ -116,6 +116,23 @@
         "type": "github"
       }
     },
+    "dev": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1782927931,
+        "narHash": "sha256-RzcaKgLg0d2+3WMz5ll2cOT4pbGGTuq44V/fyfyUS70=",
+        "path": "/Users/ktaga/git/dev",
+        "type": "path"
+      },
+      "original": {
+        "path": "/Users/ktaga/git/dev",
+        "type": "path"
+      }
+    },
     "firefox-gnome-theme": {
       "flake": false,
       "locked": {
@@ -1003,6 +1020,7 @@
     },
     "root": {
       "inputs": {
+        "dev": "dev",
         "flake-parts": "flake-parts",
         "home-manager": "home-manager",
         "hyprland": "hyprland",

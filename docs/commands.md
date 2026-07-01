@@ -25,12 +25,19 @@ nh clean all --keep 5 --keep-since 7d   # GC (user + system)
 nix develop                             # Dev shell (Python + Nix tools)
 ```
 
-## Rust workspace (`pkgs/`)
+## dev fleet tool (`~/git/dev`)
 
-`dev-core` / `dev-cli` / `dev-tui` / `dev-zellij` — see
-[dev-rust-workspace.md](dev-rust-workspace.md).
+The `dev` Rust workspace (`dev-core` / `dev-cli` / `dev-tui` / `dev-zellij`) was
+extracted to its own flake. dotfiles consumes it via the `dev` flake input and
+installs it in `home/mac/dev.nix`; `flake-modules/dev.nix` also re-exports it.
 
 ```bash
-nix develop .#rust -c just -f pkgs/justfile ci   # cargo check + test
-nix develop .#rust -c cargo <cmd> ...            # lean Rust toolchain shell
+# Build from dotfiles (uses the pinned input):
+nix build .#dev                          # dev CLI (also .#dev-tui / .#dev-zellij)
+nix flake update dev                      # pull latest dev into dotfiles' lock
+
+# Iterate on the workspace itself (toolchain lives in the dev repo's `rust` shell):
+cd ~/git/dev
+nix develop .#rust -c just ci             # cargo check + test
+nix develop .#rust -c cargo <cmd> ...     # lean Rust toolchain shell
 ```
