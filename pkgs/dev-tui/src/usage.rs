@@ -31,11 +31,16 @@ fn fetch_via_api() -> Option<ClaudeUsage> {
     let out = Command::new("curl")
         .args([
             "-s",
-            "--max-time", "8",
-            "-H", &format!("Authorization: Bearer {token}"),
-            "-H", "anthropic-beta: oauth-2025-04-20",
-            "-H", &format!("User-Agent: claude-code/{version}"),
-            "-H", "Content-Type: application/json",
+            "--max-time",
+            "8",
+            "-H",
+            &format!("Authorization: Bearer {token}"),
+            "-H",
+            "anthropic-beta: oauth-2025-04-20",
+            "-H",
+            &format!("User-Agent: claude-code/{version}"),
+            "-H",
+            "Content-Type: application/json",
             "https://api.anthropic.com/api/oauth/usage",
         ])
         .output()
@@ -48,19 +53,23 @@ fn fetch_via_api() -> Option<ClaudeUsage> {
     let v: Value = serde_json::from_slice(&out.stdout).ok()?;
 
     // API returns utilization as f64 percentage (0–100); resets_at as ISO 8601 string.
-    let five_hour_pct = v.pointer("/five_hour/utilization")
+    let five_hour_pct = v
+        .pointer("/five_hour/utilization")
         .and_then(|x| x.as_f64())
         .map(|f| f.round() as u32);
 
-    let seven_day_pct = v.pointer("/seven_day/utilization")
+    let seven_day_pct = v
+        .pointer("/seven_day/utilization")
         .and_then(|x| x.as_f64())
         .map(|f| f.round() as u32);
 
-    let five_hour_resets_at = v.pointer("/five_hour/resets_at")
+    let five_hour_resets_at = v
+        .pointer("/five_hour/resets_at")
         .and_then(|x| x.as_str())
         .and_then(parse_iso8601);
 
-    let seven_day_resets_at = v.pointer("/seven_day/resets_at")
+    let seven_day_resets_at = v
+        .pointer("/seven_day/resets_at")
         .and_then(|x| x.as_str())
         .and_then(parse_iso8601);
 
@@ -80,7 +89,12 @@ fn read_oauth_token() -> Option<String> {
     #[cfg(target_os = "macos")]
     {
         let out = Command::new("security")
-            .args(["find-generic-password", "-s", "Claude Code-credentials", "-w"])
+            .args([
+                "find-generic-password",
+                "-s",
+                "Claude Code-credentials",
+                "-w",
+            ])
             .output()
             .ok()?;
         if out.status.success() {
@@ -154,10 +168,7 @@ fn unix_now_secs() -> Option<i64> {
 
 fn usage_pct(window: Option<&Value>, now: Option<i64>) -> Option<u32> {
     let window = window?;
-    if let (Some(reset_at), Some(now)) = (
-        window.get("resets_at").and_then(|v| v.as_i64()),
-        now,
-    ) {
+    if let (Some(reset_at), Some(now)) = (window.get("resets_at").and_then(|v| v.as_i64()), now) {
         if reset_at <= now {
             return Some(0);
         }
@@ -224,7 +235,7 @@ fn parse_iso8601(s: &str) -> Option<i64> {
 }
 
 fn days_since_epoch(y: i64, m: i64, d: i64) -> Option<i64> {
-    if m < 1 || m > 12 || d < 1 || d > 31 {
+    if !(1..=12).contains(&m) || !(1..=31).contains(&d) {
         return None;
     }
     // Shift months so March = 1, making Feb the last month (handles leap day cleanly)
@@ -304,8 +315,14 @@ impl UsageHistory {
             if let Ok(v) = serde_json::from_str::<Value>(line) {
                 history.samples.push(UsageSample {
                     timestamp: v.get("timestamp").and_then(|x| x.as_i64()).unwrap_or(0),
-                    claude_5h: v.get("claude_5h").and_then(|x| x.as_u64()).map(|x| x as u32),
-                    claude_7d: v.get("claude_7d").and_then(|x| x.as_u64()).map(|x| x as u32),
+                    claude_5h: v
+                        .get("claude_5h")
+                        .and_then(|x| x.as_u64())
+                        .map(|x| x as u32),
+                    claude_7d: v
+                        .get("claude_7d")
+                        .and_then(|x| x.as_u64())
+                        .map(|x| x as u32),
                     codex_5h: v.get("codex_5h").and_then(|x| x.as_u64()).map(|x| x as u32),
                     codex_7d: v.get("codex_7d").and_then(|x| x.as_u64()).map(|x| x as u32),
                     agy_pct: v.get("agy_pct").and_then(|x| x.as_u64()).map(|x| x as u32),

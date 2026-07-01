@@ -3,6 +3,9 @@
 
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "config")]
+use serde_json::{json, Value};
+
 /// Open a git repository, searching parent dirs if needed.
 pub fn repo_open(path: &Path) -> Result<git2::Repository, git2::Error> {
     git2::Repository::discover(path)
@@ -46,7 +49,9 @@ pub fn diff_head_to_workdir(repo_path: &Path) -> Result<DiffResult, git2::Error>
             }
             true
         },
-        None, None, None,
+        None,
+        None,
+        None,
     )?;
     files.sort();
     files.dedup();
@@ -60,11 +65,7 @@ pub fn diff_head_to_workdir(repo_path: &Path) -> Result<DiffResult, git2::Error>
 
 /// Diff between two branches/refs (e.g., "main" and "task/feat-x").
 /// Returns changed files and stats.
-pub fn diff_refs(
-    repo_path: &Path,
-    base: &str,
-    head: &str,
-) -> Result<DiffResult, git2::Error> {
+pub fn diff_refs(repo_path: &Path, base: &str, head: &str) -> Result<DiffResult, git2::Error> {
     let repo = repo_open(repo_path)?;
     let base_obj = repo.revparse_single(base)?;
     let head_obj = repo.revparse_single(head)?;
@@ -83,7 +84,9 @@ pub fn diff_refs(
             }
             true
         },
-        None, None, None,
+        None,
+        None,
+        None,
     )?;
     files.sort();
     files.dedup();
@@ -135,11 +138,9 @@ fn read_worktree_branch(wt_path: &Path) -> Option<String> {
     };
     let content = std::fs::read_to_string(&head_path).ok()?;
     let content = content.trim();
-    if let Some(branch) = content.strip_prefix("ref: refs/heads/") {
-        Some(branch.to_string())
-    } else {
-        None
-    }
+    content
+        .strip_prefix("ref: refs/heads/")
+        .map(|branch| branch.to_string())
 }
 
 /// Get the current branch name at `repo_path`.
@@ -158,4 +159,135 @@ pub fn head_sha(repo_path: &Path) -> Result<String, git2::Error> {
     let head = repo.head()?;
     let oid = head.peel_to_commit()?.id();
     Ok(format!("{:.8}", oid))
+}
+
+// ── status (branch / head oneline / dirty count) ────────────────────────────
+
+/// A one-glance git summary — the bash `dev git status` fields.
+pub struct GitStatus {
+    pub branch: String,
+    /// `<short-sha> <summary>` (git's `log --oneline -1`).
+    pub head: String,
+    /// Number of `git status --short` entries.
+    pub changes: i64,
+}
+
+fn head_oneline(repo: &git2::Repository) -> Option<String> {
+    let head = repo.head().ok()?;
+    let commit = head.peel_to_commit().ok()?;
+    let short = commit.as_object().short_id().ok()?;
+    let short = short.as_str().unwrap_or("").to_string();
+    let summary = commit.summary().unwrap_or("");
+    Some(format!("{short} {summary}").trim_end().to_string())
+}
+
+fn count_changes(repo: &git2::Repository) -> Result<i64, git2::Error> {
+    let mut opts = git2::StatusOptions::new();
+    opts.include_untracked(true)
+        .include_ignored(false)
+        .recurse_untracked_dirs(false);
+    let statuses = repo.statuses(Some(&mut opts))?;
+    Ok(statuses
+        .iter()
+        .filter(|e| e.status() != git2::Status::CURRENT)
+        .count() as i64)
+}
+
+/// Local git summary via git2 (branch, head oneline, dirty count).
+pub fn status_local(repo_path: &Path) -> Result<GitStatus, git2::Error> {
+    let repo = repo_open(repo_path)?;
+    let branch = if repo.head_detached().unwrap_or(false) {
+        String::new()
+    } else {
+        repo.head()
+            .ok()
+            .and_then(|h| h.shorthand().map(|s| s.to_string()))
+            .unwrap_or_default()
+    };
+    Ok(GitStatus {
+        branch,
+        head: head_oneline(&repo).unwrap_or_default(),
+        changes: count_changes(&repo).unwrap_or(0),
+    })
+}
+
+/// Remote git summary over SSH (bash/zsh remotes; pwsh/nu handled by the
+/// windows module). Mirrors the bash `_dev_remote_git_summary` unix path.
+#[cfg(feature = "config")]
+pub fn status_remote(env: &crate::config::Env, rp: &str) -> Option<GitStatus> {
+    #[cfg(feature = "windows")]
+    if env.is_windows() {
+        return crate::windows::git_summary(env, rp).map(|(branch, head, changes)| GitStatus {
+            branch,
+            head,
+            changes,
+        });
+    }
+    let script = "echo \"B:$(git branch --show-current 2>/dev/null)\"; \
+                  echo \"H:$(git log --oneline -1 2>/dev/null)\"; \
+                  echo \"C:$(git status --short 2>/dev/null | wc -l | tr -d ' ')\"";
+    let out = crate::ssh::exec_stdout(env, rp, script)?;
+    let mut st = GitStatus {
+        branch: String::new(),
+        head: String::new(),
+        changes: 0,
+    };
+    for line in out.lines() {
+        if let Some(b) = line.strip_prefix("B:") {
+            st.branch = b.to_string();
+        } else if let Some(h) = line.strip_prefix("H:") {
+            st.head = h.to_string();
+        } else if let Some(c) = line.strip_prefix("C:") {
+            st.changes = c.trim().parse().unwrap_or(0);
+        }
+    }
+    Some(st)
+}
+
+/// `{target,kind,ok,branch,head,changes}` for one target — the
+/// `dev git status --json` row schema (kind is `local`|`remote`|`env`).
+#[cfg(feature = "config")]
+pub fn status_for_target(cfg: &crate::config::Config, name: &str) -> Value {
+    use crate::config::Target;
+    match cfg.resolve(name) {
+        Some(Target::Local { path, .. }) => match status_local(Path::new(&path)) {
+            Ok(st) => json!({"target": name, "kind": "local", "ok": true,
+                             "branch": st.branch, "head": st.head, "changes": st.changes}),
+            Err(_) => json!({"target": name, "kind": "local", "ok": true,
+                             "branch": Value::Null, "head": Value::Null, "changes": Value::Null}),
+        },
+        Some(Target::Remote { env, path, .. }) => {
+            match cfg.env(&env).and_then(|e| status_remote(e, &path)) {
+                Some(st) => json!({"target": name, "kind": "remote", "ok": true,
+                                   "branch": st.branch, "head": st.head, "changes": st.changes}),
+                None => json!({"target": name, "kind": "remote", "ok": false,
+                               "branch": Value::Null, "head": Value::Null, "changes": Value::Null}),
+            }
+        }
+        _ => json!({"target": name, "kind": "env", "ok": false,
+                    "branch": Value::Null, "head": Value::Null, "changes": Value::Null}),
+    }
+}
+
+/// Parallel git status across many targets, preserving input order.
+#[cfg(feature = "config")]
+pub fn status_all(cfg: &crate::config::Config, names: &[String]) -> Vec<Value> {
+    std::thread::scope(|s| {
+        let handles: Vec<_> = names
+            .iter()
+            .map(|name| s.spawn(move || status_for_target(cfg, name)))
+            .collect();
+        // A panicking worker (git2 / json) must not take down the whole fleet
+        // status — degrade to an error row, preserving input order.
+        handles
+            .into_iter()
+            .zip(names)
+            .map(|(h, name)| {
+                h.join().unwrap_or_else(|_| {
+                    json!({"target": name, "kind": "unknown", "ok": false, "error": "panicked",
+                           "branch": Value::Null, "head": Value::Null, "changes": Value::Null})
+                })
+            })
+            .collect()
+    })
 }

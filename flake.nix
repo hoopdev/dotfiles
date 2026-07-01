@@ -52,6 +52,7 @@
         ./flake-modules/darwin.nix
         ./flake-modules/home.nix
         ./flake-modules/per-system.nix
+        ./flake-modules/rust.nix
       ];
     };
 }

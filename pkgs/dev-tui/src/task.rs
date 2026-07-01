@@ -2,8 +2,8 @@
 //!
 //! Tasks are persisted to `~/.dev/tui-tasks.jsonl` (one JSON object per line).
 
-use std::time::{SystemTime, UNIX_EPOCH};
 use serde_json::Value;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum TaskStatus {
@@ -84,10 +84,20 @@ impl Task {
             id: v.get("id")?.as_u64()?,
             target: v.get("target")?.as_str()?.to_string(),
             tool: v.get("tool")?.as_str()?.to_string(),
-            model: v.get("model").and_then(|x| x.as_str()).unwrap_or("").to_string(),
-            task_text: v.get("task_text").and_then(|x| x.as_str()).unwrap_or("").to_string(),
+            model: v
+                .get("model")
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .to_string(),
+            task_text: v
+                .get("task_text")
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .to_string(),
             status: TaskStatus::from_str(
-                v.get("status").and_then(|x| x.as_str()).unwrap_or("pending"),
+                v.get("status")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("pending"),
             ),
             started_at: v.get("started_at")?.as_i64()?,
             finished_at: v.get("finished_at").and_then(|x| x.as_i64()),
@@ -160,7 +170,7 @@ pub(crate) fn save_all_tasks(tasks: &[Task]) {
     }
 }
 
-pub(crate) fn reconcile_tasks(tasks: &mut Vec<Task>, envs: &[crate::model::Env]) {
+pub(crate) fn reconcile_tasks(tasks: &mut [Task], envs: &[crate::model::Env]) {
     let now = unix_now();
     let mut changed = false;
 
@@ -168,14 +178,12 @@ pub(crate) fn reconcile_tasks(tasks: &mut Vec<Task>, envs: &[crate::model::Env])
         match task.status {
             TaskStatus::Pending | TaskStatus::Running => {
                 // Check if there's a matching agent running for this target
-                let agent_match = envs.iter()
-                    .find(|e| e.name == task.target)
-                    .and_then(|e| {
-                        e.agents.iter().find(|a| {
-                            let status = a.status.as_str();
-                            status == "running" || status == "busy" || status == "waiting"
-                        })
-                    });
+                let agent_match = envs.iter().find(|e| e.name == task.target).and_then(|e| {
+                    e.agents.iter().find(|a| {
+                        let status = a.status.as_str();
+                        status == "running" || status == "busy" || status == "waiting"
+                    })
+                });
 
                 if let Some(agent) = agent_match {
                     if task.status != TaskStatus::Running {
@@ -191,7 +199,8 @@ pub(crate) fn reconcile_tasks(tasks: &mut Vec<Task>, envs: &[crate::model::Env])
                 } else if task.status == TaskStatus::Running {
                     // Was running but agent is gone — check if any agent with
                     // error status exists for this target
-                    let has_error = envs.iter()
+                    let has_error = envs
+                        .iter()
                         .find(|e| e.name == task.target)
                         .map(|e| e.agents.iter().any(|a| a.status == "error"))
                         .unwrap_or(false);
@@ -248,4 +257,4 @@ pub(crate) fn unix_now() -> i64 {
 }
 
 // ── dev task store types (re-exported from dev-core) ─────────────────────────
-pub(crate) use dev_core::{DevTask, DevQuestion, TaskDetail, load_dev_tasks, load_task_detail};
+pub(crate) use dev_core::{load_dev_tasks, load_task_detail, DevQuestion, DevTask, TaskDetail};

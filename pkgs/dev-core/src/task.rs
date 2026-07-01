@@ -1,6 +1,27 @@
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Clone, Debug, Default)]
+/// Machine-readable snapshot the `dev snapshot --json` command emits and the
+/// Zellij board / TUI deserialize. Keeping the wire types here (always-on, no
+/// process/ssh features) means every consumer renders exactly what the CLI
+/// computes — one source of truth. The Zellij plugin fetches this via
+/// `run_command(["dev","snapshot","--json"])` instead of reading the host
+/// filesystem (which a WASM plugin cannot do without broad `FullHdAccess`).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct BoardSnapshot {
+    pub tasks: Vec<DevTask>,
+    pub questions: Vec<DevQuestion>,
+}
+
+/// Build a [`BoardSnapshot`] from the on-disk task store.
+pub fn load_board_snapshot() -> BoardSnapshot {
+    let (tasks, questions) = load_dev_tasks();
+    BoardSnapshot { tasks, questions }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct DevTask {
     pub id: String,
     pub project_id: String,
@@ -15,14 +36,16 @@ pub struct DevTask {
     pub diff_files_count: usize,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct QuestionOption {
     pub id: String,
     pub label: String,
     pub impact: String,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct DevQuestion {
     pub id: String,
     pub task_id: String,
@@ -42,7 +65,8 @@ pub fn dev_store_path() -> Option<std::path::PathBuf> {
 
 // ── Task detail (for the right-panel in TaskBoard) ────────────────────────────
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct TaskDetail {
     pub task_id: String,
     pub brief: String,          // from brief.md, first 300 chars
@@ -83,9 +107,7 @@ pub fn load_task_detail(task_id: &str) -> Option<TaskDetail> {
             if let Ok(rd) = std::fs::read_dir(&reviews_dir) {
                 let mut mds: Vec<_> = rd
                     .flatten()
-                    .filter(|e| {
-                        e.path().extension().and_then(|x| x.to_str()) == Some("md")
-                    })
+                    .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("md"))
                     .collect();
                 mds.sort_by_key(|e| e.file_name());
                 if let Some(last) = mds.last() {
@@ -219,4 +241,61 @@ pub fn load_dev_tasks() -> (Vec<DevTask>, Vec<DevQuestion>) {
 
     tasks.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
     (tasks, questions)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The `BoardSnapshot` wire format is the contract between `dev snapshot
+    /// --json` and the Zellij plugin's `run_command` parse. Round-trip it so a
+    /// field rename can't silently blank the board.
+    #[test]
+    fn board_snapshot_round_trips() {
+        let snap = BoardSnapshot {
+            tasks: vec![DevTask {
+                id: "T-20260701-001".into(),
+                project_id: "proj".into(),
+                title: "wire up snapshot".into(),
+                phase: "implementing".into(),
+                priority: "high".into(),
+                created_at: "2026-07-01T00:00:00Z".into(),
+                updated_at: "2026-07-01T01:00:00Z".into(),
+                assigned_tool: Some("claude".into()),
+                review_status: "none".into(),
+                test_status: "unknown".into(),
+                diff_files_count: 3,
+            }],
+            questions: vec![DevQuestion {
+                id: "Q-20260701-001".into(),
+                task_id: "T-20260701-001".into(),
+                project_id: "proj".into(),
+                severity: "blocking".into(),
+                category: "design".into(),
+                question: "which store?".into(),
+                agent_recommendation: Some("sqlite".into()),
+                context: "ctx".into(),
+                options: vec![QuestionOption {
+                    id: "a".into(),
+                    label: "sqlite".into(),
+                    impact: "low".into(),
+                }],
+            }],
+        };
+        let json = serde_json::to_string(&snap).unwrap();
+        let back: BoardSnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(snap, back);
+    }
+
+    /// Forward-compat: an unknown extra field and missing optionals must not
+    /// break the plugin's parse (`#[serde(default)]`).
+    #[test]
+    fn board_snapshot_tolerates_partial_json() {
+        let json = r#"{"tasks":[{"id":"T-1","title":"t","future_field":42}]}"#;
+        let snap: BoardSnapshot = serde_json::from_str(json).unwrap();
+        assert_eq!(snap.tasks.len(), 1);
+        assert_eq!(snap.tasks[0].id, "T-1");
+        assert_eq!(snap.tasks[0].phase, ""); // defaulted, not panicked
+        assert!(snap.questions.is_empty());
+    }
 }

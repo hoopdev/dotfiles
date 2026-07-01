@@ -58,7 +58,7 @@ fn run(term: &mut terminal::Term, app: &mut App) -> io::Result<()> {
             app.request_dev_tasks();
         }
         app.maybe_request_logs();
-        if app.refreshing || app.git_inflight {
+        if app.refreshing || app.git_inflight || app.tail_pid.is_some() {
             app.spinner = app.spinner.wrapping_add(1);
         }
 

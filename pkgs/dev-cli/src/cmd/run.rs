@@ -6,42 +6,62 @@ use tokio::process::Command;
 
 // ── entry point ───────────────────────────────────────────────────────────────
 
-pub fn run(args: &[String]) {
-    let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
-    rt.block_on(run_async(args));
+pub fn run(args: &[String], json: bool) -> anyhow::Result<()> {
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(run_async(args, json))
 }
 
-async fn run_async(args: &[String]) {
+async fn run_async(args: &[String], json: bool) -> anyhow::Result<()> {
     let mut target_arg = String::new();
     let mut cmd_parts: Vec<String> = Vec::new();
-    let mut json_out = false;
+    // Seed from the global `--json`/`DEV_JSON`; an inline `--json` can still
+    // force it on for this invocation.
+    let mut json_out = json;
     let mut timeout_secs: u64 = 120;
     let mut all = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
-            "--all" => {
+            "--" => {
+                i += 1;
+                if all {
+                    cmd_parts.extend(args[i..].iter().cloned());
+                } else if target_arg.is_empty() {
+                    if let Some(target) = args.get(i) {
+                        target_arg = target.clone();
+                        cmd_parts.extend(args[i + 1..].iter().cloned());
+                    }
+                } else {
+                    cmd_parts.extend(args[i..].iter().cloned());
+                }
+                break;
+            }
+            "--all" if target_arg.is_empty() && cmd_parts.is_empty() => {
                 all = true;
             }
-            "--json" => {
+            "--json" if cmd_parts.is_empty() => {
                 json_out = true;
             }
-            "--timeout" => {
+            "--timeout" if cmd_parts.is_empty() => {
                 i += 1;
                 timeout_secs = args.get(i).and_then(|s| s.parse().ok()).unwrap_or(120);
             }
             a => {
-                if target_arg.is_empty() {
+                if all {
+                    cmd_parts.extend(args[i..].iter().cloned());
+                    break;
+                } else if target_arg.is_empty() {
                     target_arg = a.to_string();
                 } else {
-                    cmd_parts.push(a.to_string());
+                    cmd_parts.extend(args[i..].iter().cloned());
+                    break;
                 }
             }
         }
         i += 1;
     }
 
-    if cmd_parts.is_empty() {
+    if (!all && target_arg.is_empty()) || cmd_parts.is_empty() {
         eprintln!("Usage: dev run [--all | <target>] <cmd...> [--json]");
         std::process::exit(1);
     }
@@ -55,7 +75,11 @@ async fn run_async(args: &[String]) {
             .as_array()
             .map(|arr| {
                 arr.iter()
-                    .filter_map(|v| v.get("name").and_then(|n| n.as_str()).map(|s| s.to_string()))
+                    .filter_map(|v| {
+                        v.get("name")
+                            .and_then(|n| n.as_str())
+                            .map(|s| s.to_string())
+                    })
                     .collect()
             })
             .unwrap_or_default();
@@ -63,9 +87,14 @@ async fn run_async(args: &[String]) {
             all_names
         } else {
             // Comma-separated: filter to matching names
-            let requested: std::collections::HashSet<String> =
-                target_arg.split(',').map(|s| s.trim().to_string()).collect();
-            all_names.into_iter().filter(|n| requested.contains(n)).collect()
+            let requested: std::collections::HashSet<String> = target_arg
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .collect();
+            all_names
+                .into_iter()
+                .filter(|n| requested.contains(n))
+                .collect()
         }
     } else {
         vec![target_arg.clone()]
@@ -81,8 +110,13 @@ async fn run_async(args: &[String]) {
     if targets.len() == 1 {
         // Single target — run and output directly
         let result = run_on_target(&targets[0], &cmd_str, timeout).await;
+        let ok = result["ok"].as_bool().unwrap_or(false);
+        let exit = result["exit"].as_i64().unwrap_or(1) as i32;
         if json_out {
-            println!("{}", serde_json::to_string(&[result]).unwrap());
+            println!("{}", serde_json::to_string(&[result])?);
+            if !ok {
+                std::process::exit(if exit == 0 { 1 } else { exit });
+            }
         } else {
             if !result["stdout"].as_str().unwrap_or("").is_empty() {
                 print!("{}", result["stdout"].as_str().unwrap_or(""));
@@ -90,8 +124,8 @@ async fn run_async(args: &[String]) {
             if !result["stderr"].as_str().unwrap_or("").is_empty() {
                 eprint!("{}", result["stderr"].as_str().unwrap_or(""));
             }
-            if !result["ok"].as_bool().unwrap_or(true) {
-                std::process::exit(result["exit"].as_i64().unwrap_or(1) as i32);
+            if !ok {
+                std::process::exit(if exit == 0 { 1 } else { exit });
             }
         }
     } else {
@@ -107,14 +141,14 @@ async fn run_async(args: &[String]) {
 
         let mut results = Vec::new();
         for h in handles {
-            results.push(
-                h.await
-                    .unwrap_or_else(|_| serde_json::json!({"ok": false, "error": "task panicked"})),
-            );
+            results
+                .push(h.await.unwrap_or_else(
+                    |_| serde_json::json!({"ok": false, "error": "task panicked"}),
+                ));
         }
 
         if json_out {
-            println!("{}", serde_json::to_string(&results).unwrap());
+            println!("{}", serde_json::to_string(&results)?);
         } else {
             for r in &results {
                 let target = r["target"].as_str().unwrap_or("?");
@@ -130,17 +164,20 @@ async fn run_async(args: &[String]) {
                 }
             }
         }
+        if results.iter().any(|r| !r["ok"].as_bool().unwrap_or(false)) {
+            std::process::exit(1);
+        }
     }
+    Ok(())
 }
 
 // ── target resolution ─────────────────────────────────────────────────────────
 
+// Read the fleet topology directly from `~/.config/dev/config.toml` instead of
+// shelling out to the bash `dev targets --json`. Same schema as the bash
+// `_dev_targets_json`, so the consumers below are unchanged.
 async fn fetch_targets_json() -> Value {
-    let res = Command::new("dev").args(["targets", "--json"]).output().await;
-    match res {
-        Ok(o) => serde_json::from_slice(&o.stdout).unwrap_or(Value::Array(Vec::new())),
-        Err(_) => Value::Array(Vec::new()),
-    }
+    dev_core::config::Config::load_or_default().targets_json()
 }
 
 // ── single-target execution ───────────────────────────────────────────────────
@@ -155,9 +192,12 @@ async fn run_on_target(target: &str, cmd: &str, timeout: Duration) -> Value {
 
     match info {
         Some(t) => {
-            let kind = t.get("kind").and_then(|k| k.as_str()).unwrap_or("remote");
+            let kind = t
+                .get("kind")
+                .and_then(|k| k.as_str())
+                .unwrap_or("remote-project");
             match kind {
-                "local" => {
+                "local-project" | "local" => {
                     let path = t.get("path").and_then(|p| p.as_str()).unwrap_or(".");
                     run_local(target, path, cmd, timeout).await
                 }
@@ -183,8 +223,11 @@ async fn run_local(target: &str, path: &str, cmd: &str, timeout: Duration) -> Va
         format!("cd '{}' && {}", path.replace('\'', "'\\''"), cmd)
     };
 
-    let out =
-        tokio::time::timeout(timeout, Command::new("bash").args(["-c", &full_cmd]).output()).await;
+    let out = tokio::time::timeout(
+        timeout,
+        Command::new("bash").args(["-c", &full_cmd]).output(),
+    )
+    .await;
 
     match out {
         Ok(Ok(o)) => serde_json::json!({

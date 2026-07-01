@@ -8,11 +8,18 @@ description = "Shared types and task store for the dev CLI ecosystem"
 default = []
 watch = ["dep:notify"]
 git = ["dep:git2"]
+config = ["dep:toml"]
+windows = ["config"]
 wasm = []
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+anyhow = "1"
+
+[dependencies.toml]
+version = "0.8"
+optional = true
 
 [dependencies.notify]
 version = "6"

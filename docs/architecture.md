@@ -16,7 +16,8 @@
 │   ├── nixos.nix             # nixosConfigurations (auto-built from meta.nix)
 │   ├── darwin.nix            # darwinConfigurations
 │   ├── home.nix              # homeConfigurations (standalone home-manager)
-│   └── per-system.nix        # devShells, formatter, treefmt
+│   ├── per-system.nix        # devShells, formatter, treefmt
+│   └── rust.nix              # flake packages for the pkgs/ dev tool (dev / dev-tui / dev-zellij)
 ├── modules/nixos/             # Self-exported NixOS modules
 │   ├── default.nix           # Kitchen-sink (imports the three below)
 │   ├── nix-ld.nix            # nix-ld for unpatched binaries

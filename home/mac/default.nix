@@ -5,6 +5,7 @@
     ../common
     ./gui
     ./coder.nix
+    ./dev.nix
   ];
 
   home.sessionVariables = {
