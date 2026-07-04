@@ -26,7 +26,6 @@
     ripgrep
     rclone
     rsync
-    syncthing
     hackgen-nf-font
     nixfmt
     # quarto  # temporarily disabled: bundles deno-2.7.13 / rusty-v8-147.2.1
@@ -39,10 +38,16 @@
     tree-sitter
     lsof
     trash-cli
-  ];
-  services.syncthing = {
-    enable = true;
-  };
+  ]
+  # On macOS syncthing is provided by Homebrew; only ship the nix binary on
+  # non-Darwin hosts (where there is no Homebrew).
+  ++ lib.optionals (!pkgs.stdenv.isDarwin) [ pkgs.syncthing ];
+  # On macOS syncthing runs via Homebrew (hosts/mac/configuration.nix brews).
+  # Enabling the home-manager service there creates
+  # org.nix-community.home.syncthing, which conflicts with Homebrew's
+  # homebrew.mxcl.syncthing and crash-loops (last exit code 1). Manage the
+  # nix service on non-Darwin hosts only.
+  services.syncthing.enable = !pkgs.stdenv.isDarwin;
   programs.zoxide = {
     enable = true;
     package = pkgs.zoxide;
