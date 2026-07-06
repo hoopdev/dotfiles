@@ -1,4 +1,4 @@
 {
   type = "darwin";
-  configFrom = "mac";
+  configFrom = "_shared-mac";
 }

@@ -1,18 +1,7 @@
-{
-  username,
-  inputs,
-  ...
-}:
+{ ... }:
 
 {
   imports = [
-    ../../home/common/cli
-    inputs.nixvim.homeModules.nixvim
+    ../../home/nixos/headless.nix
   ];
-
-  home = {
-    inherit username;
-    homeDirectory = "/home/${username}";
-    stateVersion = "24.05";
-  };
 }

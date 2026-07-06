@@ -9,7 +9,6 @@
   imports = [
     ../../home/common/cli
     inputs.nixvim.homeModules.nixvim
-    ./starship.nix # Ubuntu-specific Starship configuration
   ];
 
   home = {
@@ -32,6 +31,9 @@
   fonts.fontconfig.enable = true;
 
   programs.home-manager.enable = true;
+
+  # Ubuntu logo in the starship system segment (overrides the common default).
+  programs.starship.systemLogo = "󰕈";
 
   # Disable dconf - not needed in Docker/container environments
   dconf.enable = false;

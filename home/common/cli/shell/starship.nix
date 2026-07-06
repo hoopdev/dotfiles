@@ -1,6 +1,7 @@
 {
   pkgs,
   config,
+  lib,
   ...
 }:
 let
@@ -20,14 +21,20 @@ let
       "";
 in
 {
-  programs.starship = {
+  options.programs.starship.systemLogo = lib.mkOption {
+    type = lib.types.str;
+    default = systemlogo;
+    description = "Glyph shown in the starship prompt's leading system segment; hosts can override it (e.g. an Ubuntu logo).";
+  };
+
+  config.programs.starship = {
     enable = true;
     enableNushellIntegration = true;
     enableZshIntegration = true;
 
     settings = {
 
-      format = "[░▒▓](#${colors.base06})[ ${systemlogo} ](bg:#${colors.base06} fg:#${colors.base00})[](bg:#${colors.base0A} fg:#${colors.base06})$directory[](fg:#${colors.base0A} bg:#${colors.base0B})$git_branch$git_status[](fg:#${colors.base0B} bg:#${colors.base0C})$time[ ](fg:#${colors.base0C})$character";
+      format = "[░▒▓](#${colors.base06})[ ${config.programs.starship.systemLogo} ](bg:#${colors.base06} fg:#${colors.base00})[](bg:#${colors.base0A} fg:#${colors.base06})$directory[](fg:#${colors.base0A} bg:#${colors.base0B})$git_branch$git_status[](fg:#${colors.base0B} bg:#${colors.base0C})$time[ ](fg:#${colors.base0C})$character";
       #format = "[░▒▓](#${colors.base06})[  ](bg:#${colors.base06} fg:#${colors.base00})[](bg:#${colors.base0A} fg:#${colors.base06})$directory[](fg:#${colors.base0A} bg:#${colors.base0B})$git_branch$git_status[](fg:#${colors.base0B} bg:#${colors.base0C})$time[ ](fg:#${colors.base0C})$character";
 
       directory = {

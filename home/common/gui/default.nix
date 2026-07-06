@@ -1,7 +1,6 @@
 {
   imports = [
-    ./browser.nix
-    ./tools.nix
-    ./terminals
+    ./apps.nix
+    ./wezterm.nix
   ];
 }

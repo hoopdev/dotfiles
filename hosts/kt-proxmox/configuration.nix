@@ -14,6 +14,15 @@
     ./hardware-configuration.nix
     inputs.self.nixosModules.default
     ../../lib/japanese-locale.nix
+    ((import ../../lib/users.nix).mkUser {
+      username = "ktaga";
+      extraGroups = [
+        "networkmanager"
+        "audio"
+        "video"
+        "docker"
+      ];
+    })
   ];
 
   # Bootloader.
@@ -74,28 +83,8 @@
   # Enable touchpad support (enabled default in most desktopManager).
   # services.xserver.libinput.enable = true;
 
-  # Define a user account. Don't forget to set a password with ‘passwd’.
-  users.users.ktaga = {
-    isNormalUser = true;
-    description = "ktaga";
-    extraGroups = [
-      "networkmanager"
-      "wheel"
-      "audio"
-      "video"
-      "docker"
-    ];
-    shell = pkgs.zsh;
-    packages = with pkgs; [
-      zsh
-    ];
-  };
-
-  # Install programs
-  programs = {
-    zsh.enable = true;
-    # hyprland.enable = true;
-  };
+  # User account: skeleton (isNormalUser, wheel, zsh) comes from lib/users.nix,
+  # imported above; only the host-specific groups are listed there.
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
