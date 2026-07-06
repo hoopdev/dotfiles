@@ -33,7 +33,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     dev = {
-      url = "path:/Users/ktaga/git/dev";
+      # git+file (not path:) so only git-tracked files are hashed — this excludes
+      # the multi-GB gitignored target/ dir, whose churn otherwise re-hashed the
+      # input and forced a full dev rebuild on every `nh switch`.
+      url = "git+file:///Users/ktaga/git/dev";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixos-wsl.url = "github:nix-community/nixos-wsl";

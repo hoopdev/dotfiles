@@ -123,14 +123,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1783305498,
-        "narHash": "sha256-+gzFFkwFNwwmuYBMhUPFacqQu8jk3SM9wehw61v1fxo=",
-        "path": "/Users/ktaga/git/dev",
-        "type": "path"
+        "dirtyRev": "965b1cffa6dda1e5427cf709580298cf1336b465-dirty",
+        "dirtyShortRev": "965b1cf-dirty",
+        "lastModified": 1783320748,
+        "narHash": "sha256-5tPuWQULmM7a1rtAqME+WUoR05eT7IPYmOCyAz80KJw=",
+        "type": "git",
+        "url": "file:///Users/ktaga/git/dev"
       },
       "original": {
-        "path": "/Users/ktaga/git/dev",
-        "type": "path"
+        "type": "git",
+        "url": "file:///Users/ktaga/git/dev"
       }
     },
     "firefox-gnome-theme": {
@@ -805,11 +807,11 @@
         "nixpkgs": "nixpkgs_4"
       },
       "locked": {
-        "lastModified": 1781182279,
-        "narHash": "sha256-V5EQQbDnmdiXGQXrEF1PEL7QYsFqfH8N1E89Z5ONwFk=",
+        "lastModified": 1783336371,
+        "narHash": "sha256-ZisTtweyb7JUwPP54HAXE9TypT8m89dIxDI36Ak0hAs=",
         "owner": "nix-community",
         "repo": "nixos-wsl",
-        "rev": "5675822ba756e6e56f8f6a5a76e90e0da2ece94d",
+        "rev": "a9620cfa43f0c1c30a46c31ae3c6e58cdb124a14",
         "type": "github"
       },
       "original": {
