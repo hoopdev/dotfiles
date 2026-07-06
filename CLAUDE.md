@@ -17,5 +17,5 @@ Apply changes with `nh {os,darwin,home} switch` — full command reference (appl
 
 - Determine target platform (NixOS vs macOS) before suggesting system-level changes
 - `flake.nix` / `flake.lock` changes affect all hosts — verify carefully
-- Chezmoi syncs some configs (nvim, wezterm) for non-Nix environments; don't remove those hooks
+- Chezmoi sync: an activation hook in `home/common/cli/neovim.nix` copies `init.lua` into `dot_config/nvim/` on rebuild — don't remove it. Other Chezmoi files (e.g. `dot_config/wezterm/`) are hand-maintained, not auto-generated
 - GC runs weekly automatically (`nix.gc` + `programs.nh.clean`); manual GC rarely needed

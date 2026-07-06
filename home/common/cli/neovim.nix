@@ -96,8 +96,8 @@ in
   # Copy init.lua to chezmoi dotfiles directory on activation
   config.home.activation.syncNeovimConfig = config.lib.dag.entryAfter [ "writeBoundary" ] ''
     if [ -d "${dotfilesDir}" ]; then
-      $DRY_RUN_CMD mkdir -p "${dotfilesDir}/dot_config/nvim"
-      $DRY_RUN_CMD cp -f ${initLuaSource} "${dotfilesDir}/dot_config/nvim/init.lua"
+      $DRY_RUN_CMD mkdir -p "${dotfilesDir}/chezmoi/dot_config/nvim"
+      $DRY_RUN_CMD cp -f ${initLuaSource} "${dotfilesDir}/chezmoi/dot_config/nvim/init.lua"
       echo "Synced init.lua to chezmoi dotfiles"
     fi
   '';

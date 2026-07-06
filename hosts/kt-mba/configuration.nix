@@ -2,7 +2,7 @@
 {
   # Import shared Mac configuration
   imports = [
-    ../mac/configuration.nix
+    ../_shared-mac/configuration.nix
   ];
 
   # kt-mba specific settings can be added here

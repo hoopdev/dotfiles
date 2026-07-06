@@ -1,5 +1,5 @@
 {
   imports = [
-    ./tools.nix
+    ./apps.nix
   ];
 }

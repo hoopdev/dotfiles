@@ -11,6 +11,15 @@
     inputs.xremap.nixosModules.default
     inputs.self.nixosModules.default
     ../../lib/japanese-locale.nix
+    ((import ../../lib/users.nix).mkUser {
+      username = "ktaga";
+      extraGroups = [
+        "networkmanager"
+        "audio"
+        "video"
+        "input"
+      ];
+    })
   ]
   ++ (with inputs.nixos-hardware.nixosModules; [
     lenovo-thinkpad
@@ -129,30 +138,13 @@
   # UPower for battery monitoring (required by HyprPanel)
   services.upower.enable = true;
 
-  # Define a user account. Don't forget to set a password with ‘passwd’.
-  users.users.ktaga = {
-    isNormalUser = true;
-    description = "ktaga";
-    extraGroups = [
-      "networkmanager"
-      "wheel"
-      "audio"
-      "video"
-      "input"
-    ];
-    shell = pkgs.zsh;
-    packages = with pkgs; [
-      zsh
-    ];
-  };
+  # User account: skeleton (isNormalUser, wheel, zsh) comes from lib/users.nix,
+  # imported above; only the host-specific groups are listed there.
 
   # Install programs
-  programs = {
-    zsh.enable = true;
-    hyprland = {
-      enable = true;
-      xwayland.enable = true;
-    };
+  programs.hyprland = {
+    enable = true;
+    xwayland.enable = true;
   };
 
   # xdg-desktop-portal for screen sharing and dark mode detection

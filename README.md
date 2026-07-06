@@ -166,7 +166,7 @@ A unified development environment is available via `nix develop`.
 │   └── shonan.yaml           # Shonan base16 color scheme
 ├── home/                      # home-manager configurations
 │   ├── common/               # Cross-platform shared
-│   │   ├── cli/             # CLI: git, neovim, shells
+│   │   ├── cli/             # CLI: git, neovim, shells, ssh, AI tools (claude-code, opencode)
 │   │   └── gui/             # GUI: terminals, apps
 │   ├── mac/                 # macOS-specific
 │   └── nixos/               # NixOS-specific
@@ -182,6 +182,8 @@ A unified development environment is available via `nix develop`.
 ```
 
 Each `hosts/<name>/meta.nix` declares `{ type, system?, users?, configFrom? }`; new hosts are picked up automatically by `flake-modules/shared.nix`.
+
+The **Chezmoi source tree** for non-Nix targets lives under `chezmoi/` (`dot_config/` → `~/.config`, `dot_glzr/`, `AppData/`, `private_dot_jupyter/`); a root `.chezmoiroot` points Chezmoi at it, so the Nix flake and docs stay out of `chezmoi apply` automatically. The `wallpaper/` asset stays at the root (Nix-owned, used by Stylix + Hyprland). See [Chezmoi](#chezmoi) below.
 
 ## Key Components
 
@@ -238,7 +240,7 @@ chezmoi init https://github.com/hoopdev/dotfiles
 chezmoi apply
 ```
 
-Some configuration files (nvim, wezterm) are automatically synced to the Chezmoi directory during Nix rebuilds.
+Only Neovim's `init.lua` is auto-synced into the Chezmoi source tree (to `chezmoi/dot_config/nvim/`) during Nix rebuilds, via an activation hook in `home/common/cli/neovim.nix`. Other Chezmoi configs (e.g. `chezmoi/dot_config/wezterm/`) are maintained by hand.
 
 ## License
 

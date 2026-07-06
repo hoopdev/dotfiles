@@ -32,7 +32,7 @@
 │   └── shonan.yaml           # Shonan base16 color scheme definition
 ├── home/                      # Home-manager configurations
 │   ├── common/               # Cross-platform shared
-│   │   ├── cli/             # CLI: git, neovim, shells
+│   │   ├── cli/             # CLI: git, neovim, shells, ssh, AI tools (claude-code, opencode)
 │   │   └── gui/             # GUI: terminals, apps
 │   ├── mac/                 # macOS-specific home configurations
 │   └── nixos/               # NixOS-specific home configurations
@@ -48,6 +48,23 @@
 ```
 
 Each `hosts/<name>/meta.nix` declares `{ type, system?, users?, configFrom? }`; `flake-modules/shared.nix` reads the directory and dispatches to the matching subsystem module.
+
+### Chezmoi source tree (non-Nix targets)
+
+Dotfiles for environments without Nix (Windows, bare Jupyter) live under `chezmoi/`, isolated from the Nix flake. A root `.chezmoiroot` points [Chezmoi](https://chezmoi.io) at that subdirectory, so Chezmoi only ever sees dotfile sources — the Nix tree, docs, and build outputs sit outside its root and need no `.chezmoiignore` entries.
+
+```
+├── .chezmoiroot               # Contains "chezmoi" — sets the Chezmoi source root
+├── wallpaper/                 # Wallpaper asset — Nix-owned (Stylix + Hyprland), NOT a Chezmoi target
+└── chezmoi/                   # Chezmoi source root
+    ├── dot_config/            # → ~/.config   (nvim, wezterm, starship, zoxide, scoop)
+    ├── dot_glzr/              # → ~/.glzr     (GlazeWM + Zebar, Windows)
+    ├── AppData/               # → ~/AppData   (Nushell, Windows)
+    ├── private_dot_jupyter/   # → ~/.jupyter  (JupyterLab settings)
+    └── .chezmoiignore         # Only per-OS target exclusions remain
+```
+
+Only Neovim's `init.lua` is auto-synced into this tree (to `chezmoi/dot_config/nvim/`) on rebuild, via an activation hook in `home/common/cli/neovim.nix`. Every other Chezmoi file is maintained by hand.
 
 ## Design Principles
 
@@ -101,3 +118,9 @@ Platform-specific libraries are included automatically (Linux: glibc, X11; macOS
 - Shells: Nushell, Zsh
 - Color scheme: Shonan (custom base16, via Stylix)
 - GC: weekly automatic (system via `nix.gc`, user via `programs.nh.clean`)
+
+## Related Docs
+
+- [docs/commands.md](commands.md) — apply / bootstrap / maintenance / dev-fleet commands
+- [docs/neovim.md](neovim.md) — Neovim (nixvim + lazy.nvim) setup
+- [docs/ssh.md](ssh.md) — SSH client + 1Password agent configuration
