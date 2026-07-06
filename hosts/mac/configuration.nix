@@ -103,6 +103,11 @@
   # Touch ID for sudo
   security.pam.services.sudo_local.touchIdAuth = true;
 
+  # nixos-render-docs on nixpkgs unstable dropped --toc-depth, which the
+  # pinned nix-darwin still passes when building the HTML manual.
+  # Re-enable once nix-darwin/nix-darwin#1819 is merged and the input bumped.
+  documentation.doc.enable = false;
+
   # Auto upgrade nix package and the daemon service.
   nix.package = pkgs.nix;
 
