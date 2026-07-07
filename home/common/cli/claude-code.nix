@@ -34,6 +34,21 @@ in
   home.file.".claude/skills/skill-sync".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/dotfiles/claude/skills/skill-sync";
 
+  # /fleet-review — agy/codex/opencode の3系統を並列実行して統合レビューする
+  # グローバルスキル。skill-sync 同様、全マシンに配るので home-manager で
+  # out-of-store symlink する（project 配布ではないため skills.toml は projects=[]）。
+  home.file.".claude/skills/fleet-review".source =
+    config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/dotfiles/claude/skills/fleet-review";
+
+  # fleet-review が使う reviewer サブエージェント定義。ファイル単位で symlink し、
+  # マシン固有のローカル agent を ~/.claude/agents に共存できる余地を残す。
+  home.file.".claude/agents/agy-reviewer.md".source =
+    config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/dotfiles/claude/agents/agy-reviewer.md";
+  home.file.".claude/agents/codex-reviewer.md".source =
+    config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/dotfiles/claude/agents/codex-reviewer.md";
+  home.file.".claude/agents/opencode-reviewer.md".source =
+    config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/dotfiles/claude/agents/opencode-reviewer.md";
+
   # Claude Code settings.json — Nix管理しない
   # Claude Codeがpermissions・プラグイン設定を頻繁に書き換えるため、各マシンで独立管理。
   # settings.local.json と合わせて手動で管理する。
