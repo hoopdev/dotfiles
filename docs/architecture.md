@@ -36,6 +36,8 @@
 │   │   └── gui/             # GUI: terminals, apps
 │   ├── mac/                 # macOS-specific home configurations
 │   └── nixos/               # NixOS-specific home configurations
+├── claude/                    # Claude Code skill library (canonical source)
+│   └── skills/               # skills.toml manifest + one dir per skill
 └── hosts/                    # Host-specific system configurations
     ├── kt-proxmox/          # Proxmox VM (NixOS)
     ├── kt-thinkpad/         # ThinkPad (NixOS)
@@ -48,6 +50,18 @@
 ```
 
 Each `hosts/<name>/meta.nix` declares `{ type, system?, users?, configFrom? }`; `flake-modules/shared.nix` reads the directory and dispatches to the matching subsystem module.
+
+### Claude Code skill library (`claude/skills/`)
+
+Canonical source for Claude Code skills that grow across projects. `dev skill`
+(from the `dev` fleet tool) distributes them into each subscribed project's
+`.claude/skills/` as plain committed copies and classifies sync state via an
+`x-canonical-hash` frontmatter key; per-repo rules live in a
+`<!-- project-specific -->` block that survives pushes. Subscriptions are
+declared in `claude/skills/skills.toml`. The `/skill-sync` skill (symlinked
+into `~/.claude/skills/` by `home/common/cli/claude-code.nix`) drives the
+semantic merge: harvesting project improvements back into this library and
+redistributing. See `~/git/dev/docs/commands.md` (`dev skill`).
 
 ### Chezmoi source tree (non-Nix targets)
 

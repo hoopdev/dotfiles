@@ -10,6 +10,7 @@ Apply changes with `nh {os,darwin,home} switch` — full command reference (appl
 - Theming is unified via Stylix — color changes go in `lib/shonan.yaml`, not per-app configs
 - Cross-platform config lives in `home/common/`; `home/mac/` and `home/nixos/` are overlays that extend it
 - Hosts are auto-discovered from `hosts/<name>/meta.nix` — adding one needs no edits to `flake-modules/*.nix`
+- Claude Code skills shared across projects live in `claude/skills/` and are distributed with `dev skill` / harvested with `/skill-sync` — edit the library, not the per-project copies (except their `<!-- project-specific -->` blocks)
 - Format with `nixfmt`; lint with `statix` and `deadnix`
 - Directory layout, key components, and design principles: @docs/architecture.md
 

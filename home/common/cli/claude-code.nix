@@ -1,4 +1,5 @@
 {
+  config,
   pkgs,
   lib,
   ...
@@ -25,6 +26,13 @@ in
       PATH="${pkgs.curl}/bin:$PATH" ${pkgs.curl}/bin/curl -fsSL https://claude.ai/install.sh | PATH="${pkgs.curl}/bin:$PATH" bash
     fi
   '';
+
+  # /skill-sync — スキル正本ライブラリ (claude/skills/) の同期スキルだけは
+  # Nix で ~/.claude/skills に symlink する(「~/.claude は管理しない」方針の例外)。
+  # out-of-store symlink なので rebuild なしで編集が反映される。
+  # 他のスキルの配布は `dev skill push` が行う (claude/skills/skills.toml 参照)。
+  home.file.".claude/skills/skill-sync".source =
+    config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/dotfiles/claude/skills/skill-sync";
 
   # Claude Code settings.json — Nix管理しない
   # Claude Codeがpermissions・プラグイン設定を頻繁に書き換えるため、各マシンで独立管理。
