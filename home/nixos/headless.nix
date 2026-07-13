@@ -4,13 +4,11 @@
 # stay in the per-host home.nix.
 {
   username,
-  inputs,
   ...
 }:
 {
   imports = [
     ../common/cli
-    inputs.nixvim.homeModules.nixvim
   ];
 
   home = {

@@ -1,14 +1,12 @@
 {
   pkgs,
   username,
-  inputs,
   ...
 }:
 
 {
   imports = [
     ../../home/common/cli
-    inputs.nixvim.homeModules.nixvim
   ];
 
   home = {

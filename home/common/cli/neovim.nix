@@ -8,18 +8,9 @@ let
   initLuaSource = ./init.lua;
   dotfilesDir = "${config.home.homeDirectory}/git/dotfiles";
 
-  # Obsidian vault paths - can be overridden per host
-  obsidianVaults =
-    config.programs.nixvim.obsidianVaults or [
-      {
-        name = "Private";
-        path = "${config.home.homeDirectory}/Library/Mobile Documents/iCloud~md~obsidian/Documents/Private";
-      }
-      {
-        name = "Work";
-        path = "${config.home.homeDirectory}/Library/Mobile Documents/iCloud~md~obsidian/Documents/Work";
-      }
-    ];
+  # Obsidian vault paths - can be overridden per host via
+  # programs.neovim.obsidianVaults (custom option declared below).
+  obsidianVaults = config.programs.neovim.obsidianVaults;
 
   # Generate Lua code for obsidian vaults
   vaultsLua = lib.concatMapStringsSep ",\n    " (vault: ''
@@ -29,8 +20,12 @@ let
     }'') obsidianVaults;
 in
 {
-  # Allow setting obsidian vaults from host config
-  options.programs.nixvim.obsidianVaults = lib.mkOption {
+  # Allow setting obsidian vaults from host config. (Custom option grafted
+  # onto the stock home-manager programs.neovim namespace; it replaces the
+  # old programs.nixvim.obsidianVaults — nixvim itself was removed 2026-07-11:
+  # it was only a thin shell around init.lua, and its pandoc-rendered option
+  # man pages broke `nh switch` on the pinned nixpkgs.)
+  options.programs.neovim.obsidianVaults = lib.mkOption {
     type = lib.types.listOf (lib.types.attrsOf lib.types.str);
     default = [
       {
@@ -45,16 +40,13 @@ in
     description = "List of Obsidian vault configurations";
   };
 
-  config.programs.nixvim = {
+  config.programs.neovim = {
     enable = true;
+    defaultEditor = true;
 
-    # Reuse the host's already-evaluated nixpkgs instead of letting nixvim import
-    # a second one from its flake input. Keeps a single nixpkgs in the closure
-    # and silences nixvim's `inputs.nixvim.inputs.nixpkgs.follows` warning.
-    nixpkgs.pkgs = pkgs;
-
-    # Load external Lua configuration (init.lua) with vault paths injected
-    extraConfigLua = ''
+    # Load external Lua configuration (init.lua) with vault paths injected.
+    # home-manager writes this as ~/.config/nvim/init.lua.
+    initLua = ''
       -- Obsidian vault configuration (injected from Nix)
       vim.g.obsidian_vaults = {
         ${vaultsLua}
@@ -70,27 +62,11 @@ in
         pynvim
       ];
 
-    # Add lazy.nvim plugin to be available for bootstrapping
-    extraPlugins = with pkgs.vimPlugins; [
+    # Add lazy.nvim to the runtimepath for bootstrapping; plugin management
+    # itself is done by lazy.nvim from init.lua, exactly as before.
+    plugins = with pkgs.vimPlugins; [
       lazy-nvim
     ];
-
-    # Disable nixvim's built-in lazy plugin management
-    # We use lazy.nvim directly in init.lua for full control
-    plugins = {
-      lazy = {
-        enable = false;
-      };
-    };
-
-    # Performance settings
-    performance = {
-      byteCompileLua = {
-        enable = true;
-        nvimRuntime = true;
-        plugins = true;
-      };
-    };
   };
 
   # Copy init.lua to chezmoi dotfiles directory on activation

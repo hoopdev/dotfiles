@@ -2,7 +2,14 @@
   description = "KT Nix System Flake";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    # Pinned to the last Hydra-green aarch64-darwin eval (2026-07-08 11:07,
+    # eval 1826973): later revs (0bb7ec5, 2026-07-08 14:55 onward) ship a
+    # cctools/ld64-957.1 that SIGTRAPs (Trace/BPT trap: 5, exit 133) linking
+    # some aarch64-darwin binaries (starship, unar/XADMaster, …). This rev's
+    # darwin builds are all substitutable from cache.nixos.org. Return to
+    # "github:NixOS/nixpkgs/nixpkgs-unstable" once upstream fixes ld64
+    # (verify with: nix build --no-link nixpkgs#starship).
+    nixpkgs.url = "github:NixOS/nixpkgs/999488783490e5a7bf0b4393f8ddbe7daf10edfe";
     flake-parts = {
       url = "github:hercules-ci/flake-parts";
       inputs.nixpkgs-lib.follows = "nixpkgs";
@@ -26,10 +33,6 @@
     };
     wezterm = {
       url = "github:wez/wezterm?dir=nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    nixvim = {
-      url = "github:nix-community/nixvim";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     dev = {

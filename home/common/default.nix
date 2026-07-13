@@ -2,13 +2,11 @@
   lib,
   pkgs,
   username,
-  inputs,
   ...
 }:
 
 {
   imports = [
-    inputs.nixvim.homeModules.nixvim
     ./cli
     ./gui
   ];
