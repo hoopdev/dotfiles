@@ -4,7 +4,8 @@
 
 ## 概要
 
-- **設定管理**: nixvim (Nix経由でNeovimを管理) + lazy.nvim (プラグイン管理)
+- **設定管理**: home-manager の `programs.neovim` (Neovim 本体・Python 連携・lazy.nvim の配置) + lazy.nvim (プラグイン管理)
+  - Nix はランタイムを用意するだけで、設定の実体はプレーンな `init.lua` 1本。Nix はこれを読むだけなので、Nix のない環境（Windows）へそのまま持ち出せる
 - **カラースキーム**: Shonan (カスタムbase16テーマ、Stylix経由で自動適用)
 - **Leaderキー**: `<Space>`
 - **LocalLeaderキー**: `\`
@@ -275,5 +276,5 @@ Neovimプラグイン用のPythonパッケージ:
 
 ## 設定ファイル
 
-- `home/common/cli/neovim.nix` - nixvim設定
-- `home/common/cli/init.lua` - Lua設定（lazy.nvimプラグイン定義）
+- `home/common/cli/neovim.nix` - home-manager の `programs.neovim` 設定（Obsidian vault のパス注入、Python パッケージ、chezmoi への `init.lua` 同期フック）
+- `home/common/cli/init.lua` - Lua設定（lazy.nvimプラグイン定義）— 唯一の設定実体

@@ -33,14 +33,15 @@ echo "experimental-features = nix-command flakes" > ~/.config/nix/nix.conf
 ### 4. Fonts (Managed by Home Manager)
 
 Fonts are automatically installed by home-manager:
-- **Noto Fonts CJK Sans**: For Japanese and CJK characters
+- **HackGen Console NF**: The monospace font, installed by Stylix (see `lib/stylix.nix`)
+- **Noto Fonts CJK Sans / Serif**: For Japanese and CJK characters
 - **Noto Color Emoji**: For emoji support
-- **Nerd Fonts**: FiraCode, JetBrainsMono, and Meslo for icons
+- **Nerd Fonts**: FiraCode, JetBrainsMono, and Meslo — extra choices declared by this host
 
 **Configure your terminal** to use a Nerd Font for proper icon display:
-- `JetBrainsMono Nerd Font Mono` (recommended)
+- `HackGen Console NF` (recommended — matches every other host)
+- `JetBrainsMono Nerd Font Mono`
 - `FiraCode Nerd Font Mono`
-- `MesloLGS Nerd Font Mono`
 
 ## Usage
 
@@ -74,7 +75,7 @@ nix flake update
 
 - **Shell**: Zsh and Nushell with Starship prompt
 - **Starship**: Custom prompt with Ubuntu logo (󰕈) and icons
-- **Editor**: Neovim (nixvim configuration)
+- **Editor**: Neovim (home-manager + lazy.nvim)
 - **Git**: Pre-configured with common aliases
 - **Color Scheme**: Shonan theme via Stylix
 - **Development Tools**: Python, uv, Nix tools

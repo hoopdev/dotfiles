@@ -94,7 +94,7 @@ fc-cache -fv
 ```
 
 **What gets installed:**
-- Neovim (with nixvim + lazy.nvim configuration)
+- Neovim (home-manager + lazy.nvim configuration)
 - Git, GitHub CLI (gh)
 - Modern CLI tools (bat, zellij, eza, ripgrep, fd)
 - Shell environment (Zsh, Nushell, Starship prompt)
@@ -131,6 +131,7 @@ A unified development environment is available via `nix develop`.
 | `nix flake check` | Check flake for errors (incl. format drift) |
 | `nix flake show` | Show flake outputs |
 | `nix fmt` | Format all `.nix` files (nixfmt + statix + deadnix) |
+| `nix run .#export-dotfiles` | Re-render the generated Chezmoi files (starship, WezTerm, Neovim) |
 | `nh clean all --keep 5 --keep-since 7d` | Garbage collection (user + system) |
 | `nh clean user --keep 5 --keep-since 7d` | Garbage collection (user-only) |
 
@@ -183,7 +184,7 @@ A unified development environment is available via `nix develop`.
 
 Each `hosts/<name>/meta.nix` declares `{ type, system?, users?, configFrom? }`; new hosts are picked up automatically by `flake-modules/shared.nix`.
 
-The **Chezmoi source tree** for non-Nix targets lives under `chezmoi/` (`dot_config/` → `~/.config`, `dot_glzr/`, `AppData/`, `private_dot_jupyter/`); a root `.chezmoiroot` points Chezmoi at it, so the Nix flake and docs stay out of `chezmoi apply` automatically. The `wallpaper/` asset stays at the root (Nix-owned, used by Stylix + Hyprland). See [Chezmoi](#chezmoi) below.
+The **Chezmoi source tree** for non-Nix targets lives under `chezmoi/` (`dot_config/` → `~/.config`, `dot_glzr/`, `AppData/`, `private_dot_jupyter/`); a root `.chezmoiroot` points Chezmoi at it, so the Nix flake and docs stay out of `chezmoi apply` automatically. Most of `dot_config/` is generated from the Nix config by `nix run .#export-dotfiles` — see [Chezmoi](#chezmoi) below. The `wallpaper/` asset stays at the root (Nix-owned, used by Stylix + Hyprland).
 
 ## Key Components
 
@@ -197,7 +198,6 @@ The **Chezmoi source tree** for non-Nix targets lives under `chezmoi/` (`dot_con
 | nixos-hardware | Hardware optimizations |
 | nixos-wsl | WSL integration |
 | stylix | Unified theming (base16) |
-| nixvim | Neovim configuration |
 | hyprland | Wayland compositor (NixOS) |
 | hyprpanel | Status panel for Hyprland |
 | xremap | Key remapping (NixOS) |
@@ -222,7 +222,7 @@ The **Chezmoi source tree** for non-Nix targets lives under `chezmoi/` (`dot_con
 
 **Common**
 - WezTerm (unified terminal)
-- Neovim (nixvim + lazy.nvim)
+- Neovim (home-manager + lazy.nvim)
 - Nushell / Zsh
 - Starship prompt
 - Shonan color scheme (via Stylix)
@@ -240,7 +240,19 @@ chezmoi init https://github.com/hoopdev/dotfiles
 chezmoi apply
 ```
 
-Only Neovim's `init.lua` is auto-synced into the Chezmoi source tree (to `chezmoi/dot_config/nvim/`) during Nix rebuilds, via an activation hook in `home/common/cli/neovim.nix`. Other Chezmoi configs (e.g. `chezmoi/dot_config/wezterm/`) are maintained by hand.
+### Keeping it in sync with Nix
+
+Nix is the single source of truth, and most of the Chezmoi tree is **generated from it** — do not edit those files, edit the Nix source and re-export:
+
+```bash
+nix run .#export-dotfiles   # from the repo root, then commit the result
+```
+
+This renders `dot_config/readonly_starship.toml`, `dot_config/wezterm/` and `dot_config/nvim/init.lua`. Starship and WezTerm *must* be generated rather than hand-written: their values (the base16 palette, font, opacity) come from Stylix and cannot be expressed as static files — hand-copying them is what let the old copies drift out of sync. The output is pure data with no `/nix/store` paths, so it works on machines without Nix, and it is host-independent (a Mac and a Linux box produce byte-identical files).
+
+Neovim's `init.lua` is *also* copied on every Nix rebuild by an activation hook in `home/common/cli/neovim.nix`, so it stays current even without running the export.
+
+Everything else — `dot_glzr/` (GlazeWM, Zebar), `AppData/` (Nushell on Windows), scoop, winget and `private_dot_jupyter/` — has no Nix equivalent and is maintained by hand.
 
 ## License
 

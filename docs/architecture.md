@@ -4,7 +4,7 @@
 
 - **flake.nix**: Thin entry point — calls `flake-parts.lib.mkFlake` and imports modules from `flake-modules/`
 - **flake-modules/**: Per-subsystem flake-parts modules (the real outputs live here)
-- **Inputs**: nixpkgs, flake-parts, treefmt-nix, home-manager, nix-darwin, nixos-hardware, nixos-wsl, stylix, hyprland, hyprpanel, xremap, wezterm, nixvim, dev (standalone fleet tool)
+- **Inputs**: nixpkgs, flake-parts, treefmt-nix, home-manager, nix-darwin, nixos-hardware, nixos-wsl, stylix, hyprland, hyprpanel, xremap, wezterm, dev (standalone fleet tool)
 
 ## Directory Layout
 
@@ -17,6 +17,7 @@
 │   ├── darwin.nix            # darwinConfigurations
 │   ├── home.nix              # homeConfigurations (standalone home-manager)
 │   ├── per-system.nix        # devShells, formatter, treefmt
+│   ├── export.nix            # packages.export-dotfiles — renders portable config into chezmoi/
 │   └── dev.nix               # re-exports packages from the standalone dev flake
 ├── modules/nixos/             # Self-exported NixOS modules
 │   ├── default.nix           # Kitchen-sink (imports the three below)
@@ -78,7 +79,21 @@ Dotfiles for environments without Nix (Windows, bare Jupyter) live under `chezmo
     └── .chezmoiignore         # Only per-OS target exclusions remain
 ```
 
-Only Neovim's `init.lua` is auto-synced into this tree (to `chezmoi/dot_config/nvim/`) on rebuild, via an activation hook in `home/common/cli/neovim.nix`. Every other Chezmoi file is maintained by hand.
+Files in this tree come from three places, and it matters which:
+
+| File | Origin |
+|------|--------|
+| `dot_config/nvim/init.lua` | Copied from `home/common/cli/init.lua` on every rebuild, by an activation hook in `home/common/cli/neovim.nix` |
+| `dot_config/readonly_starship.toml`, `dot_config/wezterm/` | **Generated** — rendered from the Nix config by `nix run .#export-dotfiles` (see below) |
+| `dot_glzr/`, `AppData/`, `dot_config/{scoop,winget}`, `private_dot_jupyter/` | Hand-maintained; these targets have no Nix equivalent |
+
+### Why starship / wezterm are generated, not hand-written
+
+These configs are *portable structure + Nix-derived values*: starship's `format` interpolates the Stylix base16 palette (`fg:#${colors.base0A}`), and WezTerm's colors, font, and opacity are injected by Stylix into `programs.wezterm.settings` / `colorSchemes`. A static file cannot express them, and hand-copying them into `chezmoi/` is what let those copies silently drift.
+
+So Nix stays the single source and `flake-modules/export.nix` exports the *rendered* artifacts. They are pure data — no `/nix/store` paths — so they work on machines without Nix. The export uses a dedicated home-manager evaluation (not one of the real hosts) so its output does not depend on which machine runs it, and carries the Windows system glyph rather than the exporting host's.
+
+Platform differences that must survive the trip are resolved at runtime rather than at Nix eval time — e.g. `home/common/gui/wezterm.nix` branches on `wezterm.target_triple` in Lua, so the exact same Lua is valid on macOS, Linux, and Windows.
 
 ## Design Principles
 
@@ -101,7 +116,7 @@ Only Neovim's `init.lua` is auto-synced into this tree (to `chezmoi/dot_config/n
 | NixOS-WSL | WSL integration |
 | Stylix | Unified theming (Shonan base16 color scheme) |
 | nixos-hardware | ThinkPad hardware optimizations |
-| Neovim (nixvim + lazy.nvim) | Editor — see [docs/neovim.md](neovim.md) |
+| Neovim (home-manager + lazy.nvim) | Editor — see [docs/neovim.md](neovim.md) |
 | Hyprland + HyprPanel | Wayland compositor + panel (NixOS) |
 | AeroSpace | Tiling window manager (macOS) |
 | WezTerm | Terminal emulator (cross-platform) |
@@ -136,5 +151,5 @@ Platform-specific libraries are included automatically (Linux: glibc, X11; macOS
 ## Related Docs
 
 - [docs/commands.md](commands.md) — apply / bootstrap / maintenance / dev-fleet commands
-- [docs/neovim.md](neovim.md) — Neovim (nixvim + lazy.nvim) setup
+- [docs/neovim.md](neovim.md) — Neovim (home-manager + lazy.nvim) setup
 - [docs/ssh.md](ssh.md) — SSH client + 1Password agent configuration

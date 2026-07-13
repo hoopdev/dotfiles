@@ -18,5 +18,6 @@ Apply changes with `nh {os,darwin,home} switch` — full command reference (appl
 
 - Determine target platform (NixOS vs macOS) before suggesting system-level changes
 - `flake.nix` / `flake.lock` changes affect all hosts — verify carefully
-- Chezmoi sync: an activation hook in `home/common/cli/neovim.nix` copies `init.lua` into `dot_config/nvim/` on rebuild — don't remove it. Other Chezmoi files (e.g. `dot_config/wezterm/`) are hand-maintained, not auto-generated
+- Chezmoi sync: an activation hook in `home/common/cli/neovim.nix` copies `init.lua` into `dot_config/nvim/` on rebuild — don't remove it
+- Generated Chezmoi files: `dot_config/{readonly_starship.toml,wezterm/}` are rendered from the Nix config by `nix run .#export-dotfiles` — edit the Nix source, never the copy. Their values (base16 colors, fonts) come from Stylix and cannot be written as static files. Genuinely non-Nix targets (`dot_glzr/`, `AppData/`, scoop, winget, Jupyter) stay hand-maintained
 - GC runs weekly automatically (`nix.gc` + `programs.nh.clean`); manual GC rarely needed
