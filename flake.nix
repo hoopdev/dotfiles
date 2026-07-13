@@ -62,6 +62,7 @@
         ./flake-modules/darwin.nix
         ./flake-modules/home.nix
         ./flake-modules/per-system.nix
+        ./flake-modules/export.nix
         ./flake-modules/dev.nix
       ];
     };

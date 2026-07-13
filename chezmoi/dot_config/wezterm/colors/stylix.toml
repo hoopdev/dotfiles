@@ -1,0 +1,38 @@
+# Generated from the Nix config by: nix run .#export-dotfiles — do not edit by hand.
+[colors]
+ansi = ["1e2433", "e8787a", "8ac4a0", "e8c87a", "60b8e8", "c090e0", "70d0e8", "c5d4e8"]
+background = "1e2433"
+brights = ["4a5368", "e8787a", "8ac4a0", "e8c87a", "60b8e8", "c090e0", "70d0e8", "f0f6fc"]
+compose_cursor = "e0eaf5"
+cursor_bg = "c5d4e8"
+cursor_fg = "1e2433"
+foreground = "c5d4e8"
+scrollbar_thumb = "272d3f"
+selection_bg = "c5d4e8"
+selection_fg = "1e2433"
+split = "4a5368"
+visual_bell = "f0a070"
+
+[colors.tab_bar]
+background = "272d3f"
+inactive_tab_edge = "272d3f"
+
+[colors.tab_bar.active_tab]
+bg_color = "1e2433"
+fg_color = "c5d4e8"
+
+[colors.tab_bar.inactive_tab]
+bg_color = "4a5368"
+fg_color = "c5d4e8"
+
+[colors.tab_bar.inactive_tab_hover]
+bg_color = "c5d4e8"
+fg_color = "1e2433"
+
+[colors.tab_bar.new_tab]
+bg_color = "4a5368"
+fg_color = "c5d4e8"
+
+[colors.tab_bar.new_tab_hover]
+bg_color = "c5d4e8"
+fg_color = "1e2433"

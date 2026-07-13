@@ -28,7 +28,6 @@
       ripgrep
       rclone
       rsync
-      hackgen-nf-font
       nixfmt
       # quarto  # temporarily disabled: bundles deno-2.7.13 / rusty-v8-147.2.1
       # not yet in cache.nixos.org; local V8 build OOMs on 7.5GB RAM. Re-enable once cached.

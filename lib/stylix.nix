@@ -29,9 +29,13 @@
         package = pkgs.noto-fonts-cjk-sans;
         name = "Noto Sans CJK JP";
       };
+      # HackGen rather than plain Hack: it is the monospace font that is also
+      # easy to install on Windows, so the exported (non-Nix) config can name
+      # the same font. Stylix's font-packages target installs it on every
+      # platform, so it needs no separate entry in home.packages / fonts.packages.
       monospace = {
-        package = pkgs.nerd-fonts.hack;
-        name = "Hack Nerd Font";
+        package = pkgs.hackgen-nf-font;
+        name = "HackGen Console NF";
       };
       emoji = {
         package = pkgs.noto-fonts-color-emoji;
@@ -46,7 +50,10 @@
     };
 
     opacity = {
-      terminal = 0.95;
+      # 0.9, not 0.95: this is the value WezTerm actually ran with, back when
+      # its extraConfig overrode Stylix. Keeping it here preserves the look now
+      # that the override is gone.
+      terminal = 0.9;
       desktop = 1.0;
       popups = 0.95;
       applications = 1.0;

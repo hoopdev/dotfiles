@@ -14,31 +14,17 @@
     fcitx5.addons = [ pkgs.fcitx5-mozc ];
   };
 
-  # Japanese fonts and emoji
+  # Fonts themselves (HackGen + Noto CJK + emoji) are installed and named by
+  # Stylix — see lib/stylix.nix. Stylix's fontconfig target already puts each
+  # family's font first in defaultFonts, so all that is added here is the emoji
+  # fallback it does not append. Listing the fonts again would only duplicate
+  # every entry.
   fonts = {
-    packages = with pkgs; [
-      noto-fonts-cjk-serif
-      noto-fonts-cjk-sans
-      noto-fonts-color-emoji
-      nerd-fonts.hack
-    ];
     fontDir.enable = true;
-    fontconfig = {
-      defaultFonts = {
-        serif = [
-          "Noto Serif CJK JP"
-          "Noto Color Emoji"
-        ];
-        sansSerif = [
-          "Noto Sans CJK JP"
-          "Noto Color Emoji"
-        ];
-        monospace = [
-          "Hack Nerd Font"
-          "Noto Color Emoji"
-        ];
-        emoji = [ "Noto Color Emoji" ];
-      };
+    fontconfig.defaultFonts = {
+      serif = [ "Noto Color Emoji" ];
+      sansSerif = [ "Noto Color Emoji" ];
+      monospace = [ "Noto Color Emoji" ];
     };
   };
 }

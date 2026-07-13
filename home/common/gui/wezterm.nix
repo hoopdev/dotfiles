@@ -1,24 +1,18 @@
-{
-  pkgs,
-  ...
-}:
-let
-  inherit (pkgs.stdenv) isLinux;
-  inherit (pkgs.stdenv) isDarwin;
-in
-{
+_: {
   programs.wezterm = {
     enable = true;
+
+    # Platform differences are resolved by WezTerm at runtime (target_triple)
+    # rather than by Nix at eval time, so this exact Lua is also valid on
+    # Windows — where it is shipped verbatim by `nix run .#export-dotfiles`.
     extraConfig = ''
       local wezterm = require("wezterm")
 
-      -- Color scheme is managed by Stylix (Shonan theme)
+      local is_linux = wezterm.target_triple:find("linux") ~= nil
+
+      -- Colors, font (HackGen), font size and opacity all come from Stylix —
+      -- do not set them here, or they would silently override the theme.
       return {
-        window_background_opacity = 0.9,
-
-        font = wezterm.font("HackGen Console NF", { weight = "Regular", stretch = "Normal", style = "Normal" }),
-        font_size = 14.0,
-
         window_padding = {
           left = 10,
           right = 10,
@@ -28,10 +22,10 @@ in
 
         use_fancy_tab_bar = false,
         hide_tab_bar_if_only_one_tab = true,
-        window_decorations = "${if isDarwin then "TITLE | RESIZE" else "RESIZE"}",
+        window_decorations = is_linux and "RESIZE" or "TITLE | RESIZE",
 
         front_end = "WebGpu",
-        enable_wayland = ${if isLinux then "true" else "false"},
+        enable_wayland = is_linux,
         use_ime = true,
         check_for_updates = false,
 
