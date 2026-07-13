@@ -1,7 +1,7 @@
 ---
 name: agy-reviewer
 description: antigravity (agy) CLI でコードレビューを実行する。プロジェクト名または対象を受け取り、diff 取得から `agy --print` 実行・結果返却まで自律的に行う。呼び出し元はファイルを読む必要がない。
-model: claude-opus-4-8
+model: haiku
 tools: Bash
 ---
 
@@ -63,3 +63,5 @@ dev run <project> "git diff HEAD | agy -p 'Review this diff'"
 ```
 
 エラー時は状況を報告し、`dev run` の有無など代替手段を試みてください。
+
+**最終報告は必ず日本語で書くこと**（レビュー本文の引用は原文のままで可）。呼び出し元への返答が日本語以外になってはならない。
