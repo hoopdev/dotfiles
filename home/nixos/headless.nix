@@ -2,18 +2,9 @@
 # common CLI stack + Neovim, without the desktop GUI modules that
 # home/nixos/default.nix pulls in. Host-specific extras (xdg dirs, ollama, …)
 # stay in the per-host home.nix.
-{
-  username,
-  ...
-}:
-{
+_: {
   imports = [
     ../common/cli
   ];
 
-  home = {
-    inherit username;
-    homeDirectory = "/home/${username}";
-    stateVersion = "24.05";
-  };
 }

@@ -24,6 +24,9 @@ let
   # Mutable, out-of-store copy of the zellij board wasm so `dev board` can be
   # overridden without a switch (seeded by activation.devZellijWasm below).
   wasmTarget = "${config.home.homeDirectory}/.local/state/dev/dev.wasm";
+  localDevSource = config.dotfiles.paths.devSource;
+  localDevSourcePath = if localDevSource == null then "" else localDevSource;
+  localDevCandidateDir = if localDevSource == null then "/nonexistent" else localDevSource;
 
   loadConfig = ''
     export PATH="$HOME/.nix-profile/bin:$PATH"
@@ -48,9 +51,10 @@ let
   # Active-development override. While iterating on ~/git/dev, a locally
   # cargo-built binary shadows the flake-pinned one so a plain `cargo build`
   # (or `just build`) is picked up immediately — no commit, no `nh switch`.
-  # This snippet sets $bin to: $<envVar> (explicit) → target/release/<name> →
-  # target/debug/<name> → the nix fallback. Delete the target dir (or unset the
-  # env var) to fall back to the pinned build.
+  # This snippet sets $bin to: $<envVar> (explicit) → configured local checkout
+  # → the nix fallback. Delete the target dir (or unset the env var) to fall
+  # back to the pinned build. A host without `dotfiles.paths.devSource` simply
+  # uses the portable flake input.
   resolveLocal =
     {
       name,
@@ -59,8 +63,8 @@ let
     }:
     ''
       bin="''${${envVar}:-}"
-      if [[ -z "$bin" ]]; then
-        for candidate in "$HOME/git/dev/target/release/${name}" "$HOME/git/dev/target/debug/${name}"; do
+      if [[ -z "$bin" && -n "${localDevSourcePath}" ]]; then
+        for candidate in "${localDevCandidateDir}/target/release/${name}" "${localDevCandidateDir}/target/debug/${name}"; do
           [[ -x "$candidate" ]] && { bin="$candidate"; break; }
         done
       fi

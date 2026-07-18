@@ -37,6 +37,7 @@
                 if pkgs.stdenv.hostPlatform.isDarwin then "/Users/${username}" else "/home/${username}";
               stateVersion = "24.05";
             };
+            home.pointerCursor.enable = !pkgs.stdenv.isDarwin;
 
             # The one value that is genuinely target-specific: the exported
             # prompt is for Windows, not for the host doing the exporting.
@@ -60,6 +61,25 @@
       neovimInit = ../home/common/cli/init.lua;
 
       banner = "Generated from the Nix config by: nix run .#export-dotfiles — do not edit by hand.";
+      checkedIn = ../chezmoi/dot_config;
+
+      checkExport = pkgs.writeShellApplication {
+        name = "check-export-dotfiles";
+        runtimeInputs = [ pkgs.coreutils ];
+        text = ''
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+
+          { echo "# ${banner}"; cat ${starshipToml}; } > "$tmp/starship.toml"
+          { echo "# ${banner}"; cat ${weztermColors}; } > "$tmp/stylix.toml"
+          { echo "-- ${banner}"; cat ${weztermLua}; } > "$tmp/wezterm.lua"
+
+          cmp "$tmp/starship.toml" ${checkedIn}/readonly_starship.toml
+          cmp "$tmp/stylix.toml" ${checkedIn}/wezterm/colors/stylix.toml
+          cmp "$tmp/wezterm.lua" ${checkedIn}/wezterm/wezterm.lua
+          cmp ${neovimInit} ${checkedIn}/nvim/init.lua
+        '';
+      };
     in
     {
       packages.export-dotfiles = pkgs.writeShellApplication {
@@ -96,5 +116,10 @@
           echo "exported -> chezmoi/dot_config/{readonly_starship.toml,wezterm/,nvim/init.lua}"
         '';
       };
+      packages.check-export-dotfiles = checkExport;
+      checks.export-dotfiles = pkgs.runCommand "export-dotfiles-drift-check" { } ''
+        ${checkExport}/bin/check-export-dotfiles
+        touch $out
+      '';
     };
 }

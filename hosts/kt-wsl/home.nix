@@ -1,7 +1,1 @@
-{ ... }:
-
-{
-  imports = [
-    ../../home/nixos/headless.nix
-  ];
-}
+_: { }

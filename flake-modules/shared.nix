@@ -5,6 +5,7 @@
 { inputs, lib, ... }:
 let
   defaultUsername = "ktaga";
+  profiles = import ../lib/profiles.nix;
 
   # Auto-discover hosts: every directory under hosts/ that contains a meta.nix.
   # Each meta.nix returns { type, system?, users?, configFrom? } describing how
@@ -23,6 +24,13 @@ let
     allowUnfree = true;
   };
 
+  mkHomeProfileModule =
+    profileNames:
+    assert lib.all (name: builtins.hasAttr name profiles.home) profileNames;
+    {
+      imports = map (name: profiles.home.${name}) profileNames;
+    };
+
   # Silence home-manager 26.05 default-change warning while stateVersion
   # remains 24.05. Drop when stateVersion is bumped.
   gtk4ThemeSilencer =
@@ -39,9 +47,28 @@ let
       hostname,
       hostPath,
       isNixOS ? false,
+      homeProfiles ? [ ],
+      homeStateVersion ? "24.05",
+      repoPath ? null,
+      devSource ? null,
     }:
     { pkgs, ... }:
     let
+      homeDirectory = if isNixOS then "/home/${username}" else "/Users/${username}";
+      homeBaseModule =
+        { lib, ... }:
+        {
+          home = {
+            inherit username homeDirectory;
+            stateVersion = homeStateVersion;
+          };
+        }
+        // lib.optionalAttrs (repoPath != null || devSource != null) {
+          dotfiles.paths =
+            { }
+            // lib.optionalAttrs (repoPath != null) { repo = repoPath; }
+            // lib.optionalAttrs (devSource != null) { inherit devSource; };
+        };
       backupExistingFile = pkgs.writeShellScript "home-manager-backup-existing-file" ''
         set -eu
 
@@ -68,10 +95,14 @@ let
         extraSpecialArgs = {
           inherit username inputs;
         };
-        sharedModules = [ gtk4ThemeSilencer ];
+        sharedModules = [
+          (mkHomeProfileModule homeProfiles)
+          homeBaseModule
+          gtk4ThemeSilencer
+        ];
       };
       networking.hostName = hostname;
-      users.users.${username}.home = if isNixOS then "/home/${username}" else "/Users/${username}";
+      users.users.${username}.home = homeDirectory;
 
       nix = {
         gc = {
@@ -101,7 +132,9 @@ in
       nixpkgsConfig
       gtk4ThemeSilencer
       mkHomeConfiguration
+      mkHomeProfileModule
       hosts
+      profiles
       ;
   };
 }

@@ -2,17 +2,21 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ inputs, pkgs, ... }:
+{
+  inputs,
+  pkgs,
+  primaryUser,
+  ...
+}:
 
 {
   imports = [
     # Include the results of the hardware scan.
     ./hardware-configuration.nix
     inputs.xremap.nixosModules.default
-    inputs.self.nixosModules.default
     ../../lib/japanese-locale.nix
     ((import ../../lib/users.nix).mkUser {
-      username = "ktaga";
+      username = primaryUser;
       extraGroups = [
         "networkmanager"
         "audio"
@@ -29,7 +33,7 @@
 
   services.xremap = {
     enable = true;
-    userName = "ktaga";
+    userName = primaryUser;
     serviceMode = "system";
     watch = true;
     config = {

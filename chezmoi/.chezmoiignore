@@ -1,9 +1,14 @@
 # Chezmoi's source root is THIS directory (set by ../.chezmoiroot). The Nix
 # flake, docs, and build outputs live outside it, so chezmoi never sees them —
 # no need to list them here. The only ignores needed are per-OS target
-# exclusions: on macOS these Windows/Nix-managed targets are skipped.
-{{- if (eq .chezmoi.os "darwin") }}
+# exclusions: Windows-only targets never land on Unix. macOS additionally
+# skips .config because Nix owns its complete configuration directory there.
+{{- if ne .chezmoi.os "windows" }}
 AppData
 .glzr
+.config/scoop
+.config/winget.json
+{{- end }}
+{{- if (eq .chezmoi.os "darwin") }}
 .config
 {{- end }}

@@ -184,6 +184,18 @@ A unified development environment is available via `nix develop`.
 
 Each `hosts/<name>/meta.nix` declares `{ type, system?, users?, configFrom? }`; new hosts are picked up automatically by `flake-modules/shared.nix`.
 
+### Host profiles
+
+Host metadata is also the composition point for portable configuration. NixOS
+hosts select `systemProfiles` and all Home Manager hosts select `homeProfiles`;
+the available profile registry is [`lib/profiles.nix`](lib/profiles.nix).
+Typical profiles are `cli`, `developer`, `syncthing`, `nixos-desktop`,
+`nixos-headless`, `mac`, `onepassword`, and `hyprland-cache`.
+
+Keep machine-specific values in metadata (`primaryUser`, `system`, optional
+`paths.repo`, and optional `paths.devSource`) rather than embedding them in a
+shared module.
+
 The **Chezmoi source tree** for non-Nix targets lives under `chezmoi/` (`dot_config/` → `~/.config`, `dot_glzr/`, `AppData/`, `private_dot_jupyter/`); a root `.chezmoiroot` points Chezmoi at it, so the Nix flake and docs stay out of `chezmoi apply` automatically. Most of `dot_config/` is generated from the Nix config by `nix run .#export-dotfiles` — see [Chezmoi](#chezmoi) below. The `wallpaper/` asset stays at the root (Nix-owned, used by Stylix + Hyprland).
 
 ## Key Components
@@ -253,6 +265,26 @@ This renders `dot_config/readonly_starship.toml`, `dot_config/wezterm/` and `dot
 Neovim's `init.lua` is *also* copied on every Nix rebuild by an activation hook in `home/common/cli/neovim.nix`, so it stays current even without running the export.
 
 Everything else — `dot_glzr/` (GlazeWM, Zebar), `AppData/` (Nushell on Windows), scoop, winget and `private_dot_jupyter/` — has no Nix equivalent and is maintained by hand.
+
+Chezmoi applies Windows-only targets (`AppData`, `.glzr`, Scoop, Winget) only
+on Windows. On macOS, Nix owns the full `.config` directory; on non-Nix Linux,
+portable terminal/editor/Jupyter config can still be applied without Windows
+desktop files.
+
+## Developing `dev` locally
+
+The flake pins the private `hoopdev/dev` repository through SSH, so a clone is
+portable to any machine with GitHub SSH access. The installed macOS wrapper
+uses `paths.devSource` from host metadata and prefers local Cargo artifacts;
+`cargo build` in that checkout is therefore picked up without `nh switch`.
+
+For a Nix command that must evaluate a local, uncommitted `dev` checkout, use
+an explicit temporary override:
+
+```bash
+nix build .#dev --override-input dev path:$HOME/git/dev
+nix develop . --override-input dev path:$HOME/git/dev
+```
 
 ## License
 

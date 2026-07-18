@@ -1,54 +1,43 @@
 { pkgs, lib, ... }:
 {
-  home.packages =
-    with pkgs;
-    [
-      bat
-      cloudflared
-      eza
-      fd
-      fx
-      fzf
-      difftastic
-      dust
-      procs
-      bottom
-      ghq
-      httpie
-      imagemagick
-      jq
-      zoxide
-      unar
-      unrar
-      unzip
-      zip
-      zellij
-      gotop
-      yazi
-      ripgrep
-      rclone
-      rsync
-      nixfmt
-      # quarto  # temporarily disabled: bundles deno-2.7.13 / rusty-v8-147.2.1
-      # not yet in cache.nixos.org; local V8 build OOMs on 7.5GB RAM. Re-enable once cached.
-      fastfetch
-      _1password-cli
-      lua-language-server
-      pyright
-      ruff
-      tree-sitter
-      lsof
-      trash-cli
-    ]
-    # On macOS syncthing is provided by Homebrew; only ship the nix binary on
-    # non-Darwin hosts (where there is no Homebrew).
-    ++ lib.optionals (!pkgs.stdenv.isDarwin) [ pkgs.syncthing ];
-  # On macOS syncthing runs via Homebrew (hosts/_shared-mac/configuration.nix brews).
-  # Enabling the home-manager service there creates
-  # org.nix-community.home.syncthing, which conflicts with Homebrew's
-  # homebrew.mxcl.syncthing and crash-loops (last exit code 1). Manage the
-  # nix service on non-Darwin hosts only.
-  services.syncthing.enable = !pkgs.stdenv.isDarwin;
+  home.packages = with pkgs; [
+    bat
+    cloudflared
+    eza
+    fd
+    fx
+    fzf
+    difftastic
+    dust
+    procs
+    bottom
+    ghq
+    httpie
+    imagemagick
+    jq
+    zoxide
+    unar
+    unrar
+    unzip
+    zip
+    zellij
+    gotop
+    yazi
+    ripgrep
+    rclone
+    rsync
+    nixfmt
+    # quarto  # temporarily disabled: bundles deno-2.7.13 / rusty-v8-147.2.1
+    # not yet in cache.nixos.org; local V8 build OOMs on 7.5GB RAM. Re-enable once cached.
+    fastfetch
+    _1password-cli
+    lua-language-server
+    pyright
+    ruff
+    tree-sitter
+    lsof
+    trash-cli
+  ];
   programs.zoxide = {
     enable = true;
     package = pkgs.zoxide;

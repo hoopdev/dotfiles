@@ -117,9 +117,4 @@
   # $ darwin-rebuild changelog
   system.stateVersion = 5;
 
-  # Set primary user for nix-darwin migration
-  system.primaryUser = "ktaga";
-
-  # The platform the configuration will be used on.
-  nixpkgs.hostPlatform = "aarch64-darwin";
 }

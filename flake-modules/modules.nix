@@ -7,5 +7,6 @@ _:
     nix-ld = ../modules/nixos/nix-ld.nix;
     onepassword = ../modules/nixos/onepassword.nix;
     nix-settings = ../modules/nixos/nix-settings.nix;
+    hyprland-cache = ../modules/nixos/hyprland-cache.nix;
   };
 }

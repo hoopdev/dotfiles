@@ -1,10 +1,4 @@
-{ ... }:
-
-{
-  imports = [
-    ../../home/mac
-  ];
-
+_: {
   # kt-mba specific Karabiner Elements configuration
   home.file.".config/karabiner/karabiner.json" = {
     source = ./karabiner.json;

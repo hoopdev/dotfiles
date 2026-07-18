@@ -14,7 +14,7 @@ _: {
       } 
       $env.PATH = ($env.PATH | 
       split row (char esep) |
-      prepend /home/myuser/.apps |
+      prepend ($env.HOME | path join ".apps") |
       append /usr/bin/env
       )
     '';

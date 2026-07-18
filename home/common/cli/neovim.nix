@@ -6,7 +6,7 @@
 }:
 let
   initLuaSource = ./init.lua;
-  dotfilesDir = "${config.home.homeDirectory}/git/dotfiles";
+  dotfilesDir = config.dotfiles.paths.repo;
 
   # Obsidian vault paths - can be overridden per host via
   # programs.neovim.obsidianVaults (custom option declared below).
@@ -27,22 +27,16 @@ in
   # man pages broke `nh switch` on the pinned nixpkgs.)
   options.programs.neovim.obsidianVaults = lib.mkOption {
     type = lib.types.listOf (lib.types.attrsOf lib.types.str);
-    default = [
-      {
-        name = "Private";
-        path = "${config.home.homeDirectory}/Library/Mobile Documents/iCloud~md~obsidian/Documents/Private";
-      }
-      {
-        name = "Work";
-        path = "${config.home.homeDirectory}/Library/Mobile Documents/iCloud~md~obsidian/Documents/Work";
-      }
-    ];
+    default = [ ];
     description = "List of Obsidian vault configurations";
   };
 
   config.programs.neovim = {
     enable = true;
     defaultEditor = true;
+    # Keep current behavior explicit while home.stateVersion remains 24.05.
+    withPython3 = true;
+    withRuby = true;
 
     # Load external Lua configuration (init.lua) with vault paths injected.
     # home-manager writes this as ~/.config/nvim/init.lua.
@@ -70,11 +64,13 @@ in
   };
 
   # Copy init.lua to chezmoi dotfiles directory on activation
-  config.home.activation.syncNeovimConfig = config.lib.dag.entryAfter [ "writeBoundary" ] ''
-    if [ -d "${dotfilesDir}" ]; then
-      $DRY_RUN_CMD mkdir -p "${dotfilesDir}/chezmoi/dot_config/nvim"
-      $DRY_RUN_CMD cp -f ${initLuaSource} "${dotfilesDir}/chezmoi/dot_config/nvim/init.lua"
-      echo "Synced init.lua to chezmoi dotfiles"
-    fi
-  '';
+  config.home.activation.syncNeovimConfig = lib.mkIf (dotfilesDir != null) (
+    config.lib.dag.entryAfter [ "writeBoundary" ] ''
+      if [ -d "${dotfilesDir}" ]; then
+        $DRY_RUN_CMD mkdir -p "${dotfilesDir}/chezmoi/dot_config/nvim"
+        $DRY_RUN_CMD cp -f ${initLuaSource} "${dotfilesDir}/chezmoi/dot_config/nvim/init.lua"
+        echo "Synced init.lua to chezmoi dotfiles"
+      fi
+    ''
+  );
 }

@@ -9,14 +9,15 @@
   inputs,
   lib,
   pkgs,
+  primaryUser,
   ...
 }:
 
 {
   imports = [
-    inputs.self.nixosModules.default
     (import ../../lib/wsl-common.nix {
       inherit lib pkgs inputs;
+      username = primaryUser;
       enableDockerGroup = true;
     })
   ];

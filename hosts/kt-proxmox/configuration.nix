@@ -3,8 +3,8 @@
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
 {
-  inputs,
   pkgs,
+  primaryUser,
   ...
 }:
 
@@ -12,10 +12,9 @@
   imports = [
     # Include the results of the hardware scan.
     ./hardware-configuration.nix
-    inputs.self.nixosModules.default
     ../../lib/japanese-locale.nix
     ((import ../../lib/users.nix).mkUser {
-      username = "ktaga";
+      username = primaryUser;
       extraGroups = [
         "networkmanager"
         "audio"
@@ -132,7 +131,7 @@
   nix.settings = {
     trusted-users = [
       "root"
-      "ktaga"
+      primaryUser
     ];
   };
 }

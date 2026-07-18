@@ -52,6 +52,19 @@
 
 Each `hosts/<name>/meta.nix` declares `{ type, system?, users?, configFrom? }`; `flake-modules/shared.nix` reads the directory and dispatches to the matching subsystem module.
 
+### Profiles and host inventory
+
+`meta.nix` is the host inventory, not only a discovery marker. It declares the
+target system, primary user, and selected profiles. [`lib/profiles.nix`](../lib/profiles.nix)
+maps those names to modules, while `flake-modules/{nixos,darwin,home}.nix`
+creates the shared Home Manager baseline. This keeps personal paths and
+service choices out of reusable modules.
+
+`systemProfiles` are NixOS-only (`base`, `onepassword`, `hyprland-cache`);
+`homeProfiles` work across host kinds (`cli`, `developer`, `syncthing`,
+`nixos-desktop`, `nixos-headless`, `ollama`, `mac`). The base NixOS profile no
+longer implicitly trusts the Hyprland cache or installs the 1Password GUI.
+
 ### Claude Code skill library (`claude/skills/`)
 
 Canonical source for Claude Code skills that grow across projects. `dev skill`
@@ -104,6 +117,8 @@ Platform differences that must survive the trip are resolved at runtime rather t
 - **Platform-Specific Overlays**: `home/mac/` and `home/nixos/` extend the common base
 - **Unified Theming**: Stylix applies the Shonan color scheme (custom base16) everywhere
 - **Reproducible Builds**: `flake.lock` pins all input versions
+- **Profile-driven Hosts**: Features and services are opt-in through metadata
+- **Portable Private Inputs**: Private flakes use SSH; local worktrees use explicit Nix overrides
 
 ## Key Components
 
@@ -139,6 +154,13 @@ Defined in `lib/devshell.nix`:
 | Shell | zsh, starship, direnv, nix-direnv |
 
 Platform-specific libraries are included automatically (Linux: glibc, X11; macOS: system frameworks).
+
+## Verification
+
+`nix flake check --all-systems` evaluates every NixOS, Darwin, and standalone
+Home Manager configuration through lightweight check derivations. It also
+checks that generated Chezmoi artifacts match the Nix-rendered source.
+Use `nix run .#check-export-dotfiles` for the drift check alone.
 
 ## User Configuration
 

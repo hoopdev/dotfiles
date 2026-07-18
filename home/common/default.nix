@@ -1,20 +1,16 @@
 {
   lib,
   pkgs,
-  username,
   ...
 }:
 
 {
   imports = [
+    ./profiles.nix
     ./cli
-    ./gui
   ];
 
   home = {
-    inherit username;
-    stateVersion = "24.05";
-
     sessionVariables = {
       NIXPKGS_ALLOW_UNFREE = "1";
     }

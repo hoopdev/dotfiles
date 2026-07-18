@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, config, ... }:
 let
   # matugen 4.0.0 errors with "IO error: not a terminal" on `matugen image …`
   # in non-TTY contexts (subprocess, pipe) when --source-color-index is not
@@ -30,15 +30,18 @@ in
   services.hyprpaper = {
     enable = true;
     settings = {
-      preload = [ "~/dotfiles/wallpaper/wallpaper_enoshima.jpg" ];
+      preload = [ "${config.dotfiles.paths.repo}/wallpaper/wallpaper_enoshima.jpg" ];
       wallpaper = [
-        "eDP-1,~/dotfiles/wallpaper/wallpaper_enoshima.jpg"
+        "eDP-1,${config.dotfiles.paths.repo}/wallpaper/wallpaper_enoshima.jpg"
       ];
     };
   };
 
   wayland.windowManager.hyprland = {
     enable = true;
+    # Preserve the existing generated Hyprland configuration format across
+    # future Home Manager state-version bumps.
+    configType = "hyprlang";
     xwayland.enable = true;
     settings = {
       exec-once = [

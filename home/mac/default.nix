@@ -1,4 +1,4 @@
-{ ... }:
+{ config, ... }:
 
 {
   imports = [
@@ -12,8 +12,19 @@
     OLLAMA_HOST = "0.0.0.0";
   };
 
+  programs.neovim.obsidianVaults = [
+    {
+      name = "Private";
+      path = "${config.home.homeDirectory}/Library/Mobile Documents/iCloud~md~obsidian/Documents/Private";
+    }
+    {
+      name = "Work";
+      path = "${config.home.homeDirectory}/Library/Mobile Documents/iCloud~md~obsidian/Documents/Work";
+    }
+  ];
+
   home.sessionPath = [
-    "/Users/ktaga/.local/bin"
-    "/Users/ktaga/.deno/bin"
+    "${config.home.homeDirectory}/.local/bin"
+    "${config.home.homeDirectory}/.deno/bin"
   ];
 }

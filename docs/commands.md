@@ -21,6 +21,8 @@ nix run nixpkgs#nh -- darwin switch . -H kt-mac-studio
 ```bash
 nix flake update                        # Update inputs
 nix flake check                         # Validate
+nix flake check --all-systems           # Evaluate every host/profile output
+nix run .#check-export-dotfiles         # Verify generated Chezmoi files have no drift
 nh clean all --keep 5 --keep-since 7d   # GC (user + system)
 nix develop                             # Dev shell (Python + Nix tools)
 ```
@@ -48,4 +50,12 @@ nix flake update dev                      # pull latest dev into dotfiles' lock
 cd ~/git/dev
 nix develop .#rust -c just ci             # cargo check + test
 nix develop .#rust -c cargo <cmd> ...     # lean Rust toolchain shell
+```
+
+`dev` is a private SSH flake input, so the machine needs GitHub SSH access.
+To test dotfiles against local, uncommitted `dev` code without altering the
+lock, pass an explicit override:
+
+```bash
+nix build .#dev --override-input dev path:$HOME/git/dev
 ```

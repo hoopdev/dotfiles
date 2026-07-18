@@ -1,29 +1,17 @@
 {
   pkgs,
-  username,
   ...
 }:
 
 {
-  imports = [
-    ../../home/common/cli
+  home.packages = with pkgs; [
+    noto-fonts-cjk-sans
+    noto-fonts-color-emoji
+    # Nerd Fonts for Starship icons and Ubuntu logo
+    nerd-fonts.fira-code
+    nerd-fonts.jetbrains-mono
+    nerd-fonts.meslo-lg
   ];
-
-  home = {
-    inherit username;
-    homeDirectory = "/home/${username}";
-    stateVersion = "24.05";
-
-    # Fonts for icons and emoji support in terminal
-    packages = with pkgs; [
-      noto-fonts-cjk-sans
-      noto-fonts-color-emoji
-      # Nerd Fonts for Starship icons and Ubuntu logo
-      nerd-fonts.fira-code
-      nerd-fonts.jetbrains-mono
-      nerd-fonts.meslo-lg
-    ];
-  };
 
   # Enable font configuration in home-manager
   fonts.fontconfig.enable = true;

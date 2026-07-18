@@ -5,4 +5,9 @@
     "ktaga"
     "jovyan"
   ];
+  homeProfiles = [
+    "cli"
+    "developer"
+    "syncthing"
+  ];
 }

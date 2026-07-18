@@ -39,7 +39,12 @@
       # git+file (not path:) so only git-tracked files are hashed — this excludes
       # the multi-GB gitignored target/ dir, whose churn otherwise re-hashed the
       # input and forced a full dev rebuild on every `nh switch`.
-      url = "git+file:///Users/ktaga/git/dev";
+      # Keep the lock portable. Local iteration uses
+      # `nix ... --override-input dev path:$HOME/git/dev` (documented in README)
+      # while Home Manager wrappers prefer locally built binaries when present.
+      # `dev` is private, so use the authenticated Git transport rather than
+      # GitHub's anonymous flake API.
+      url = "git+ssh://git@github.com/hoopdev/dev.git";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixos-wsl.url = "github:nix-community/nixos-wsl";
@@ -57,6 +62,7 @@
       ];
       imports = [
         ./flake-modules/shared.nix
+        ./flake-modules/checks.nix
         ./flake-modules/modules.nix
         ./flake-modules/nixos.nix
         ./flake-modules/darwin.nix

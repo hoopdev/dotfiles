@@ -129,11 +129,11 @@
         "rev": "0f60ff6164e48b9ce267f735767d39a7874001e6",
         "revCount": 721,
         "type": "git",
-        "url": "file:///Users/ktaga/git/dev"
+        "url": "ssh://git@github.com/hoopdev/dev.git"
       },
       "original": {
         "type": "git",
-        "url": "file:///Users/ktaga/git/dev"
+        "url": "ssh://git@github.com/hoopdev/dev.git"
       }
     },
     "firefox-gnome-theme": {

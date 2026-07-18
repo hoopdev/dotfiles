@@ -16,10 +16,18 @@ let
 
   mkDarwinConfiguration =
     hostname: meta:
+    let
+      username = meta.primaryUser or defaultUsername;
+      paths = meta.paths or { };
+    in
     inputs.nix-darwin.lib.darwinSystem {
-      system = "aarch64-darwin";
+      inherit (meta) system;
       modules = [
         { nixpkgs.config = nixpkgsConfig; }
+        {
+          system.primaryUser = username;
+          nixpkgs.hostPlatform = meta.system;
+        }
         # Workaround: nixpkgs-unstable's nixos-render-docs dropped the
         # `--toc-depth` flag (now `--sidebar-depth`), but the current
         # nix-darwin release still passes it when building the HTML manual,
@@ -39,9 +47,13 @@ let
         (import ../lib/stylix.nix { darwin = true; })
         inputs.home-manager.darwinModules.home-manager
         (mkHomeConfiguration {
-          username = defaultUsername;
+          inherit username;
           inherit hostname;
           hostPath = hostDir hostname meta + "/home.nix";
+          homeProfiles = meta.homeProfiles or [ ];
+          homeStateVersion = meta.homeStateVersion or "24.05";
+          repoPath = paths.repo or null;
+          devSource = paths.devSource or null;
         })
       ];
       specialArgs = {
