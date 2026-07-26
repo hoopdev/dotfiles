@@ -15,7 +15,7 @@ _:
     #   loginExtra override is invisible inside zellij and `git push` there grabs
     #   WezTerm's (empty) mux agent instead of 1Password.
     initContent = ''
-      if [[ -z "''${SSH_AUTH_SOCK:-}" && -z "''${SSH_CONNECTION:-}" ]]; then
+      if [[ -z "''${SSH_CONNECTION:-}" ]]; then
         export SSH_AUTH_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
       fi
 
