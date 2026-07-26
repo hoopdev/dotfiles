@@ -6,12 +6,11 @@
   ...
 }:
 # Everything the `dev` fleet tool needs, kept out of coder.nix (which is coder
-# connection only): the `dev` CLI + TUI + Zellij board, the opencode wrapper
-# that `dev` agents launch, and the Claude Code statusline that feeds
-# `dev usage` / the TUI.
+# connection only): the `dev` CLI + TUI + Zellij board, and the Claude Code
+# statusline that feeds `dev usage` / the TUI.
 let
-  # local.zsh (untracked) holds only the secrets these wrappers source:
-  # TELEGRAM_* for `dev notify`, LLM_CF_TOKEN for opencode. Fleet topology
+  # local.zsh (untracked) holds secrets sourced by the dev wrapper:
+  # TELEGRAM_* for `dev notify`. Fleet topology
   # (envs / local / remote projects) lives in ~/.config/dev/config.toml, managed
   # by `dev config`; migrate old DEV_* arrays with
   # `dev config import`.
@@ -111,21 +110,12 @@ let
     exec "$bin" statusline "$@"
   '';
 
-  # opencode is launched by `dev` agents; this wrapper sources local.zsh so
-  # LLM_CF_TOKEN (and other secrets) are present even when a subagent invokes it
-  # without an interactive-shell env.
-  opencodeWrapper = pkgs.writeShellScriptBin "opencode" ''
-    export PATH="$HOME/.nix-profile/bin:/opt/homebrew/bin:$PATH"
-    [[ -f "${localZsh}" ]] && source "${localZsh}"
-    exec /opt/homebrew/bin/opencode "$@"
-  '';
 in
 {
   home = {
     packages = [
       devCmd
       devTuiCmd
-      opencodeWrapper
     ];
 
     file = {
