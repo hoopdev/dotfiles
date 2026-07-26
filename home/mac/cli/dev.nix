@@ -35,7 +35,7 @@ let
     # may not have run the macOS login hook, so point it at the 1Password agent
     # when unset for local invocations. SSH sessions should use only a
     # client-forwarded agent so the origin machine controls key approval.
-    if [[ -z "''${SSH_AUTH_SOCK:-}" && -z "''${SSH_CONNECTION:-}" ]]; then
+    if [[ -z "''${SSH_CONNECTION:-}" ]]; then
       export SSH_AUTH_SOCK="''${DEV_SSH_AGENT_SOCK:-$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock}"
     fi
   '';
