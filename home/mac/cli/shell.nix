@@ -21,6 +21,7 @@ _:
 
       export LANG=ja_JP.utf8
       eval "$(/opt/homebrew/bin/brew shellenv)"
+      export PATH="$HOME/.nix-profile/bin:/etc/profiles/per-user/$USER/bin:$PATH"
 
       # 1Password secrets cache (~/.op-secrets)
       # Delete this file to force re-fetch: rm ~/.op-secrets
