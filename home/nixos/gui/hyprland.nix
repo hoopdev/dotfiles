@@ -49,6 +49,10 @@ in
         "fcitx5 -d --replace"
         "swayosd-server"
         "wl-paste --watch cliphist store"
+        # Keeps the 1Password SSH agent socket alive across logins; without
+        # this the socket file persists but nothing listens on it, so
+        # ssh-add/git-over-ssh silently fail with "Permission denied".
+        "1password --silent"
       ];
       monitor = [ "eDP-1, 2160x1440@60, 0x0, 1" ];
       env = [
