@@ -8,6 +8,7 @@
   imports = [
     ./profiles.nix
     ./cli
+    ./gui
   ];
 
   home = {
