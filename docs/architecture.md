@@ -4,7 +4,7 @@
 
 - **flake.nix**: Thin entry point — calls `flake-parts.lib.mkFlake` and imports modules from `flake-modules/`
 - **flake-modules/**: Per-subsystem flake-parts modules (the real outputs live here)
-- **Inputs**: nixpkgs, flake-parts, treefmt-nix, home-manager, nix-darwin, nixos-hardware, nixos-wsl, stylix, hyprland, hyprpanel, xremap, wezterm, dev (standalone fleet tool)
+- **Inputs**: nixpkgs, flake-parts, treefmt-nix, home-manager, nix-darwin, nixos-hardware, nixos-wsl, stylix, hyprland, hyprpanel, xremap, dev (standalone fleet tool)
 
 ## Directory Layout
 
