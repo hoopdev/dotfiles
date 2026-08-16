@@ -31,10 +31,6 @@
       url = "github:nix-community/stylix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    wezterm = {
-      url = "github:wez/wezterm?dir=nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     dev = {
       # git+file (not path:) so only git-tracked files are hashed — this excludes
       # the multi-GB gitignored target/ dir, whose churn otherwise re-hashed the
