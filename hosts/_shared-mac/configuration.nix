@@ -59,6 +59,12 @@
       "discord"
       "obsidian"
       "telegram"
+      "slack"
+      "visual-studio-code"
+      # The app only — ~/.config/wezterm is still written by Home Manager
+      # (home/common/gui/wezterm.nix), which is what carries the Stylix theme.
+      # Nightly, because the stable cask is pinned to 20240203.
+      "wezterm@nightly"
     ];
   };
 
