@@ -12,6 +12,12 @@ in
   # - インストール先: ~/.local/bin/claude (→ ~/.local/share/claude/versions/<ver>)
   # - 更新: Claude Code 自身が自動更新するので activation では再実行しない
   # - Nix / brew / npm では入れない (公式バイナリを単一の真実とする)
+
+  # インストーラが放り込む ~/.local/bin を PATH に追加する。
+  # macOS は home/mac/default.nix で sessionPath 済みだが、NixOS/Linux 側では
+  # 未設定のため claude が PATH に見えなかった。共通側に定義して両対応にする。
+  home.sessionPath = [ "${config.home.homeDirectory}/.local/bin" ];
+
   home.packages =
     with pkgs;
     lib.optionals (!isDarwin) [
