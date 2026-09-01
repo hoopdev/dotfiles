@@ -16,5 +16,6 @@
     base = ../modules/nixos/default.nix;
     onepassword = ../modules/nixos/onepassword.nix;
     hyprland-cache = ../modules/nixos/hyprland-cache.nix;
+    nvidia = ../modules/nixos/nvidia.nix;
   };
 }
