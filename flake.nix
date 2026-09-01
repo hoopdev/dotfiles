@@ -32,8 +32,10 @@
       # `nix ... --override-input dev path:$HOME/git/dev` (documented in README)
       # while Home Manager wrappers prefer locally built binaries when present.
       # `dev` is private, so use the authenticated Git transport rather than
-      # GitHub's anonymous flake API.
-      url = "git+ssh://git@github.com/hoopdev/dev.git";
+      # GitHub's anonymous flake API. HTTPS + gh's git-credential helper
+      # (git config credential.https://github.com.helper) avoids depending
+      # on an SSH agent/key being loaded (e.g. 1Password not running).
+      url = "git+https://github.com/hoopdev/dev.git";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixos-wsl.url = "github:nix-community/nixos-wsl";
