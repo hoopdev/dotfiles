@@ -129,11 +129,11 @@
         "rev": "a4ad11e11598998aeb5566c0ea4f0f19de074d80",
         "revCount": 1217,
         "type": "git",
-        "url": "ssh://git@github.com/hoopdev/dev.git"
+        "url": "https://github.com/hoopdev/dev.git"
       },
       "original": {
         "type": "git",
-        "url": "ssh://git@github.com/hoopdev/dev.git"
+        "url": "https://github.com/hoopdev/dev.git"
       }
     },
     "firefox-gnome-theme": {
