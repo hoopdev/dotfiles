@@ -5,6 +5,7 @@
   systemProfiles = [
     "base"
     "onepassword"
+    "nvidia"
   ];
   homeProfiles = [
     "nixos-headless"

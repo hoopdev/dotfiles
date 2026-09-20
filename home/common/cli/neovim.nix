@@ -24,7 +24,7 @@ in
   # onto the stock home-manager programs.neovim namespace; it replaces the
   # old programs.nixvim.obsidianVaults — nixvim itself was removed 2026-07-11:
   # it was only a thin shell around init.lua, and its pandoc-rendered option
-  # man pages broke `nh switch` on the pinned nixpkgs.)
+  # man pages broke `nh switch`.)
   options.programs.neovim.obsidianVaults = lib.mkOption {
     type = lib.types.listOf (lib.types.attrsOf lib.types.str);
     default = [ ];

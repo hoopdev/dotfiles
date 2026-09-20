@@ -37,7 +37,7 @@
                 if pkgs.stdenv.hostPlatform.isDarwin then "/Users/${username}" else "/home/${username}";
               stateVersion = "24.05";
             };
-            home.pointerCursor.enable = !pkgs.stdenv.isDarwin;
+            home.pointerCursor.enable = !pkgs.stdenv.hostPlatform.isDarwin;
 
             # This rendering-only configuration does not use Rofi.
             stylix.targets.rofi.enable = false;

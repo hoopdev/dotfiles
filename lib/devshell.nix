@@ -9,8 +9,8 @@ let
   cliPackages = commonCliTools.home.packages;
 
   # Platform detection
-  inherit (pkgs.stdenv) isLinux;
-  inherit (pkgs.stdenv) isDarwin;
+  inherit (pkgs.stdenv.hostPlatform) isLinux;
+  inherit (pkgs.stdenv.hostPlatform) isDarwin;
 
   # Platform-specific libraries
   linuxLibraries = with pkgs; [

@@ -23,12 +23,7 @@ let
     inputs.nixpkgs.lib.nixosSystem {
       inherit (meta) system;
       modules = [
-        {
-          nixpkgs.config = nixpkgsConfig;
-          # No host uses ReGreet. Stylix targets its new option location,
-          # which is not available in our pinned nixpkgs yet.
-          disabledModules = [ "${inputs.stylix}/modules/regreet/nixos.nix" ];
-        }
+        { nixpkgs.config = nixpkgsConfig; }
       ]
       ++ lib.optionals (lib.elem "onepassword" systemProfiles) [
         {
@@ -43,6 +38,14 @@ let
         ../hosts/${hostname}/configuration.nix
         inputs.stylix.nixosModules.stylix
         (import ../lib/stylix.nix { })
+        # No host uses ReGreet; stylix auto-enables this target on every
+        # Linux system regardless, and its module still references
+        # `services.displayManager.regreet` — renamed by nixpkgs to
+        # `programs.regreet` (unmatched by stylix as of 2026-08-12). Setting
+        # `enable = false` alone doesn't help: NixOS's module system rejects
+        # definitions against a nonexistent option even under `mkIf false`.
+        # Excluding the module outright via `disabledModules` is the only fix.
+        { disabledModules = [ "${inputs.stylix}/modules/regreet/nixos.nix" ]; }
         inputs.home-manager.nixosModules.home-manager
         (mkHomeConfiguration {
           inherit username;

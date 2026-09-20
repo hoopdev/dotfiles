@@ -15,11 +15,11 @@
     sessionVariables = {
       NIXPKGS_ALLOW_UNFREE = "1";
     }
-    // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+    // lib.optionalAttrs (!pkgs.stdenv.hostPlatform.isDarwin) {
       NPM_CONFIG_PREFIX = "$HOME/.npm-global";
     };
 
-    sessionPath = lib.optionals (!pkgs.stdenv.isDarwin) [
+    sessionPath = lib.optionals (!pkgs.stdenv.hostPlatform.isDarwin) [
       "$HOME/.npm-global/bin"
     ];
 

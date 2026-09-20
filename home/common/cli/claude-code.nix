@@ -5,13 +5,14 @@
   ...
 }:
 let
-  inherit (pkgs.stdenv) isDarwin;
+  inherit (pkgs.stdenv.hostPlatform) isDarwin;
 in
 {
   # Claude Code 本体は ai-tools-bootstrap で公式インストーラから導入する。
   # - インストール先: ~/.local/bin/claude (→ ~/.local/share/claude/versions/<ver>)
   # - 更新: 自己更新、または ai-tools-update claude。activation では取得しない
   # - Nix / brew / npm では入れない (公式バイナリを単一の真実とする)
+
   home.packages =
     with pkgs;
     lib.optionals (!isDarwin) [

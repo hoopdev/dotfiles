@@ -14,7 +14,7 @@
   };
 
   config = {
-    home.pointerCursor.enable = lib.mkIf (!pkgs.stdenv.isDarwin) true;
+    home.pointerCursor.enable = lib.mkIf (!pkgs.stdenv.hostPlatform.isDarwin) true;
 
     # Stylix still uses the deprecated Rofi font option. Do not generate
     # unused Rofi settings on hosts where the program is disabled.
