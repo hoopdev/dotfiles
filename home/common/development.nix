@@ -2,6 +2,7 @@
 {
   imports = [
     ./cli/development.nix
+    ./cli/ai-tools.nix
     ./cli/claude-code.nix
     ./cli/opencode.nix
   ];

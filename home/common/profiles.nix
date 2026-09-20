@@ -11,14 +11,13 @@
       default = "${config.home.homeDirectory}/dotfiles";
       description = "Location of this dotfiles checkout on the current host.";
     };
-    devSource = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      description = "Optional local checkout of hoopdev/dev used by development wrappers.";
-    };
   };
 
-  config = lib.mkIf (!pkgs.stdenv.isDarwin) {
-    home.pointerCursor.enable = true;
+  config = {
+    home.pointerCursor.enable = lib.mkIf (!pkgs.stdenv.isDarwin) true;
+
+    # Stylix still uses the deprecated Rofi font option. Do not generate
+    # unused Rofi settings on hosts where the program is disabled.
+    stylix.targets.rofi.enable = lib.mkDefault config.programs.rofi.enable;
   };
 }

@@ -7,6 +7,5 @@
     "developer"
   ];
   paths = {
-    devSource = "/Users/ktaga/git/dev";
   };
 }

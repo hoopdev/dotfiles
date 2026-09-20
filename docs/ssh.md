@@ -82,9 +82,8 @@ if [[ -z "${SSH_CONNECTION:-}" && -z "${SSH_AUTH_SOCK:-}" ]]; then
 fi
 ```
 
-この repo の macOS 設定も同じ方針にしている。`home/mac/default.nix` はローカル
-端末だけ 1Password socket を補完し、`home/mac/dev.nix` で導入される `dev` も SSH
-セッション内では補完しない。
+この repo の macOS 設定も同じ方針にしている。`home/mac/cli/shell.nix` はローカル
+端末だけ 1Password socket を補完し、SSH セッション内では補完しない。
 
 ## Verification
 

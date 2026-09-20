@@ -4,7 +4,7 @@
 
 - **flake.nix**: Thin entry point — calls `flake-parts.lib.mkFlake` and imports modules from `flake-modules/`
 - **flake-modules/**: Per-subsystem flake-parts modules (the real outputs live here)
-- **Inputs**: nixpkgs, flake-parts, treefmt-nix, home-manager, nix-darwin, nixos-hardware, nixos-wsl, stylix, hyprland, hyprpanel, xremap, wezterm, dev (standalone fleet tool)
+- **Inputs**: nixpkgs, flake-parts, treefmt-nix, home-manager, nix-darwin, nixos-hardware, nixos-wsl, stylix, hyprland, hyprpanel, xremap, wezterm
 
 ## Directory Layout
 
@@ -17,8 +17,7 @@
 │   ├── darwin.nix            # darwinConfigurations
 │   ├── home.nix              # homeConfigurations (standalone home-manager)
 │   ├── per-system.nix        # devShells, formatter, treefmt
-│   ├── export.nix            # packages.export-dotfiles — renders portable config into chezmoi/
-│   └── dev.nix               # re-exports packages from the standalone dev flake
+│   └── export.nix            # packages.export-dotfiles — renders portable config into chezmoi/
 ├── modules/nixos/             # Self-exported NixOS modules
 │   ├── default.nix           # Kitchen-sink (imports the three below)
 │   ├── nix-ld.nix            # nix-ld for unpatched binaries
@@ -67,7 +66,7 @@ longer implicitly trusts the Hyprland cache or installs the 1Password GUI.
 
 ### Claude Code skill library (`claude/skills/`)
 
-Canonical source for Claude Code skills that grow across projects. `dev skill`
+Canonical source for Claude Code skills that grow across projects. The separately installed `dev skill`
 (from the `dev` fleet tool) distributes them into each subscribed project's
 `.claude/skills/` as plain committed copies and classifies sync state via an
 `x-canonical-hash` frontmatter key; per-repo rules live in a
@@ -139,7 +138,6 @@ Platform differences that must survive the trip are resolved at runtime rather t
 | nix-ld | Run unpatched binaries on NixOS (uv, Python wheels) |
 | 1Password CLI | Secret management |
 | Chezmoi | Supplementary dotfile sync for non-Nix environments |
-| dev | Standalone fleet tool flake consumed from `~/git/dev` (installed on macOS via `home/mac`) |
 
 ## Development Shell (`nix develop`)
 
@@ -172,6 +170,6 @@ Use `nix run .#check-export-dotfiles` for the drift check alone.
 
 ## Related Docs
 
-- [docs/commands.md](commands.md) — apply / bootstrap / maintenance / dev-fleet commands
+- [docs/commands.md](commands.md) — apply / bootstrap / maintenance commands
 - [docs/neovim.md](neovim.md) — Neovim (home-manager + lazy.nvim) setup
 - [docs/ssh.md](ssh.md) — SSH client + 1Password agent configuration
