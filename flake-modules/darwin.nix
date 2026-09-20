@@ -53,7 +53,6 @@ let
           homeProfiles = meta.homeProfiles or [ ];
           homeStateVersion = meta.homeStateVersion or "24.05";
           repoPath = paths.repo or null;
-          devSource = paths.devSource or null;
         })
       ];
       specialArgs = {

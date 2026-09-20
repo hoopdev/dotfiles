@@ -50,7 +50,6 @@ let
       homeProfiles ? [ ],
       homeStateVersion ? "24.05",
       repoPath ? null,
-      devSource ? null,
     }:
     { pkgs, ... }:
     let
@@ -63,11 +62,8 @@ let
             stateVersion = homeStateVersion;
           };
         }
-        // lib.optionalAttrs (repoPath != null || devSource != null) {
-          dotfiles.paths =
-            { }
-            // lib.optionalAttrs (repoPath != null) { repo = repoPath; }
-            // lib.optionalAttrs (devSource != null) { inherit devSource; };
+        // lib.optionalAttrs (repoPath != null) {
+          dotfiles.paths.repo = repoPath;
         };
       backupExistingFile = pkgs.writeShellScript "home-manager-backup-existing-file" ''
         set -eu

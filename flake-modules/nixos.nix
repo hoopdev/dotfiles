@@ -23,7 +23,12 @@ let
     inputs.nixpkgs.lib.nixosSystem {
       inherit (meta) system;
       modules = [
-        { nixpkgs.config = nixpkgsConfig; }
+        {
+          nixpkgs.config = nixpkgsConfig;
+          # No host uses ReGreet. Stylix targets its new option location,
+          # which is not available in our pinned nixpkgs yet.
+          disabledModules = [ "${inputs.stylix}/modules/regreet/nixos.nix" ];
+        }
       ]
       ++ lib.optionals (lib.elem "onepassword" systemProfiles) [
         {
@@ -47,7 +52,6 @@ let
           inherit homeProfiles;
           homeStateVersion = meta.homeStateVersion or "24.05";
           repoPath = paths.repo or null;
-          devSource = paths.devSource or null;
         })
       ];
       specialArgs = {

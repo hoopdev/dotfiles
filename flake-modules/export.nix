@@ -39,6 +39,9 @@
             };
             home.pointerCursor.enable = !pkgs.stdenv.isDarwin;
 
+            # This rendering-only configuration does not use Rofi.
+            stylix.targets.rofi.enable = false;
+
             # The one value that is genuinely target-specific: the exported
             # prompt is for Windows, not for the host doing the exporting.
             programs.starship.systemLogo = "";

@@ -35,18 +35,6 @@
       url = "github:wez/wezterm?dir=nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    dev = {
-      # git+file (not path:) so only git-tracked files are hashed — this excludes
-      # the multi-GB gitignored target/ dir, whose churn otherwise re-hashed the
-      # input and forced a full dev rebuild on every `nh switch`.
-      # Keep the lock portable. Local iteration uses
-      # `nix ... --override-input dev path:$HOME/git/dev` (documented in README)
-      # while Home Manager wrappers prefer locally built binaries when present.
-      # `dev` is private, so use the authenticated Git transport rather than
-      # GitHub's anonymous flake API.
-      url = "git+ssh://git@github.com/hoopdev/dev.git";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     nixos-wsl.url = "github:nix-community/nixos-wsl";
     hyprland.url = "github:hyprwm/Hyprland";
     xremap.url = "github:xremap/nix-flake";
@@ -69,7 +57,6 @@
         ./flake-modules/home.nix
         ./flake-modules/per-system.nix
         ./flake-modules/export.nix
-        ./flake-modules/dev.nix
       ];
     };
 }

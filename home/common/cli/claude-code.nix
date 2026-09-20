@@ -8,9 +8,9 @@ let
   inherit (pkgs.stdenv) isDarwin;
 in
 {
-  # Claude Code 本体は公式 curl インストーラで管理する。
+  # Claude Code 本体は ai-tools-bootstrap で公式インストーラから導入する。
   # - インストール先: ~/.local/bin/claude (→ ~/.local/share/claude/versions/<ver>)
-  # - 更新: Claude Code 自身が自動更新するので activation では再実行しない
+  # - 更新: 自己更新、または ai-tools-update claude。activation では取得しない
   # - Nix / brew / npm では入れない (公式バイナリを単一の真実とする)
   home.packages =
     with pkgs;
@@ -18,12 +18,22 @@ in
       chromium # For Playwright MCP (Linux only)
     ];
 
-  home.activation.installClaudeCode = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    if [ ! -x "$HOME/.local/bin/claude" ]; then
-      echo "Installing Claude Code via official installer..."
-      # install.sh re-invokes curl/wget from PATH, which is sanitized during
-      # home-manager activation — make curl available to the piped script.
-      PATH="${pkgs.curl}/bin:$PATH" ${pkgs.curl}/bin/curl -fsSL https://claude.ai/install.sh | PATH="${pkgs.curl}/bin:$PATH" bash
+  # Remove only the statusline installed by the retired dev integration.
+  home.activation.removeDevStatusline = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    settings="$HOME/.claude/settings.json"
+    if [[ -f "$settings" ]] && ${pkgs.jq}/bin/jq -e '
+      .statusLine.type == "command" and
+      ((.statusLine.command // "") | test("^/nix/store/[^/]+-dev-statusline/bin/dev-statusline$"))
+    ' "$settings" >/dev/null; then
+      if [[ -z "''${DRY_RUN_CMD:-}" ]]; then
+        tmp=$(${pkgs.coreutils}/bin/mktemp "$settings.XXXXXX")
+        if ${pkgs.jq}/bin/jq 'del(.statusLine)' "$settings" > "$tmp"; then
+          ${pkgs.coreutils}/bin/mv "$tmp" "$settings"
+        else
+          ${pkgs.coreutils}/bin/rm -f "$tmp"
+          exit 1
+        fi
+      fi
     fi
   '';
 

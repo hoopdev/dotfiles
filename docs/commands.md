@@ -27,6 +27,34 @@ nh clean all --keep 5 --keep-since 7d   # GC (user + system)
 nix develop                             # Dev shell (Python + Nix tools)
 ```
 
+## AI tools (developer profile)
+
+Apply Home Manager first, then open a new shell:
+
+```bash
+ai-tools-bootstrap          # Install missing Claude Code / Codex native apps
+ai-tools-update             # Update both apps without rebuilding Nix
+ai-tools-bootstrap codex    # Install just Codex
+ai-tools-update claude      # Update just Claude Code
+```
+
+Nix manages these commands, PATH, and the NixOS `nix-ld` runtime. App binaries
+live in writable user directories and are installed by the
+[Claude Code](https://code.claude.com/docs/en/setup) and
+[Codex](https://learn.chatgpt.com/docs/codex/cli) official installers.
+Home Manager activation does not download either app. Bootstrap skips existing
+native installations; update requires them to be installed. Both commands refuse
+to overwrite installations managed by Nix, npm, Homebrew, or custom launchers.
+To migrate, remove the previous installation with its owning package manager,
+then run bootstrap. App versions are outside Nix generation rollback; Claude's
+own update channel and auto-update settings remain under its control.
+
+Running sessions and services are not restarted. Codex version mismatches are
+reported after maintenance. Once active work finishes, use
+`codex app-server daemon restart` for a CLI-managed daemon; externally launched
+servers must be restarted through their original supervisor or launcher.
+Do not create a second daemon to replace one owned by Coder or another service.
+
 ## Export config to non-Nix machines (Chezmoi)
 
 ```bash
@@ -34,28 +62,3 @@ nix run .#export-dotfiles   # from the repo root
 ```
 
 Renders the configs whose values come from Nix/Stylix (starship, WezTerm) plus Neovim's `init.lua` into `chezmoi/dot_config/`, then commit the result. Windows picks them up with `chezmoi apply`. Output is host-independent — running it on a Mac or a Linux box produces byte-identical files. Never edit the copies under `chezmoi/dot_config/{readonly_starship.toml,wezterm/}`; edit the Nix source and re-run.
-
-## dev fleet tool (`~/git/dev`)
-
-The `dev` Rust workspace (`dev-core` / `dev-cli` / `dev-tui` / `dev-zellij`) was
-extracted to its own flake. dotfiles consumes it via the `dev` flake input and
-installs it in `home/mac/dev.nix`; `flake-modules/dev.nix` also re-exports it.
-
-```bash
-# Build from dotfiles (uses the pinned input):
-nix build .#dev                          # dev CLI (also .#dev-tui / .#dev-zellij)
-nix flake update dev                      # pull latest dev into dotfiles' lock
-
-# Iterate on the workspace itself (toolchain lives in the dev repo's `rust` shell):
-cd ~/git/dev
-nix develop .#rust -c just ci             # cargo check + test
-nix develop .#rust -c cargo <cmd> ...     # lean Rust toolchain shell
-```
-
-`dev` is a private SSH flake input, so the machine needs GitHub SSH access.
-To test dotfiles against local, uncommitted `dev` code without altering the
-lock, pass an explicit override:
-
-```bash
-nix build .#dev --override-input dev path:$HOME/git/dev
-```

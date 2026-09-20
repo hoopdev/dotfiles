@@ -22,7 +22,6 @@ let
         let
           paths = meta.paths or { };
           repoPath = paths.repo or null;
-          devSource = paths.devSource or null;
           profileNames = (meta.homeProfiles or [ ]) ++ ((meta.userProfiles or { }).${username} or [ ]);
           homeDirectory = "/home/${username}";
           homeBaseModule =
@@ -33,11 +32,8 @@ let
                 stateVersion = meta.homeStateVersion or "24.05";
               };
             }
-            // lib.optionalAttrs (repoPath != null || devSource != null) {
-              dotfiles.paths =
-                { }
-                // lib.optionalAttrs (repoPath != null) { repo = repoPath; }
-                // lib.optionalAttrs (devSource != null) { inherit devSource; };
+            // lib.optionalAttrs (repoPath != null) {
+              dotfiles.paths.repo = repoPath;
             };
         in
         lib.nameValuePair "${username}@${hostname}" (
