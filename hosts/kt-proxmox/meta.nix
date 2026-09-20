@@ -4,7 +4,7 @@
   primaryUser = "ktaga";
   systemProfiles = [
     "base"
-    "onepassword"
+    "headless"
     "nvidia"
   ];
   homeProfiles = [

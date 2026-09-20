@@ -74,7 +74,9 @@ in
       );
     in
     ''
-      echo "${environment}"
+      if [[ $- == *i* ]]; then
+        echo "${environment}"
+      fi
 
       # Set up zsh if available
       if command -v zsh >/dev/null 2>&1; then
@@ -112,16 +114,9 @@ in
     in
     pkgs.mkShell {
       packages = common.shellPackages ++ packages;
-      shellHook =
-        common.shellHook environment
-        + shellHook
-        + ''
-          # Force zsh to be the shell if not already running in zsh
-          if [ -z "$ZSH_VERSION" ] && command -v zsh >/dev/null 2>&1; then
-            export SHELL="${pkgs.zsh}/bin/zsh"
-            exec zsh
-          fi
-        '';
+      # Never replace the shell here: direnv and `nix develop --command`
+      # evaluate shellHook too, including non-interactive agent commands.
+      shellHook = common.shellHook environment + shellHook;
     };
 
   # Predefined development shells
