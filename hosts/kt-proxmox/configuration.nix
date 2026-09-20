@@ -25,9 +25,11 @@
   ];
 
   # Bootloader.
-  boot.loader.grub.enable = true;
-  boot.loader.grub.device = "/dev/sda";
-  boot.loader.grub.useOSProber = true;
+  #boot.loader.grub.enable = true;
+  #boot.loader.grub.device = "/dev/sda";
+  #boot.loader.grub.useOSProber = true;
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = false;
 
   networking.hostName = "kt-proxmox";
 
@@ -109,6 +111,7 @@
   services.tailscale.enable = true;
   services.ollama = {
     enable = true;
+    # TODO: package = pkgs.ollama-cuda; — enable once GPU recognition is confirmed
     host = "0.0.0.0";
     port = 11434;
   };

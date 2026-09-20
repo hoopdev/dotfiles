@@ -211,7 +211,6 @@ The **Chezmoi source tree** for non-Nix targets lives under `chezmoi/` (`dot_con
 | hyprland | Wayland compositor (NixOS) |
 | hyprpanel | Status panel for Hyprland |
 | xremap | Key remapping (NixOS) |
-| wezterm | Terminal emulator |
 | flake-parts | Modular flake structure |
 | treefmt-nix | Multi-formatter integration (nixfmt + statix + deadnix) |
 

@@ -62,7 +62,7 @@
     # On Linux (SSH targets) copy_command is left unset so zellij emits OSC 52
     # instead — the only clipboard mechanism that survives an SSH hop (it is
     # forwarded up to the connecting terminal, i.e. WezTerm on the Mac).
-    // lib.optionalAttrs pkgs.stdenv.isDarwin {
+    // lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
       copy_command = "pbcopy";
     };
   };
