@@ -14,6 +14,7 @@
 
   nixos = {
     base = ../modules/nixos/default.nix;
+    headless = ../modules/nixos/headless.nix;
     onepassword = ../modules/nixos/onepassword.nix;
     hyprland-cache = ../modules/nixos/hyprland-cache.nix;
     nvidia = ../modules/nixos/nvidia.nix;

@@ -59,10 +59,16 @@ maps those names to modules, while `flake-modules/{nixos,darwin,home}.nix`
 creates the shared Home Manager baseline. This keeps personal paths and
 service choices out of reusable modules.
 
-`systemProfiles` are NixOS-only (`base`, `onepassword`, `hyprland-cache`);
+`systemProfiles` are NixOS-only (`base`, `headless`, `onepassword`, `hyprland-cache`, `nvidia`);
 `homeProfiles` work across host kinds (`cli`, `developer`, `syncthing`,
 `nixos-desktop`, `nixos-headless`, `ollama`, `mac`). The base NixOS profile no
 longer implicitly trusts the Hyprland cache or installs the 1Password GUI.
+
+The `headless` system profile is selected by Proxmox and WSL. It defaults desktop,
+printing and audio services off and bounds persistent journal storage. SSH,
+Tailscale, containers and GPU drivers remain host-specific choices. It is distinct
+from `nixos-headless`, which selects the Home Manager CLI environment.
+The `developer` home profile also enables direnv + nix-direnv for Zsh and Nushell.
 
 ### Claude Code skill library (`claude/skills/`)
 

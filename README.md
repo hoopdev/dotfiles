@@ -47,6 +47,26 @@ nix develop
 cd ~/projects/myapp && nix develop ~/git/dotfiles
 ```
 
+The `developer` Home Manager profile enables direnv + nix-direnv in Zsh and
+Nushell. After applying Home Manager and opening a new shell, run `direnv allow`
+in this checkout once to enable its `.envrc`. Other projects can add their own
+`.envrc` containing `use flake` alongside a project-specific `flake.nix`.
+
+For IDE tasks and Codex/Claude subprocesses, select the environment explicitly:
+
+```bash
+nix develop --command python --version
+# Or, after approving the project's .envrc:
+direnv exec . python --version
+# Explicitly request Zsh when desired for an interactive session:
+nix develop --command zsh
+```
+
+Non-interactive shells do not automatically run the interactive direnv hook;
+starting an agent from an activated shell also lets it inherit that environment.
+The devShell hook never starts a replacement shell. See
+[headless development](docs/headless.md) for the server profile and agent workflow.
+
 ## System Configurations
 
 ### NixOS
