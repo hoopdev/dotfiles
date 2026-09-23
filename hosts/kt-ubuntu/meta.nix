@@ -5,6 +5,7 @@
     "ktaga"
     "jovyan"
   ];
+  homeStateVersion = "24.05";
   homeProfiles = [
     "cli"
     "developer"

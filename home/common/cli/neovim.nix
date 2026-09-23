@@ -31,46 +31,55 @@ in
     description = "List of Obsidian vault configurations";
   };
 
-  config.programs.neovim = {
-    enable = true;
-    defaultEditor = true;
-    # Keep current behavior explicit while home.stateVersion remains 24.05.
-    withPython3 = true;
-    withRuby = true;
+  config = {
+    programs.neovim = {
+      enable = true;
+      defaultEditor = true;
+      # Keep current behavior explicit while home.stateVersion remains 24.05.
+      withPython3 = true;
+      withRuby = true;
 
-    # Load external Lua configuration (init.lua) with vault paths injected.
-    # home-manager writes this as ~/.config/nvim/init.lua.
-    initLua = ''
-      -- Obsidian vault configuration (injected from Nix)
-      vim.g.obsidian_vaults = {
-        ${vaultsLua}
-      }
-    ''
-    + builtins.readFile initLuaSource;
+      # Load external Lua configuration (init.lua) with vault paths injected.
+      # home-manager writes this as ~/.config/nvim/init.lua.
+      initLua = ''
+        -- Obsidian vault configuration (injected from Nix)
+        vim.g.obsidian_vaults = {
+          ${vaultsLua}
+        }
+      ''
+      + builtins.readFile initLuaSource;
 
-    # Python packages for Neovim plugins
-    extraPython3Packages =
-      ps: with ps; [
-        jupyter-client
-        jupytext
-        pynvim
+      # Python packages for Neovim plugins
+      extraPython3Packages =
+        ps: with ps; [
+          jupyter-client
+          jupytext
+          pynvim
+        ];
+
+      # Add lazy.nvim to the runtimepath for bootstrapping; plugin management
+      # itself is done by lazy.nvim from init.lua, exactly as before.
+      plugins = with pkgs.vimPlugins; [
+        lazy-nvim
       ];
+    };
 
-    # Add lazy.nvim to the runtimepath for bootstrapping; plugin management
-    # itself is done by lazy.nvim from init.lua, exactly as before.
-    plugins = with pkgs.vimPlugins; [
-      lazy-nvim
+    # LSP servers that init.lua's lspconfig setup expects on PATH. (ruff comes
+    # from cli/development.nix, since it is also a general Python tool.)
+    home.packages = with pkgs; [
+      lua-language-server
+      pyright
     ];
-  };
 
-  # Copy init.lua to chezmoi dotfiles directory on activation
-  config.home.activation.syncNeovimConfig = lib.mkIf (dotfilesDir != null) (
-    config.lib.dag.entryAfter [ "writeBoundary" ] ''
-      if [ -d "${dotfilesDir}" ]; then
-        $DRY_RUN_CMD mkdir -p "${dotfilesDir}/chezmoi/dot_config/nvim"
-        $DRY_RUN_CMD cp -f ${initLuaSource} "${dotfilesDir}/chezmoi/dot_config/nvim/init.lua"
-        echo "Synced init.lua to chezmoi dotfiles"
-      fi
-    ''
-  );
+    # Copy init.lua to chezmoi dotfiles directory on activation
+    home.activation.syncNeovimConfig = lib.mkIf (dotfilesDir != null) (
+      config.lib.dag.entryAfter [ "writeBoundary" ] ''
+        if [ -d "${dotfilesDir}" ]; then
+          $DRY_RUN_CMD mkdir -p "${dotfilesDir}/chezmoi/dot_config/nvim"
+          $DRY_RUN_CMD cp -f ${initLuaSource} "${dotfilesDir}/chezmoi/dot_config/nvim/init.lua"
+          echo "Synced init.lua to chezmoi dotfiles"
+        fi
+      ''
+    );
+  };
 }

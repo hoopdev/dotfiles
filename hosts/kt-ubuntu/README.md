@@ -4,7 +4,7 @@ Standalone home-manager configuration for Ubuntu systems (non-NixOS).
 
 This configuration includes:
 - **Starship** prompt with Ubuntu logo (󰕈) and icons
-- **Fonts** automatically installed (Nerd Fonts, Noto CJK, Emoji)
+- **Fonts** automatically installed (HackGen Console NF, Noto CJK, Emoji)
 - **Shell**: Zsh and Nushell with consistent configuration
 
 ## Prerequisites
@@ -36,12 +36,9 @@ Fonts are automatically installed by home-manager:
 - **HackGen Console NF**: The monospace font, installed by Stylix (see `lib/stylix.nix`)
 - **Noto Fonts CJK Sans / Serif**: For Japanese and CJK characters
 - **Noto Color Emoji**: For emoji support
-- **Nerd Fonts**: FiraCode, JetBrainsMono, and Meslo — extra choices declared by this host
 
-**Configure your terminal** to use a Nerd Font for proper icon display:
-- `HackGen Console NF` (recommended — matches every other host)
-- `JetBrainsMono Nerd Font Mono`
-- `FiraCode Nerd Font Mono`
+**Configure your terminal** to use `HackGen Console NF` (a Nerd Font, so
+Starship icons and the Ubuntu logo render) — the same font every other host uses.
 
 ## Usage
 
@@ -79,19 +76,19 @@ nix flake update
 - **Git**: Pre-configured with common aliases
 - **Color Scheme**: Shonan theme via Stylix
 - **Development Tools**: Python, uv, Nix tools
-- **Fonts**: Nerd Fonts (FiraCode, JetBrainsMono, Meslo), Noto CJK, Emoji
+- **Fonts**: HackGen Console NF (Nerd Font), Noto CJK, Emoji
 
 ## Troubleshooting
 
 ### Icons not displaying
 
-1. Verify Nerd Font is installed by home-manager:
+1. Verify the font is installed by home-manager:
    ```bash
-   fc-list | grep -i "nerd"
+   fc-list | grep -i "hackgen"
    ```
 
 2. Check terminal font configuration:
-   - Ensure terminal is set to use a Nerd Font (e.g., "FiraCode Nerd Font Mono")
+   - Ensure terminal is set to use `HackGen Console NF`
    - Restart terminal after font changes
 
 3. If fonts are not found, rebuild font cache:
@@ -101,10 +98,8 @@ nix flake update
 
 ### Starship not showing Ubuntu logo
 
-1. **Configure terminal font**: Ensure your terminal uses a Nerd Font
-   - Set font to `JetBrainsMono Nerd Font Mono` (recommended)
-   - Or use `FiraCode Nerd Font Mono` or `MesloLGS Nerd Font Mono`
-   - Restart terminal after font changes
+1. **Configure terminal font**: set it to `HackGen Console NF` and restart
+   the terminal
 
 2. **Test Unicode support**:
    ```bash
@@ -126,5 +121,5 @@ nix flake update
 
 - This configuration is for **standalone home-manager** only (not NixOS)
 - Fonts are managed by home-manager and installed to `~/.nix-profile/share/fonts`
-- Nerd Fonts are automatically installed for proper icon display in Starship
+- HackGen Console NF (a Nerd Font) is installed by Stylix for icon display in Starship
 - After first install, you may need to restart your terminal or run `fc-cache -fv`

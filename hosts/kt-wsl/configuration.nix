@@ -21,4 +21,8 @@
       enableDockerGroup = true;
     })
   ];
+
+  # This value determines the NixOS release from which the default settings
+  # for stateful data were taken. Leave it at the first-install release.
+  system.stateVersion = "24.11";
 }

@@ -26,14 +26,17 @@ in
   #   { "provider": { "vllm": { "npm": "@ai-sdk/openai-compatible",
   #       "options": { "baseURL": "...", "apiKey": "..." },
   #       "models": { "<model-id>": {} } } } }
+  # Exported through hm-session-vars.sh, which home-manager's zsh (.zshenv)
+  # and nushell integrations both source.
   home.sessionVariables.OPENCODE_CONFIG = localConfig;
-  programs.zsh.initContent = lib.mkBefore ''
-    export OPENCODE_CONFIG="${localConfig}"
-  '';
 
-  # OpenCode configuration with Shonan theme
+  # OpenCode theme rendered from the Stylix palette (lib/shonan.yaml), so a
+  # color change there propagates here without a hand-maintained copy.
   xdg.configFile."opencode/themes/shonan.json".text = builtins.toJSON (
-    import ./opencode/shonan-theme.nix
+    import ./opencode/shonan-theme.nix {
+      inherit lib;
+      inherit (config.lib.stylix) colors;
+    }
   );
 
   # OpenCode config with Shonan theme and auth plugins

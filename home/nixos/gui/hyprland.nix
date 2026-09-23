@@ -1,17 +1,9 @@
-{ pkgs, config, ... }:
-let
-  # matugen 4.0.0 errors with "IO error: not a terminal" on `matugen image …`
-  # in non-TTY contexts (subprocess, pipe) when --source-color-index is not
-  # passed, because it tries to prompt for color selection via dialoguer.
-  # Inject --source-color-index 0 by default; honour any user override.
-  matugen = pkgs.writeShellScriptBin "matugen" ''
-    if [ "''${1-}" = "image" ] && \
-       ! printf '%s\n' "''${@:2}" | grep -qE -- '^--source-color-index(=|$)'; then
-      exec ${pkgs.matugen}/bin/matugen image --source-color-index 0 "''${@:2}"
-    fi
-    exec ${pkgs.matugen}/bin/matugen "$@"
-  '';
-in
+{
+  lib,
+  pkgs,
+  osConfig ? { },
+  ...
+}:
 {
   home.packages = [
     pkgs.hyprpicker
@@ -22,20 +14,10 @@ in
     pkgs.brightnessctl
     pkgs.playerctl
     pkgs.pamixer
-    matugen
   ];
 
-  services.dunst.enable = true;
-
-  services.hyprpaper = {
-    enable = true;
-    settings = {
-      preload = [ "${config.dotfiles.paths.repo}/wallpaper/wallpaper_enoshima.jpg" ];
-      wallpaper = [
-        "eDP-1,${config.dotfiles.paths.repo}/wallpaper/wallpaper_enoshima.jpg"
-      ];
-    };
-  };
+  # Wallpaper: Stylix's hyprpaper target enables hyprpaper and sets the
+  # wallpaper from stylix.image — do not define services.hyprpaper here.
 
   wayland.windowManager.hyprland = {
     enable = true;
@@ -45,20 +27,20 @@ in
     xwayland.enable = true;
     settings = {
       exec-once = [
-        "hyprpanel"
+        # The bar/shell (wayle) is a systemd user service — see wayle.nix.
         "fcitx5 -d --replace"
         "swayosd-server"
         "wl-paste --watch cliphist store"
-        # Keeps the 1Password SSH agent socket alive across logins; without
-        # this the socket file persists but nothing listens on it, so
-        # ssh-add/git-over-ssh silently fail with "Permission denied".
-        "1password --silent"
-      ];
-      monitor = [ "eDP-1, 2160x1440@60, 0x0, 1" ];
+      ]
+      # Keeps the 1Password SSH agent socket alive across logins; without
+      # this the socket file persists but nothing listens on it, so
+      # ssh-add/git-over-ssh silently fail with "Permission denied".
+      # Only on hosts that selected the `onepassword` system profile.
+      ++ lib.optional (osConfig.programs._1password-gui.enable or false) "1password --silent";
+      # monitor, HiDPI env (GDK_SCALE) and the per-device input block are
+      # hardware-specific and live in hosts/<name>/home.nix. GTK theme and
+      # cursor (XCURSOR_SIZE) are set by Stylix — do not override them here.
       env = [
-        "GDK_SCALE,2"
-        "XCURSOR_SIZE,32"
-        "GTK_THEME,Nordic"
         # IME (Fcitx5) support — GTK4 uses native Wayland text-input-v3,
         # so GTK_IM_MODULE is intentionally unset to silence the warning.
         "QT_IM_MODULE,fcitx"
@@ -81,12 +63,6 @@ in
           tap-to-click = true;
           clickfinger_behavior = true;
         };
-      };
-      # Explicitly configure TrackPoint on keyboard (USB device)
-      device = {
-        name = "synaptics-tm3203-003";
-        sensitivity = 0;
-        accel_profile = "flat";
       };
       general = {
         gaps_in = 5;

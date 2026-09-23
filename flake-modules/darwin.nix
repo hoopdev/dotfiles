@@ -51,7 +51,7 @@ let
           inherit hostname;
           hostPath = hostDir hostname meta + "/home.nix";
           homeProfiles = meta.homeProfiles or [ ];
-          homeStateVersion = meta.homeStateVersion or "24.05";
+          inherit (meta) homeStateVersion;
           repoPath = paths.repo or null;
         })
       ];

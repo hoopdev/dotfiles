@@ -4,7 +4,7 @@
 
 - **flake.nix**: Thin entry point — calls `flake-parts.lib.mkFlake` and imports modules from `flake-modules/`
 - **flake-modules/**: Per-subsystem flake-parts modules (the real outputs live here)
-- **Inputs**: nixpkgs, flake-parts, treefmt-nix, home-manager, nix-darwin, nixos-hardware, nixos-wsl, stylix, hyprland, hyprpanel, xremap
+- **Inputs**: nixpkgs, flake-parts, treefmt-nix, home-manager, nix-darwin, nixos-hardware, nixos-wsl, stylix, xremap
 
 ## Directory Layout
 
@@ -19,13 +19,16 @@
 │   ├── per-system.nix        # devShells, formatter, treefmt
 │   └── export.nix            # packages.export-dotfiles — renders portable config into chezmoi/
 ├── modules/nixos/             # Self-exported NixOS modules
-│   ├── default.nix           # Kitchen-sink (imports the three below)
+│   ├── default.nix           # Baseline (imports nix-ld + nix-settings)
+│   ├── headless.nix          # Server defaults (no desktop/audio/printing, bounded journal)
 │   ├── nix-ld.nix            # nix-ld for unpatched binaries
-│   ├── onepassword.nix       # 1Password CLI + GUI
-│   └── nix-settings.nix      # Nix daemon settings + Hyprland cache
+│   ├── nix-settings.nix      # Nix daemon settings
+│   ├── nvidia.nix            # Headless NVIDIA/CUDA
+│   └── onepassword.nix       # 1Password CLI + GUI
 ├── lib/                       # Shared Nix utilities (non-module)
 │   ├── devshell.nix          # Development shell (Python 3.13, uv, Nix tools, build tools)
-│   ├── japanese-locale.nix   # Japanese locale settings
+│   ├── japanese-locale.nix   # Japanese locale, time zone, font fallbacks
+│   ├── japanese-input.nix    # Fcitx5 + Mozc (desktop hosts only)
 │   ├── wsl-common.nix        # WSL-specific settings
 │   ├── users.nix             # User account definitions
 │   ├── stylix.nix            # Unified Stylix theming (NixOS / darwin / home-manager)
@@ -44,12 +47,12 @@
     ├── kt-wsl/              # WSL (NixOS)
     ├── kt-ubuntu/           # Ubuntu (standalone home-manager)
     ├── kt-mba/              # MacBook Air
-    ├── kt-mac-studio/       # Mac Studio (meta.nix only — shares mac/)
-    ├── kt-mac-mini/         # Mac Mini (meta.nix only — shares mac/)
-    └── mac/                 # Shared Mac Studio / Mac Mini config
+    ├── kt-mac-studio/       # Mac Studio (meta.nix only — shares _shared-mac/)
+    ├── kt-mac-mini/         # Mac Mini (meta.nix only — shares _shared-mac/)
+    └── _shared-mac/         # Shared Mac Studio / Mac Mini config
 ```
 
-Each `hosts/<name>/meta.nix` declares `{ type, system?, users?, configFrom? }`; `flake-modules/shared.nix` reads the directory and dispatches to the matching subsystem module.
+Each `hosts/<name>/meta.nix` declares `{ type, system, homeStateVersion, primaryUser? | users, configFrom?, systemProfiles?, homeProfiles? }`; `flake-modules/shared.nix` reads the directory and dispatches to the matching subsystem module.
 
 ### Profiles and host inventory
 
@@ -59,10 +62,16 @@ maps those names to modules, while `flake-modules/{nixos,darwin,home}.nix`
 creates the shared Home Manager baseline. This keeps personal paths and
 service choices out of reusable modules.
 
-`systemProfiles` are NixOS-only (`base`, `headless`, `onepassword`, `hyprland-cache`, `nvidia`);
+`homeStateVersion` is mandatory and explicit per host. Existing hosts stay on
+`"24.05"`; a **new** host should start at the current Home Manager release
+(`"26.05"` at the time of writing) so it never needs compatibility shims
+such as `gtk4ThemeSilencer` in `flake-modules/shared.nix`.
+
+`systemProfiles` are NixOS-only (`base`, `headless`, `onepassword`, `nvidia`);
 `homeProfiles` work across host kinds (`cli`, `developer`, `syncthing`,
 `nixos-desktop`, `nixos-headless`, `ollama`, `mac`). The base NixOS profile no
-longer implicitly trusts the Hyprland cache or installs the 1Password GUI.
+longer installs the 1Password GUI. Hyprland is taken from nixpkgs, so no extra
+binary cache is trusted anywhere.
 
 The `headless` system profile is selected by Proxmox and WSL. It defaults desktop,
 printing and audio services off and bounds persistent journal storage. SSH,
@@ -137,7 +146,7 @@ Platform differences that must survive the trip are resolved at runtime rather t
 | Stylix | Unified theming (Shonan base16 color scheme) |
 | nixos-hardware | ThinkPad hardware optimizations |
 | Neovim (home-manager + lazy.nvim) | Editor — see [docs/neovim.md](neovim.md) |
-| Hyprland + HyprPanel | Wayland compositor + panel (NixOS) |
+| Hyprland + Wayle | Wayland compositor + desktop shell/bar (NixOS, both from nixpkgs) |
 | AeroSpace | Tiling window manager (macOS) |
 | WezTerm | Terminal emulator (cross-platform) |
 | xremap / Karabiner | Key remapping (NixOS / macOS) |
@@ -172,7 +181,7 @@ Use `nix run .#check-export-dotfiles` for the drift check alone.
 - Editor: Neovim
 - Shells: Nushell, Zsh
 - Color scheme: Shonan (custom base16, via Stylix)
-- GC: weekly automatic (system via `nix.gc`, user via `programs.nh.clean`)
+- GC: weekly automatic, one runner per host — NixOS `programs.nh.clean` (`nh clean all`), macOS `nix.gc`, standalone home-manager `programs.nh.clean`
 
 ## Related Docs
 

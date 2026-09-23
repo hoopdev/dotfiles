@@ -7,5 +7,6 @@
     ./tools.nix
     ./neovim.nix
     ./nh.nix
+    ./onepassword.nix
   ];
 }

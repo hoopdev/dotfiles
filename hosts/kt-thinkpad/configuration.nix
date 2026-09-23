@@ -4,6 +4,7 @@
 
 {
   inputs,
+  lib,
   pkgs,
   primaryUser,
   ...
@@ -15,6 +16,7 @@
     ./hardware-configuration.nix
     inputs.xremap.nixosModules.default
     ../../lib/japanese-locale.nix
+    ../../lib/japanese-input.nix
     ((import ../../lib/users.nix).mkUser {
       username = primaryUser;
       extraGroups = [
@@ -31,121 +33,129 @@
     common-pc-ssd
   ]);
 
-  services.xremap = {
-    enable = true;
-    userName = primaryUser;
-    serviceMode = "system";
-    watch = true;
-    config = {
-      modmap = [
-        {
-          # CapsLockをCtrlに置換
-          name = "Caps2Ctrl";
-          remap = {
-            CapsLock = "Ctrl_L";
-          };
-        }
-      ];
-      keymap = [
-      ];
-    };
-  };
-
-  #Bootloader.
-  boot.loader = {
-    timeout = 2;
-    efi = {
-      canTouchEfiVariables = true;
-      efiSysMountPoint = "/boot";
-    };
-    grub = {
-      enable = true;
-      efiSupport = true;
-      device = "nodev";
-    };
-  };
-
-  # Reduce console log level to prevent logs from appearing on login screen
-  boot.consoleLogLevel = 0;
-  boot.initrd.verbose = false;
-  boot.kernelParams = [
-    "quiet"
-    "udev.log_level=3"
-  ];
-
-  # TrackPoint support for keyboard's TrackPoint via RMI4
-  hardware.trackpoint.enable = true;
-
-  # udev rule to bind psmouse to RMI4 PS/2 pass-through (TrackPoint on keyboard)
-  services.udev.extraRules = ''
-    ACTION=="add", SUBSYSTEM=="serio", ATTR{description}=="RMI4 PS/2 pass-through", ATTR{drvctl}="psmouse"
-  '';
-
-  # Enable networking
-  networking.networkmanager.enable = true;
-
-  # Enable X11 for XWayland support
-  services.xserver.enable = true;
-
-  # Enable libinput for touchpad/trackpoint
-  services.libinput = {
-    enable = true;
-    touchpad = {
-      naturalScrolling = true;
-      tapping = true;
-      clickMethod = "clickfinger";
-    };
-  };
-
-  # greetd + tuigreet for TUI login
-  services.greetd = {
-    enable = true;
-    settings = {
-      default_session = {
-        command = "${pkgs.tuigreet}/bin/tuigreet --time --remember --cmd start-hyprland";
-        user = "greeter";
+  boot = {
+    loader = {
+      timeout = 2;
+      efi = {
+        canTouchEfiVariables = true;
+        efiSysMountPoint = "/boot";
+      };
+      grub = {
+        enable = true;
+        efiSupport = true;
+        device = "nodev";
       };
     };
+    # Reduce console log level to prevent logs from appearing on login screen
+    consoleLogLevel = 0;
+    initrd.verbose = false;
+    kernelParams = [
+      "quiet"
+      "udev.log_level=3"
+    ];
   };
+
+  # HiDPI panel: lib/stylix.nix defaults the cursor to 24px, which is too
+  # small at 2x. Propagates to Home Manager (XCURSOR_SIZE, GTK, Hyprland).
+  stylix.cursor.size = lib.mkForce 32;
+
+  hardware = {
+    # TrackPoint support for keyboard's TrackPoint via RMI4
+    trackpoint.enable = true;
+    bluetooth = {
+      enable = true;
+      powerOnBoot = true;
+    };
+  };
+
+  networking.networkmanager.enable = true;
+
+  services = {
+    xremap = {
+      enable = true;
+      userName = primaryUser;
+      serviceMode = "system";
+      watch = true;
+      config = {
+        modmap = [
+          {
+            # CapsLockをCtrlに置換
+            name = "Caps2Ctrl";
+            remap = {
+              CapsLock = "Ctrl_L";
+            };
+          }
+        ];
+        keymap = [ ];
+      };
+    };
+
+    # udev rule to bind psmouse to RMI4 PS/2 pass-through (TrackPoint on keyboard)
+    udev.extraRules = ''
+      ACTION=="add", SUBSYSTEM=="serio", ATTR{description}=="RMI4 PS/2 pass-through", ATTR{drvctl}="psmouse"
+    '';
+
+    # Enable X11 for XWayland support
+    xserver = {
+      enable = true;
+      xkb = {
+        layout = "us";
+        variant = "";
+      };
+    };
+
+    # Enable libinput for touchpad/trackpoint
+    libinput = {
+      enable = true;
+      touchpad = {
+        naturalScrolling = true;
+        tapping = true;
+        clickMethod = "clickfinger";
+      };
+    };
+
+    # greetd + tuigreet for TUI login
+    greetd = {
+      enable = true;
+      settings = {
+        default_session = {
+          command = "${pkgs.tuigreet}/bin/tuigreet --time --remember --cmd start-hyprland";
+          user = "greeter";
+        };
+      };
+    };
+
+    # Enable CUPS to print documents.
+    printing.enable = true;
+
+    # Enable sound with pipewire.
+    pulseaudio.enable = false;
+    pipewire = {
+      enable = true;
+      alsa.enable = true;
+      alsa.support32Bit = true;
+      pulse.enable = true;
+    };
+
+    tailscale.enable = true;
+
+    # UPower for battery monitoring (used by the Wayle battery module)
+    upower.enable = true;
+
+    openssh.enable = true;
+  };
+
+  security.rtkit.enable = true;
 
   # Suppress getty on tty1 since we use greetd
-  systemd.services."getty@tty1".enable = false;
-  systemd.services."autovt@tty1".enable = false;
-
-  # Configure keymap in X11
-  services.xserver.xkb = {
-    layout = "us";
-    variant = "";
+  systemd.services = {
+    "getty@tty1".enable = false;
+    "autovt@tty1".enable = false;
   };
-
-  # Enable CUPS to print documents.
-  services.printing.enable = true;
-
-  # Enable sound with pipewire.
-  services.pulseaudio.enable = false;
-  security.rtkit.enable = true;
-  services.pipewire = {
-    enable = true;
-    alsa.enable = true;
-    alsa.support32Bit = true;
-    pulse.enable = true;
-  };
-
-  services.tailscale.enable = true;
-
-  # Bluetooth support
-  hardware.bluetooth = {
-    enable = true;
-    powerOnBoot = true;
-  };
-
-  # UPower for battery monitoring (required by HyprPanel)
-  services.upower.enable = true;
 
   # User account: skeleton (isNormalUser, wheel, zsh) comes from lib/users.nix,
   # imported above; only the host-specific groups are listed there.
 
-  # Install programs
   programs.hyprland = {
     enable = true;
     xwayland.enable = true;
@@ -159,11 +169,6 @@
       pkgs.xdg-desktop-portal-hyprland
     ];
   };
-
-  environment.systemPackages = with pkgs; [ ];
-  environment.variables = { };
-
-  services.openssh.enable = true;
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions

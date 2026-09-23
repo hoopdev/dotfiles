@@ -21,7 +21,6 @@
     unzip
     zip
     zellij
-    gotop
     yazi
     ripgrep
     rclone
@@ -31,9 +30,6 @@
     # not yet in cache.nixos.org; local V8 build OOMs on 7.5GB RAM. Re-enable once cached.
     fastfetch
     _1password-cli
-    lua-language-server
-    pyright
-    ruff
     tree-sitter
     lsof
     trash-cli

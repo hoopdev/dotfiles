@@ -1,3 +1,9 @@
+# Shared NixOS-WSL settings. Called as a function from the host:
+#
+#   imports = [ (import ../../lib/wsl-common.nix { inherit lib pkgs inputs; username = primaryUser; }) ];
+#
+# The user account itself comes from lib/users.nix like every other NixOS
+# host; `system.stateVersion` stays in the host file.
 {
   lib,
   pkgs,
@@ -8,12 +14,14 @@
 }:
 
 {
-  # Import NixOS-WSL modules
   imports = [
     inputs.nixos-wsl.nixosModules.wsl
+    ((import ./users.nix).mkUser {
+      inherit username;
+      extraGroups = lib.optionals enableDockerGroup [ "docker" ];
+    })
   ];
 
-  # WSL configuration
   wsl = {
     enable = true;
     defaultUser = username;
@@ -26,32 +34,14 @@
     };
   };
 
-  # Enable Docker
-  virtualisation.docker = {
-    enable = true;
-  };
+  virtualisation.docker.enable = true;
 
-  # Fonts for WSL
+  # Fonts for GUI apps forwarded through WSLg.
   fonts.packages = with pkgs; [
     noto-fonts-cjk-sans
     noto-fonts-color-emoji
   ];
 
-  # Shell configuration
-  programs.zsh.enable = true;
   environment.pathsToLink = [ "/share/zsh" ];
   environment.shells = [ pkgs.zsh ];
-
-  # User configuration
-  users.users.${username} = {
-    isNormalUser = true;
-    shell = pkgs.zsh;
-    extraGroups = [
-      "wheel"
-    ]
-    ++ lib.optionals enableDockerGroup [ "docker" ];
-  };
-
-  # State version
-  system.stateVersion = "24.11";
 }
