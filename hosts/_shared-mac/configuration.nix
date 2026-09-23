@@ -14,8 +14,11 @@
   homebrew = {
     enable = true;
     onActivation = {
-      autoUpdate = true; # brew update を自動実行
-      upgrade = true; # brew upgrade を自動実行
+      # switch のたびに brew update/upgrade を走らせない: ネットワーク必須になり、
+      # Nix 世代と無関係に全 brew が動くので再現性が崩れる。
+      # 更新は意図的に `brew update && brew upgrade` を実行する。
+      autoUpdate = false;
+      upgrade = false;
       cleanup = "none"; # 手動 brew install を消さない (以前は "zap" で ollama 等が毎回消えていた)
     };
     masApps = {
@@ -69,40 +72,49 @@
   };
 
   # Finder設定
-  system.defaults.finder = {
-    AppleShowAllExtensions = true;
-    AppleShowAllFiles = true;
-    CreateDesktop = false;
-    FXEnableExtensionChangeWarning = false;
-    ShowPathbar = true;
-    ShowStatusBar = true;
-  };
+  system = {
+    defaults = {
+      finder = {
+        AppleShowAllExtensions = true;
+        AppleShowAllFiles = true;
+        CreateDesktop = false;
+        FXEnableExtensionChangeWarning = false;
+        ShowPathbar = true;
+        ShowStatusBar = true;
+      };
 
-  # Dock設定
-  system.defaults.dock = {
-    autohide = true;
-    show-recents = false;
-    tilesize = 50;
-    magnification = true;
-    largesize = 64;
-    orientation = "left";
-    mineffect = "scale";
-    launchanim = true;
-  };
+      # Dock設定
+      dock = {
+        autohide = true;
+        show-recents = false;
+        tilesize = 50;
+        magnification = true;
+        largesize = 64;
+        orientation = "left";
+        mineffect = "scale";
+        launchanim = true;
+      };
 
-  # DS_Store作成防止設定
-  system.defaults.CustomUserPreferences = {
-    "com.apple.desktopservices" = {
-      # ネットワークボリュームでDS_Storeを作成しない
-      DSDontWriteNetworkStores = true;
-      # USBボリュームでDS_Storeを作成しない
-      DSDontWriteUSBStores = true;
+      # DS_Store作成防止設定
+      CustomUserPreferences = {
+        "com.apple.desktopservices" = {
+          # ネットワークボリュームでDS_Storeを作成しない
+          DSDontWriteNetworkStores = true;
+          # USBボリュームでDS_Storeを作成しない
+          DSDontWriteUSBStores = true;
+        };
+      };
+
     };
-  };
 
-  # キーボード設定 (CapsLockのremapはkarabiner-elementsで実行)
-  system.keyboard = {
-    enableKeyMapping = true;
+    # キーボード設定 (CapsLockのremapはkarabiner-elementsで実行)
+    keyboard = {
+      enableKeyMapping = true;
+    };
+
+    # Used for backwards compatibility, please read the changelog before changing.
+    # $ darwin-rebuild changelog
+    stateVersion = 5;
   };
 
   # Touch ID for sudo
@@ -118,9 +130,5 @@
 
   # Necessary for using flakes on this system.
   nix.settings.experimental-features = "nix-command flakes";
-
-  # Used for backwards compatibility, please read the changelog before changing.
-  # $ darwin-rebuild changelog
-  system.stateVersion = 5;
 
 }

@@ -1,9 +1,18 @@
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  osConfig ? null,
+  ...
+}:
 {
   programs.nh = {
     enable = true;
+    # Weekly cleanup only on standalone Home Manager hosts. Under NixOS /
+    # nix-darwin the system already runs GC once a week (see
+    # flake-modules/shared.nix) and Home Manager generations belong to the
+    # system generation, so a second user-level run would be redundant.
     clean = {
-      enable = true;
+      enable = osConfig == null;
       dates = "weekly";
       extraArgs = "--keep-since 7d --keep 5";
     };

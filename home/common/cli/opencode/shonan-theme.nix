@@ -1,27 +1,33 @@
-# Shonan theme for opencode — static data extracted from opencode.nix.
-# Consumed as: builtins.toJSON (import ./opencode/shonan-theme.nix)
+# Shonan theme for opencode, built from the Stylix base16 palette.
+# Consumed as: import ./opencode/shonan-theme.nix { inherit lib; inherit (config.lib.stylix) colors; }
+# `colors.baseXX` are bare lowercase hex strings (no "#"), as in
+# shell/starship.nix; upper-cased here to match the previous hand-written file.
+{ colors, lib }:
+let
+  hex = name: "#${lib.toUpper colors.${name}}";
+in
 {
   "$schema" = "https://opencode.ai/theme.json";
   defs = {
     # Background colors - twilight blue
-    base00 = "#1E2433";
-    base01 = "#272D3F";
-    base02 = "#353D52";
-    base03 = "#4A5368";
+    base00 = hex "base00";
+    base01 = hex "base01";
+    base02 = hex "base02";
+    base03 = hex "base03";
     # Foreground colors - sky white
-    base04 = "#A0B4C8";
-    base05 = "#C5D4E8";
-    base06 = "#E0EAF5";
-    base07 = "#F0F6FC";
+    base04 = hex "base04";
+    base05 = hex "base05";
+    base06 = hex "base06";
+    base07 = hex "base07";
     # Accent colors - sunset & sea
-    red = "#E8787A";
-    orange = "#F0A070";
-    yellow = "#E8C87A";
-    green = "#8AC4A0";
-    cyan = "#70D0E8";
-    blue = "#60B8E8";
-    purple = "#C090E0";
-    pink = "#E890C0";
+    red = hex "base08";
+    orange = hex "base09";
+    yellow = hex "base0A";
+    green = hex "base0B";
+    cyan = hex "base0C";
+    blue = hex "base0D";
+    purple = hex "base0E";
+    pink = hex "base0F";
   };
   theme = {
     primary = {

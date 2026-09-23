@@ -1,6 +1,6 @@
 # Nix daemon settings shared across all NixOS hosts: store optimisation and
-# experimental features. Hyprland's cache lives in hyprland-cache.nix and is
-# selected only by desktop hosts.
+# experimental features. Hyprland comes from nixpkgs (cache.nixos.org), so no
+# extra substituter is needed.
 _:
 
 {

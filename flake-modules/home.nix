@@ -29,7 +29,7 @@ let
             {
               home = {
                 inherit username homeDirectory;
-                stateVersion = meta.homeStateVersion or "24.05";
+                stateVersion = meta.homeStateVersion;
               };
             }
             // lib.optionalAttrs (repoPath != null) {

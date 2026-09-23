@@ -5,12 +5,10 @@
 
 {
   home.packages = with pkgs; [
+    # CJK + emoji fallbacks. The monospace/Nerd Font (HackGen Console NF) is
+    # installed by Stylix, same as on every other host.
     noto-fonts-cjk-sans
     noto-fonts-color-emoji
-    # Nerd Fonts for Starship icons and Ubuntu logo
-    nerd-fonts.fira-code
-    nerd-fonts.jetbrains-mono
-    nerd-fonts.meslo-lg
   ];
 
   # Enable font configuration in home-manager

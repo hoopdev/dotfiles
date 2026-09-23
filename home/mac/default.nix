@@ -7,6 +7,12 @@
     ./gui
   ];
 
+  # Resolved from 1Password on demand: `with-secrets <cmd>` / `secrets-load`.
+  dotfiles.secrets.env = {
+    BRAVE_API_KEY = "op://Personal/BraveAPI/credential";
+    TELEGRAM_BOT_TOKEN = "op://Personal/Telegram/credential";
+  };
+
   home.sessionVariables = {
     USE_SYMENGINE = "1";
     OLLAMA_HOST = "0.0.0.0";

@@ -28,7 +28,7 @@
             inherit (inputs.nixpkgs) lib;
           };
         in
-        devshell.shells.default { inherit devshell; };
+        devshell.shells.default;
 
     };
 }

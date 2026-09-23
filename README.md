@@ -157,7 +157,15 @@ A unified development environment is available via `nix develop`.
 
 ### Formatting & Linting
 
-`nix fmt` runs nixfmt + statix + deadnix via [treefmt-nix](https://github.com/numtide/treefmt-nix). `nix flake check` also runs the treefmt drift check, so unformatted code fails CI-style verification.
+`nix fmt` runs nixfmt + statix + deadnix via [treefmt-nix](https://github.com/numtide/treefmt-nix). `nix flake check` also runs the treefmt drift check, so unformatted code fails verification.
+
+There is no CI for this repo; the git hooks are the gate. Install them once per checkout:
+
+```bash
+pre-commit install --hook-type pre-commit --hook-type pre-push
+```
+
+Commits run `nix fmt -- --ci`; pushes run `nix flake check --no-build` so every host still evaluates.
 
 ## Directory Structure
 
@@ -167,16 +175,20 @@ A unified development environment is available via `nix develop`.
 ├── flake.lock                 # Lock file (reproducibility)
 ├── flake-modules/             # flake-parts modules (the real flake outputs live here)
 │   ├── shared.nix            # Shared helpers + auto-discovered hosts attrset
+│   ├── checks.nix            # Eval checks for every host configuration
 │   ├── modules.nix           # flake.nixosModules.* exports
 │   ├── nixos.nix             # nixosConfigurations (auto-built from hosts/*/meta.nix)
 │   ├── darwin.nix            # darwinConfigurations
 │   ├── home.nix              # homeConfigurations (standalone home-manager)
-│   └── per-system.nix        # devShells, formatter, treefmt
+│   ├── per-system.nix        # devShells, formatter, treefmt
+│   └── export.nix            # packages.export-dotfiles — renders portable config into chezmoi/
 ├── modules/nixos/             # Self-exported NixOS modules
-│   ├── default.nix           # Aggregate (imports the three below)
+│   ├── default.nix           # Baseline (imports nix-ld + nix-settings)
+│   ├── headless.nix          # Server defaults (no desktop/audio/printing, bounded journal)
 │   ├── nix-ld.nix            # nix-ld for unpatched binaries
-│   ├── onepassword.nix       # 1Password CLI + GUI
-│   └── nix-settings.nix      # Nix daemon settings + Hyprland cache
+│   ├── nix-settings.nix      # Nix daemon settings
+│   ├── nvidia.nix            # Headless NVIDIA/CUDA
+│   └── onepassword.nix       # 1Password CLI + GUI
 ├── lib/                       # Shared Nix utilities (non-module)
 │   ├── devshell.nix          # Development shell definition
 │   ├── japanese-locale.nix   # Japanese locale settings
@@ -196,12 +208,12 @@ A unified development environment is available via `nix develop`.
     ├── kt-wsl/              # WSL (NixOS)
     ├── kt-ubuntu/           # Ubuntu (standalone home-manager)
     ├── kt-mba/              # MacBook Air
-    ├── kt-mac-studio/       # Mac Studio (meta.nix only — shares mac/)
-    ├── kt-mac-mini/         # Mac Mini (meta.nix only — shares mac/)
-    └── mac/                 # Shared Mac Studio/Mini config
+    ├── kt-mac-studio/       # Mac Studio (meta.nix only — shares _shared-mac/)
+    ├── kt-mac-mini/         # Mac Mini (meta.nix only — shares _shared-mac/)
+    └── _shared-mac/         # Shared Mac Studio/Mini config
 ```
 
-Each `hosts/<name>/meta.nix` declares `{ type, system?, users?, configFrom? }`; new hosts are picked up automatically by `flake-modules/shared.nix`.
+Each `hosts/<name>/meta.nix` declares `{ type, system, homeStateVersion, primaryUser? | users, configFrom?, systemProfiles?, homeProfiles? }`; new hosts are picked up automatically by `flake-modules/shared.nix`.
 
 ### Host profiles
 
@@ -209,7 +221,7 @@ Host metadata is also the composition point for portable configuration. NixOS
 hosts select `systemProfiles` and all Home Manager hosts select `homeProfiles`;
 the available profile registry is [`lib/profiles.nix`](lib/profiles.nix).
 Typical profiles are `cli`, `developer`, `syncthing`, `nixos-desktop`,
-`nixos-headless`, `mac`, `onepassword`, and `hyprland-cache`.
+`nixos-headless`, `mac`, `onepassword`, and `nvidia`.
 
 Keep machine-specific values in metadata (`primaryUser`, `system`, optional
 `paths.repo`) rather than embedding them in a shared module.
@@ -228,8 +240,6 @@ The **Chezmoi source tree** for non-Nix targets lives under `chezmoi/` (`dot_con
 | nixos-hardware | Hardware optimizations |
 | nixos-wsl | WSL integration |
 | stylix | Unified theming (base16) |
-| hyprland | Wayland compositor (NixOS) |
-| hyprpanel | Status panel for Hyprland |
 | xremap | Key remapping (NixOS) |
 | flake-parts | Modular flake structure |
 | treefmt-nix | Multi-formatter integration (nixfmt + statix + deadnix) |
@@ -237,7 +247,7 @@ The **Chezmoi source tree** for non-Nix targets lives under `chezmoi/` (`dot_con
 ### Platform-Specific Features
 
 **NixOS**
-- Hyprland + HyprPanel (Wayland)
+- Hyprland + Wayle (Wayland)
 - xremap (key remapping)
 - nix-ld (unpatched binary support)
 - nixos-hardware optimizations

@@ -10,6 +10,7 @@
     ./wofi.nix
     ./gtk.nix
     ./swayosd.nix
+    ./wayle.nix
   ];
 
   # GUI apps from nixpkgs. These are deliberately NOT in home/common/gui:

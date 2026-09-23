@@ -13,6 +13,8 @@ result-*
 
 # Ephemeral Claude Code agent worktrees
 .claude/worktrees/
+# Machine-local Claude Code permissions
+.claude/settings.local.json
 
 # Skill subscription manifest — machine-local (contains private dev project names).
 claude/skills/skills.toml

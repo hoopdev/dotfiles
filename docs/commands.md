@@ -19,6 +19,7 @@ nix run nixpkgs#nh -- darwin switch . -H kt-mac-studio
 ## Maintenance
 
 ```bash
+brew update && brew upgrade                # macOS: Homebrew is no longer upgraded by `nh darwin switch`
 nix flake update                        # Update inputs
 nix flake check                         # Validate
 nix flake check --all-systems           # Evaluate every host/profile output
@@ -26,6 +27,17 @@ nix run .#check-export-dotfiles         # Verify generated Chezmoi files have no
 nh clean all --keep 5 --keep-since 7d   # GC (user + system)
 nix develop                             # Dev shell (Python + Nix tools)
 ```
+
+## Git hooks (no CI)
+
+Nothing runs this repo's checks automatically, so the pre-commit hooks stand in:
+
+```bash
+pre-commit install --hook-type pre-commit --hook-type pre-push
+```
+
+Commit → `nix fmt -- --ci` (nixfmt + statix + deadnix drift).
+Push   → `nix flake check --no-build` (every host / profile evaluates).
 
 ## AI tools (developer profile)
 
@@ -54,6 +66,41 @@ reported after maintenance. Once active work finishes, use
 `codex app-server daemon restart` for a CLI-managed daemon; externally launched
 servers must be restarted through their original supervisor or launcher.
 Do not create a second daemon to replace one owned by Coder or another service.
+
+## Secrets from 1Password
+
+Secrets are never written to disk by this config. `op://` references are
+declared per host in `dotfiles.secrets.env` (rendered to
+`~/.config/op/secrets.env`); machine-local extras go in the untracked
+`~/.config/op/secrets.local.env` in the same `KEY=op://vault/item/field` form.
+
+```bash
+with-secrets claude             # run one command with the variables injected
+with-secrets codex              # (any command; TUIs are fine, output is not masked)
+secrets-load                    # zsh: export them into the current shell (one auth prompt)
+secrets-unload                  # zsh: drop them again
+op signin                       # headless Linux without the desktop app
+```
+
+The 1Password desktop app must have "Integrate with 1Password CLI" enabled
+(Settings → Developer) so `op` can authenticate with Touch ID / system auth.
+
+### Headless hosts (kt-proxmox, kt-wsl, kt-ubuntu)
+
+`op` is installed everywhere, but without the desktop app it needs one of:
+
+```bash
+# Interactive sessions (expire after 30 min idle):
+op account add            # once: sign-in address, email, Secret Key, password
+eval "$(op signin)"       # per session; then with-secrets / secrets-load work
+
+# Unattended (cron, agents): a 1Password Service Account scoped to a
+# dedicated vault. Keep the token in ~/.config/zsh/local.zsh (chmod 600):
+export OP_SERVICE_ACCOUNT_TOKEN=ops_…
+```
+
+The 1Password SSH agent forwarded from a Mac only carries SSH keys — it does
+not authenticate `op` on the remote side.
 
 ## Export config to non-Nix machines (Chezmoi)
 

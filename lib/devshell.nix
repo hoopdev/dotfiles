@@ -1,196 +1,156 @@
+# Shared development shell (`nix develop` / direnv `use flake`).
+#
+# The hook runs under bash (both `nix develop` and direnv evaluate it there),
+# so it must not try to initialise zsh, starship or zoxide — those come from
+# the Home Manager zsh config when you run `nix develop --command zsh`.
 { pkgs, lib, ... }:
 
 let
-  # Import common CLI tools from home-manager configuration
+  # Reuse the CLI tool list from the Home Manager config so the devshell and
+  # the login shell agree on what is available. tools.nix is a plain module
+  # that only needs pkgs/lib, which is what makes this import possible.
   commonCliTools = import ../home/common/cli/tools.nix { inherit pkgs lib; };
   commonAliases = import ../home/common/cli/shell/aliases.nix;
-
-  # Extract packages from home.packages
   cliPackages = commonCliTools.home.packages;
 
-  # Platform detection
   inherit (pkgs.stdenv.hostPlatform) isLinux;
-  inherit (pkgs.stdenv.hostPlatform) isDarwin;
 
-  # Platform-specific libraries
-  linuxLibraries = with pkgs; [
-    glibc
-    stdenv.cc.cc
-    stdenv.cc.cc.lib
-    libGL
-    libx11
-    libxext
-    libxrender
-    libice
-    libsm
-  ];
-
-  darwinLibraries = with pkgs; [
-    # macOS uses system frameworks, minimal additional libs needed
-  ];
-
-  # Common libraries (cross-platform)
-  commonLibraries = with pkgs; [
-    zlib
-    glib
-    libffi
-    openssl
-    xz
-    bzip2
-    ncurses
-    readline
-    sqlite
-    freetype
-    fontconfig
-    expat
-  ];
-
-  # Combined libraries based on platform
+  # Libraries exposed to unpatched binaries (uv-managed Python, wheels) via
+  # nix-ld on NixOS. On other Linux distributions the host loader is used and
+  # NIX_LD_LIBRARY_PATH is simply ignored.
   libraries =
-    commonLibraries ++ lib.optionals isLinux linuxLibraries ++ lib.optionals isDarwin darwinLibraries;
-in
-{
-  # Common shell packages used across all development environments
+    with pkgs;
+    [
+      zlib
+      glib
+      libffi
+      openssl
+      xz
+      bzip2
+      ncurses
+      readline
+      sqlite
+      freetype
+      fontconfig
+      expat
+    ]
+    ++ lib.optionals isLinux [
+      glibc
+      stdenv.cc.cc
+      stdenv.cc.cc.lib
+      libGL
+      libx11
+      libxext
+      libxrender
+      libice
+      libsm
+    ];
+
   shellPackages =
     with pkgs;
     [
-      # Shell and prompt
       zsh
       starship
-
-      # Development utilities
       direnv
       nix-direnv
     ]
     ++ cliPackages;
 
-  # Common shell hook for development environments
-  shellHook =
-    environment:
-    let
-      # Generate alias commands from commonAliases
-      aliasCommands = lib.concatStringsSep "\n" (
-        lib.mapAttrsToList (name: value: "alias ${name}='${value}'") commonAliases
-      );
-    in
-    ''
-      if [[ $- == *i* ]]; then
-        echo "${environment}"
-      fi
+  aliasCommands = lib.concatStringsSep "\n" (
+    lib.mapAttrsToList (name: value: "alias ${name}='${value}'") commonAliases
+  );
 
-      # Set up zsh if available
-      if command -v zsh >/dev/null 2>&1; then
-        export SHELL=$(command -v zsh)
-        
-        # Load direnv if available (only in zsh context)
-        if [[ -n "$ZSH_VERSION" ]] && command -v direnv >/dev/null 2>&1; then
-          eval "$(direnv hook zsh)"
-        fi
-        
-        # Load starship if available (only in zsh context)  
-        if [[ -n "$ZSH_VERSION" ]] && command -v starship >/dev/null 2>&1; then
-          eval "$(starship init zsh)"
-        fi
-        
-        # Load zoxide if available (only in zsh context)
-        if [[ -n "$ZSH_VERSION" ]] && command -v zoxide >/dev/null 2>&1; then
-          eval "$(zoxide init zsh)"
-        fi
-      fi
+  commonShellHook = environment: ''
+    if [[ $- == *i* ]]; then
+      echo "${environment}"
+    fi
 
-      # Set up shell aliases from home/common/cli/shell/aliases.nix
-      ${aliasCommands}
-    '';
+    # Shell aliases from home/common/cli/shell/aliases.nix (interactive bash only;
+    # zsh gets them from Home Manager).
+    ${aliasCommands}
+  '';
 
-  # Shell configuration with additional packages
   mkShell =
     {
       environment,
       packages ? [ ],
       shellHook ? "",
     }:
-    let
-      common = import ./devshell.nix { inherit pkgs lib; };
-    in
     pkgs.mkShell {
-      packages = common.shellPackages ++ packages;
+      packages = shellPackages ++ packages;
       # Never replace the shell here: direnv and `nix develop --command`
       # evaluate shellHook too, including non-interactive agent commands.
-      shellHook = common.shellHook environment + shellHook;
+      shellHook = commonShellHook environment + shellHook;
     };
+in
+{
+  inherit shellPackages mkShell;
 
-  # Predefined development shells
-  shells = {
-    # Unified default development shell with Python support
-    default =
-      { devshell }:
-      devshell.mkShell {
-        environment = "🚀 Development environment with Python & Nix tools";
-        packages =
-          with pkgs;
-          [
-            # Essential development tools
-            git
-            curl
-            wget
+  shells.default = mkShell {
+    environment = "🚀 Development environment with Python & Nix tools";
+    packages =
+      with pkgs;
+      [
+        # Essential development tools
+        git
+        curl
+        wget
 
-            # Text editors and utilities
-            vim
-            less
-            tree
+        # Text editors and utilities
+        vim
+        less
+        tree
 
-            # Process management
-            htop
-            which
+        # Process management
+        htop
+        which
 
-            # Nix development (using RFC-style formatter)
-            nixfmt
-            statix
-            deadnix
+        # Nix development (using RFC-style formatter)
+        nixfmt
+        statix
+        deadnix
 
-            # Python runtime
-            python313
+        # Python runtime
+        python313
 
-            # Python package manager
-            uv
+        # Python package manager
+        uv
 
-            # Development tools
-            ruff
-            mypy
-            python3Packages.pytest
-            ninja
-            meson
+        # Development tools
+        ruff
+        mypy
+        python3Packages.pytest
+        ninja
+        meson
 
-            # Build tools
-            gcc
-            pkg-config
+        # Build tools
+        gcc
+        pkg-config
 
-            # Task runner
-            just
+        # Task runner
+        just
 
-            # Version control tools
-            pre-commit
-          ]
-          ++ libraries
-          ++ lib.optionals isLinux [
-            # Linux-specific packages
-            nix-ld
-          ];
+        # Version control tools
+        pre-commit
+      ]
+      ++ libraries;
 
-        shellHook = ''
-          # Set library paths (Linux only)
-          ${lib.optionalString isLinux ''
-            export LD_LIBRARY_PATH="${lib.makeLibraryPath libraries}:$LD_LIBRARY_PATH"
-            export NIX_LD_LIBRARY_PATH="${lib.makeLibraryPath libraries}"
-          ''}
+    shellHook = ''
+      # Let nix-ld supply libraries on NixOS without overriding the host
+      # loader on other Linux distributions. In particular, putting Nix's
+      # glibc in LD_LIBRARY_PATH crashes host binaries such as /bin/sh and
+      # the native Claude Code executable on Ubuntu.
+      # Prepend rather than assign: on NixOS the system nix-ld list set by
+      # programs.nix-ld stays available; on other distros the variable is
+      # unset, so nothing changes there.
+      ${lib.optionalString isLinux ''
+        export NIX_LD_LIBRARY_PATH="${lib.makeLibraryPath libraries}''${NIX_LD_LIBRARY_PATH:+:$NIX_LD_LIBRARY_PATH}"
+      ''}
 
-          # Set up uv environment variables
-          export UV_CACHE_DIR="$PWD/.uv-cache"
-          export UV_PYTHON_PREFERENCE="managed"
-
-          # Create cache directory if it doesn't exist
-          mkdir -p .uv-cache
-        '';
-      };
+      # uv: prefer its own managed interpreters over whatever python is on
+      # PATH. The cache stays at uv's default (~/.cache/uv) so downloads are
+      # shared across projects instead of duplicated per checkout.
+      export UV_PYTHON_PREFERENCE="managed"
+    '';
   };
 }

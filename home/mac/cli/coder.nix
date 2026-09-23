@@ -71,8 +71,10 @@ in
 
   # Keep `coder login` usable without manually exporting the deployment URL.
   # The URL is stored by Coder after the first successful login.
-  programs.zsh.initContent = lib.mkAfter ''
-    [[ -f "${localZsh}" ]] && source "${localZsh}"
+  # local.zsh is sourced once by home/common/cli/shell/zsh.nix (mkAfter =
+  # 1500); this block must run after it, so order it explicitly later.
+  # Sourcing local.zsh here again would re-run cloudflared on every shell.
+  programs.zsh.initContent = lib.mkOrder 1600 ''
     ${loadCoderCfApp}
     [[ -n "''${CODER_URL:-}" ]] || export CODER_URL="''${CODER_CF_APP:-}"
     export CODER_HEADER_COMMAND="${coderHeaderCommand}"

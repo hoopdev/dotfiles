@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+_:
 
 {
   # Timezone
@@ -6,13 +6,20 @@
 
   # Japanese locale
   i18n.defaultLocale = "ja_JP.UTF-8";
-
-  # Japanese input method (Fcitx5 + Mozc)
-  i18n.inputMethod = {
-    enable = true;
-    type = "fcitx5";
-    fcitx5.addons = [ pkgs.fcitx5-mozc ];
+  i18n.extraLocaleSettings = {
+    LC_ADDRESS = "ja_JP.UTF-8";
+    LC_IDENTIFICATION = "ja_JP.UTF-8";
+    LC_MEASUREMENT = "ja_JP.UTF-8";
+    LC_MONETARY = "ja_JP.UTF-8";
+    LC_NAME = "ja_JP.UTF-8";
+    LC_NUMERIC = "ja_JP.UTF-8";
+    LC_PAPER = "ja_JP.UTF-8";
+    LC_TELEPHONE = "ja_JP.UTF-8";
+    LC_TIME = "ja_JP.UTF-8";
   };
+
+  # The input method (Fcitx5 + Mozc) is desktop-only and lives in
+  # lib/japanese-input.nix; headless hosts import just this file.
 
   # Fonts themselves (HackGen + Noto CJK + emoji) are installed and named by
   # Stylix — see lib/stylix.nix. Stylix's fontconfig target already puts each

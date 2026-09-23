@@ -23,18 +23,10 @@ _:
       eval "$(/opt/homebrew/bin/brew shellenv)"
       export PATH="$HOME/.nix-profile/bin:/etc/profiles/per-user/$USER/bin:$PATH"
 
-      # 1Password secrets cache (~/.op-secrets)
-      # Delete this file to force re-fetch: rm ~/.op-secrets
-      if [[ ! -f ~/.op-secrets ]]; then
-        op read "op://Personal/Anthropic/credential" > /dev/null 2>&1 && {
-          cat > ~/.op-secrets <<EOF
-      export BRAVE_API_KEY=$(op read "op://Personal/BraveAPI/credential")
-      export TELEGRAM_BOT_TOKEN=$(op read "op://Personal/Telegram/credential")
-      EOF
-          chmod 600 ~/.op-secrets
-        }
-      fi
-      [[ -f ~/.op-secrets ]] && source ~/.op-secrets
+      # API tokens are not cached on disk any more. Their op:// references are
+      # declared in home/mac/default.nix (dotfiles.secrets.env) and resolved on
+      # demand by `with-secrets <cmd>` or `secrets-load` — see
+      # home/common/cli/onepassword.nix. The old ~/.op-secrets can be deleted.
     '';
   };
 }

@@ -53,7 +53,7 @@ let
           hostPath = ../hosts/${hostname}/home.nix;
           isNixOS = true;
           inherit homeProfiles;
-          homeStateVersion = meta.homeStateVersion or "24.05";
+          inherit (meta) homeStateVersion;
           repoPath = paths.repo or null;
         })
       ];

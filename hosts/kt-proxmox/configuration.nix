@@ -24,35 +24,20 @@
     })
   ];
 
-  # Bootloader.
-  #boot.loader.grub.enable = true;
-  #boot.loader.grub.device = "/dev/sda";
-  #boot.loader.grub.useOSProber = true;
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = false;
+  boot.loader = {
+    systemd-boot.enable = true;
+    efi.canTouchEfiVariables = false;
+  };
 
-  networking.hostName = "kt-proxmox";
-
-  # Enable networking
-  networking.networkmanager.enable = true;
-
-  # Additional Japanese locale settings for this host
-  i18n.extraLocaleSettings = {
-    LC_ADDRESS = "ja_JP.UTF-8";
-    LC_IDENTIFICATION = "ja_JP.UTF-8";
-    LC_MEASUREMENT = "ja_JP.UTF-8";
-    LC_MONETARY = "ja_JP.UTF-8";
-    LC_NAME = "ja_JP.UTF-8";
-    LC_NUMERIC = "ja_JP.UTF-8";
-    LC_PAPER = "ja_JP.UTF-8";
-    LC_TELEPHONE = "ja_JP.UTF-8";
-    LC_TIME = "ja_JP.UTF-8";
+  networking = {
+    hostName = "kt-proxmox";
+    networkmanager.enable = true;
+    # Ollama is reachable over Tailscale only; the LAN side stays closed.
+    firewall.interfaces.tailscale0.allowedTCPPorts = [ 11434 ];
   };
 
   # Hardware graphics
-  hardware.graphics = {
-    enable = true;
-  };
+  hardware.graphics.enable = true;
 
   # Desktop services are disabled by the headless system profile.
   # Keep CLI integration without installing the 1Password GUI on this host.
@@ -61,33 +46,21 @@
   # User account: skeleton (isNormalUser, wheel, zsh) comes from lib/users.nix,
   # imported above; only the host-specific groups are listed there.
 
-  # List packages installed in system profile. To search, run:
-  # $ nix search wget
   environment.systemPackages = with pkgs; [
     devenv
     git-lfs
     google-cloud-sdk
   ];
 
-  # Some programs need SUID wrappers, can be configured further or are
-  # started in user sessions.
-  # programs.mtr.enable = true;
-  # programs.gnupg.agent = {
-  #   enable = true;
-  #   enableSSHSupport = true;
-  # };
-
-  # List services that you want to enable:
-
-  # Enable the OpenSSH daemon.
-  services.openssh.enable = true;
-
-  services.tailscale.enable = true;
-  services.ollama = {
-    enable = true;
-    # TODO: package = pkgs.ollama-cuda; — enable once GPU recognition is confirmed
-    host = "0.0.0.0";
-    port = 11434;
+  services = {
+    openssh.enable = true;
+    tailscale.enable = true;
+    ollama = {
+      enable = true;
+      # TODO: package = pkgs.ollama-cuda; — enable once GPU recognition is confirmed
+      host = "0.0.0.0";
+      port = 11434;
+    };
   };
 
   virtualisation.docker = {
@@ -105,10 +78,8 @@
   system.stateVersion = "24.05"; # Did you read the comment?
 
   # Host-specific Nix settings (extends modules/nixos/nix-settings.nix)
-  nix.settings = {
-    trusted-users = [
-      "root"
-      primaryUser
-    ];
-  };
+  nix.settings.trusted-users = [
+    "root"
+    primaryUser
+  ];
 }
