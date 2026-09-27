@@ -1,14 +1,10 @@
 {
-  config,
   pkgs,
   lib,
   ...
 }:
 let
   inherit (pkgs.stdenv.hostPlatform) isDarwin;
-  repo = config.dotfiles.paths.repo;
-  # out-of-store symlink into the dotfiles checkout; rebuild-free edits.
-  fromRepo = path: config.lib.file.mkOutOfStoreSymlink "${repo}/${path}";
 in
 {
   # Claude Code 本体は ai-tools-bootstrap で公式インストーラから導入する。
@@ -41,28 +37,6 @@ in
         fi
       fi
     '';
-
-    # The symlinks below point into the checkout named by dotfiles.paths.repo
-    # (host metadata `paths.repo`; default ~/dotfiles). Skipped when the host
-    # declares no checkout, exactly like the init.lua sync in neovim.nix.
-    file = lib.mkIf (repo != null) {
-      # /skill-sync — スキル正本ライブラリ (claude/skills/) の同期スキルだけは
-      # Nix で ~/.claude/skills に symlink する(「~/.claude は管理しない」方針の例外)。
-      # out-of-store symlink なので rebuild なしで編集が反映される。
-      # 他のスキルの配布は `dev skill push` が行う (claude/skills/skills.toml 参照)。
-      ".claude/skills/skill-sync".source = fromRepo "claude/skills/skill-sync";
-
-      # /fleet-review — agy/codex/opencode の3系統を並列実行して統合レビューする
-      # グローバルスキル。skill-sync 同様、全マシンに配るので home-manager で
-      # out-of-store symlink する(project 配布ではないため skills.toml は projects=[])。
-      ".claude/skills/fleet-review".source = fromRepo "claude/skills/fleet-review";
-
-      # fleet-review が使う reviewer サブエージェント定義。ファイル単位で symlink し、
-      # マシン固有のローカル agent を ~/.claude/agents に共存できる余地を残す。
-      ".claude/agents/agy-reviewer.md".source = fromRepo "claude/agents/agy-reviewer.md";
-      ".claude/agents/codex-reviewer.md".source = fromRepo "claude/agents/codex-reviewer.md";
-      ".claude/agents/opencode-reviewer.md".source = fromRepo "claude/agents/opencode-reviewer.md";
-    };
   };
 
   # Claude Code settings.json — Nix管理しない
