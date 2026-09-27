@@ -76,7 +76,10 @@ in
     # does not exist; edit it locally and keep it chmod 600.
     #
     # Sourced from interactive init (.zshrc), NOT envExtra (.zshenv).
-    # local.zsh fetches tokens with `cloudflared`, which is installed through
+    # This is the sole interactive loader; consumers must run after order 1500
+    # instead of sourcing it again. SSH agent selection lives in the macOS
+    # managed ssh-agent.sh, not in local.zsh.
+    # local.zsh may fetch tokens with `cloudflared`, which is installed through
     # Home Manager and appears on PATH in interactive shells. Interactive-only
     # is also desirable here: it avoids re-running cloudflared on every
     # non-interactive `zsh -c`.
