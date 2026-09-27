@@ -82,8 +82,18 @@ if [[ -z "${SSH_CONNECTION:-}" && -z "${SSH_AUTH_SOCK:-}" ]]; then
 fi
 ```
 
-この repo の macOS 設定も同じ方針にしている。`home/mac/cli/shell.nix` はローカル
-端末だけ 1Password socket を補完し、SSH セッション内では補完しない。
+この repo の macOS 設定は `home/mac/cli/ssh-agent.sh` で agent を選ぶ。
+zsh の初期化でこの処理を読み込み、SSH セッション内では
+ローカル agent を補完しない。転送された socket は `~/.ssh/agent/current` に
+symlink で保持し、長時間動く mux の pane からも参照できるようにする。
+
+ローカル起動時、そのリンクが 1Password を指していれば疎通確認しない。
+以前の転送先を指している場合だけ `ssh-add -l` を最大0.5秒で実行する
+（終了しない場合は追加0.5秒後に強制終了）。終了コード2の場合だけローカルに戻し、
+鍵がない場合やタイムアウトでは転送先を維持する。
+
+`~/.config/zsh/local.zsh` は共通 zsh 設定で一度だけ読み込む。古い SSH agent
+選択処理をこのファイルに残さず、秘密情報やマシン固有の設定だけを置く。
 
 ## Verification
 
@@ -131,6 +141,14 @@ sign_and_send_pubkey: signing using ...
 `signing using` の後で止まる場合は、client 側の 1Password 承認待ち。
 
 ## Troubleshooting
+
+WezTerm / zellij の新しい pane で zsh 初期化が止まる:
+
+- 起動設定中の無制限な `ssh-add -l` は、1Password や転送 agent の応答待ちで
+  停止することがある。`local.zsh` に古い疎通確認処理が残っていないか確認する。
+- 管理された `ssh-agent.sh` はローカル 1Password への起動時の疎通確認を省き、
+  転送先の確認にも時間制限を設ける。これはシェル起動の対策であり、実際の SSH
+  接続時に必要な 1Password の承認を省略するものではない。
 
 `target-host` でパスワードを聞かれる:
 
