@@ -15,6 +15,15 @@ host decisions. WSL does not acquire an SSH listener through this profile.
 Proxmox retains NVIDIA/graphics and 1Password CLI, without the desktop app.
 Existing authentication and SSH agent forwarding are unchanged.
 
+## Orca on SSH hosts
+
+Orca can own worktrees and sessions on this host while the desktop supplies the
+UI. `orca.yaml` installs Git hooks directly inside the Nix development shell;
+`nix develop --command just verify` provides the common verification command.
+Skills are managed in Orca outside this repository. Desktop and SSH execution
+hosts have separate installations. See [Orca workflow](orca.md) for ownership
+boundaries; the relay CLI may describe the desktop rather than this host.
+
 ## Project environments and agents
 
 Apply Home Manager, open a new shell, and approve a project's `.envrc` with

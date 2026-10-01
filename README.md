@@ -67,6 +67,19 @@ starting an agent from an activated shell also lets it inherit that environment.
 The devShell hook never starts a replacement shell. See
 [headless development](docs/headless.md) for the server profile and agent workflow.
 
+## Agent workflow in Orca
+
+Orca manages task worktrees, agent sessions, review, and skills. This repository
+supplies shared project instructions in `AGENTS.md` and a worktree setup hook in
+`orca.yaml`. Nix remains responsible for the execution environment.
+
+```bash
+nix develop --command just verify
+```
+
+Skills are managed outside this repository through Orca. See
+[Orca workflow](docs/orca.md) for worktree isolation, verification, and MCP ownership.
+
 ## System Configurations
 
 ### NixOS
@@ -165,7 +178,10 @@ There is no CI for this repo; the git hooks are the gate. Install them once per 
 pre-commit install --hook-type pre-commit --hook-type pre-push
 ```
 
-Commits run `nix fmt -- --ci`; pushes run `nix flake check --no-build` so every host still evaluates.
+Commits run `nix fmt -- --ci`. Pushes run `nix flake check --no-build --all-systems`
+to evaluate every host, the SSH agent/secrets regression tests, and
+`nix run .#check-export-dotfiles` to build and compare the generated Chezmoi files.
+These push checks also run for changes to `flake.lock` and non-Nix files.
 
 ## Directory Structure
 

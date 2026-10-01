@@ -1,0 +1,6 @@
+# Orca repository hook. Dependencies and activation remain owned by Nix.
+scripts:
+  setup: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+    nix develop --command pre-commit install --hook-type pre-commit --hook-type pre-push
