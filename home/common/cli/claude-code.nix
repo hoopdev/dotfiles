@@ -43,6 +43,8 @@ in
   # Claude Codeがpermissions・プラグイン設定を頻繁に書き換えるため、各マシンで独立管理。
   # settings.local.json と合わせて手動で管理する。
 
-  # MCP servers: Nix管理しない
-  # claude mcp add で ~/.claude.json に追加して各マシンで独立管理する。
+  # MCP servers and agent hooks: Orca owns their integration where supported.
+  # Keep credentials and mutable agent settings outside Nix. Migrate existing
+  # registrations through Orca Settings, verify on the execution host, then
+  # remove duplicates. See docs/orca.md; do not overwrite ~/.claude.json here.
 }

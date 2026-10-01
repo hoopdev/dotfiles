@@ -39,8 +39,10 @@
 │   │   └── gui/             # GUI: terminals, apps
 │   ├── mac/                 # macOS-specific home configurations
 │   └── nixos/               # NixOS-specific home configurations
-├── claude/                    # Claude Code skill library (canonical source)
-│   └── skills/               # skills.toml manifest + one dir per skill
+├── AGENTS.md                  # Shared project instructions
+├── CLAUDE.md                  # Claude entrypoint importing AGENTS.md
+├── justfile                   # Repository verification commands
+├── orca.yaml                  # Orca worktree setup hook
 └── hosts/                    # Host-specific system configurations
     ├── kt-proxmox/          # Proxmox VM (NixOS)
     ├── kt-thinkpad/         # ThinkPad (NixOS)
@@ -79,17 +81,15 @@ Tailscale, containers and GPU drivers remain host-specific choices. It is distin
 from `nixos-headless`, which selects the Home Manager CLI environment.
 The `developer` home profile also enables direnv + nix-direnv for Zsh and Nushell.
 
-### Claude Code skill library (`claude/skills/`)
+### Orca integration
 
-Canonical source for Claude Code skills that grow across projects. The separately installed `dev skill`
-(from the `dev` fleet tool) distributes them into each subscribed project's
-`.claude/skills/` as plain committed copies and classifies sync state via an
-`x-canonical-hash` frontmatter key; per-repo rules live in a
-`<!-- project-specific -->` block that survives pushes. Subscriptions are
-declared in `claude/skills/skills.toml`. The `/skill-sync` skill (symlinked
-into `~/.claude/skills/` by `home/common/cli/claude-code.nix`) drives the
-semantic merge: harvesting project improvements back into this library and
-redistributing. See `~/git/dev/docs/commands.md` (`dev skill`).
+Orca owns workspace/session orchestration and skill management. Skill sources,
+installers, and synchronization are not part of this repository. Installed skills
+remain independent of the checkout.
+
+Nix owns runtime dependencies. `AGENTS.md` describes repository behavior and
+`justfile` contains only verification tasks. The `orca.yaml` setup hook invokes
+`pre-commit install` directly inside the Nix environment. See [Orca workflow](orca.md).
 
 ### Chezmoi source tree (non-Nix targets)
 
@@ -170,10 +170,11 @@ Platform-specific libraries are included automatically (Linux: glibc, X11; macOS
 
 ## Verification
 
-`nix flake check --all-systems` evaluates every NixOS, Darwin, and standalone
-Home Manager configuration through lightweight check derivations. It also
-checks that generated Chezmoi artifacts match the Nix-rendered source.
-Use `nix run .#check-export-dotfiles` for the drift check alone.
+`nix develop --command just verify` runs formatting/lint,
+`nix flake check --no-build --all-systems`, the regression tests, and the generated
+Chezmoi drift check. The all-systems step evaluates every host without attempting
+to build another platform's checks. Use `nix run .#check-export-dotfiles` for the
+drift check alone.
 
 ## User Configuration
 
@@ -185,6 +186,7 @@ Use `nix run .#check-export-dotfiles` for the drift check alone.
 
 ## Related Docs
 
+- [docs/orca.md](orca.md) — Orca workspaces and agent integration
 - [docs/commands.md](commands.md) — apply / bootstrap / maintenance commands
 - [docs/neovim.md](neovim.md) — Neovim (home-manager + lazy.nvim) setup
 - [docs/ssh.md](ssh.md) — SSH client + 1Password agent configuration

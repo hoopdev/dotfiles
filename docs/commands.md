@@ -22,7 +22,7 @@ nix run nixpkgs#nh -- darwin switch . -H kt-mac-studio
 brew update && brew upgrade                # macOS: Homebrew is no longer upgraded by `nh darwin switch`
 nix flake update                        # Update inputs
 nix flake check                         # Validate
-nix flake check --all-systems           # Evaluate every host/profile output
+nix flake check --no-build --all-systems # Evaluate every host/profile output
 nix run .#check-export-dotfiles         # Verify generated Chezmoi files have no drift
 nh clean all --keep 5 --keep-since 7d   # GC (user + system)
 nix develop                             # Dev shell (Python + Nix tools)
@@ -37,7 +37,22 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 ```
 
 Commit → `nix fmt -- --ci` (nixfmt + statix + deadnix drift).
-Push   → `nix flake check --no-build` (every host / profile evaluates).
+Push   → `nix flake check --no-build --all-systems` (every host / profile evaluates),
+`nix develop --command python3 -B -m unittest discover -s tests -v` (SSH agent and
+secrets regression tests), and `nix run .#check-export-dotfiles` (build and compare
+generated files). Push checks run regardless of which file types changed.
+
+## Orca
+
+Orca manages worktrees, sessions, and skills. This repository only supplies
+project setup and verification commands:
+
+```bash
+nix develop --command pre-commit install --hook-type pre-commit --hook-type pre-push
+nix develop --command just verify
+```
+
+Manage skills in Orca independently of dotfiles. See [Orca workflow](orca.md).
 
 ## AI tools (developer profile)
 
