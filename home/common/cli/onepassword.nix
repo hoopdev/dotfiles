@@ -76,6 +76,7 @@ in
       # result into this shell. One auth prompt per call; values live only in
       # this process' environment.
       secrets-load() {
+        emulate -L zsh
         local -a files
         ${envFilesSh}
         # Desktop hosts authenticate through the 1Password app. Headless hosts
@@ -86,16 +87,29 @@ in
           print -u2 "  unattended:  export OP_SERVICE_ACCOUNT_TOKEN=…   (put it in ~/.config/zsh/local.zsh)"
           return 1
         fi
-        local f out line
+        local f out line key
+        local -a assignments
         for f in "''${files[@]}"; do
-          # Resolve first, export after: a failed/cancelled auth must not
-          # leave a half-exported set behind.
+          # Resolve ALL files before changing this shell's environment.
           out="$(op inject -i "$f")" || { print -u2 "secrets-load: op inject failed for $f"; return 1; }
           for line in "''${(f)out}"; do
             [[ -z "$line" || "$line" == \#* ]] && continue
-            export "''${line%%=*}=''${line#*=}"
+            key="''${line%%=*}"
+            if [[ "$line" != *=* || ! "$key" =~ '^[A-Za-z_][A-Za-z0-9_]*$' ]]; then
+              print -u2 "secrets-load: invalid environment assignment in $f"
+              return 1
+            fi
+            assignments+=("$line")
           done
         done
+        # Check exportability (e.g. readonly variables) in a subshell first.
+        # Suppress shell diagnostics because they may contain secret values.
+        (( ''${#assignments} )) || return 0
+        ( builtin export -- "''${assignments[@]}" ) >/dev/null 2>&1 || {
+          print -u2 "secrets-load: environment assignments cannot be exported"
+          return 1
+        }
+        builtin export -- "''${assignments[@]}"
       }
       secrets-unload() {
         local -a files

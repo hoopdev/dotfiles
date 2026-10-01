@@ -11,8 +11,8 @@
     includes = [ "config.local" ];
     # IdentityAgent is intentionally absent from every Host block.
     # $SSH_AUTH_SOCK is the single source of truth for which agent to use:
-    #   - macOS local shell: home/mac/cli/ssh-agent.sh selects the stable agent
-    #                        link, falling back to the local 1Password socket.
+    #   - macOS local shell: home/mac/cli/ssh-agent.sh selects local 1Password
+    #                        or the socket inherited from its parent session.
     #   - SSH session with ForwardAgent: sshd injects the caller's forwarded
     #                        agent into SSH_AUTH_SOCK; zsh init does not
     #                        fall back to the remote machine's local agent.
