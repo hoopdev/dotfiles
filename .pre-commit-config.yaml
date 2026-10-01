@@ -1,26 +1,44 @@
+default_install_hook_types: [pre-commit, pre-push]
+default_stages: [pre-commit]
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
       - id: trailing-whitespace
+        stages: [pre-commit]
       - id: end-of-file-fixer
+        stages: [pre-commit]
       - id: check-yaml
+        stages: [pre-commit]
       - id: check-added-large-files
+        stages: [pre-commit]
   - repo: local
     hooks:
-      - id: nixfmt
-        name: nixfmt
-        entry: nixfmt
+      - id: treefmt
+        name: Nix formatting and lint checks
+        entry: nix fmt -- --ci
         language: system
-        files: \.nix$
-      - id: statix
-        name: statix
-        entry: statix check
-        language: system
-        files: \.nix$
         pass_filenames: false
-      - id: deadnix
-        name: deadnix
-        entry: deadnix
+        always_run: true
+      - id: flake-eval
+        name: Evaluate every host and platform
+        entry: nix flake check --no-build --all-systems
         language: system
-        files: \.nix$
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: shell-tests
+        name: SSH agent and secrets regression tests
+        entry: nix develop --command python3 -B -m unittest discover -s tests -v
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: export-dotfiles
+        name: Generated Chezmoi files match Nix sources
+        entry: nix run .#check-export-dotfiles
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

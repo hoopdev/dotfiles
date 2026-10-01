@@ -1,18 +1,15 @@
-{ pkgs, config, ... }:
+{ config, ... }:
 
 {
-  xdg.configFile."zsh/ssh-agent.sh".source = pkgs.replaceVars ./ssh-agent.sh {
-    timeout = "${pkgs.coreutils}/bin/timeout";
-    sshAdd = "${pkgs.openssh}/bin/ssh-add";
-  };
+  xdg.configFile."zsh/ssh-agent.sh".source = ./ssh-agent.sh;
 
   programs.zsh = {
     enable = true;
     # SSH agent strategy (see also home/common/cli/ssh.nix):
     #   Neither ~/.ssh/config nor config.local sets IdentityAgent anywhere.
     #   Instead, $SSH_AUTH_SOCK is the single source of truth:
-    #   - Local shell  → use the stable agent link (local 1Password by default,
-    #                    or a pinned forwarded agent for long-lived mux panes).
+    #   - Local shell  → local 1Password by default; mux panes inherit their
+    #                    parent session's DEV_SSH_AGENT_SOCK, even when empty.
     #   - SSH session  → use only a client-forwarded SSH_AUTH_SOCK, so the
     #                    agent follows the origin machine.
     #   This MUST live in initContent (.zshrc), not loginExtra (.zlogin): zellij

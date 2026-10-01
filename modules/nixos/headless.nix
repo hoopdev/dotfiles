@@ -9,11 +9,11 @@
     pipewire.enable = lib.mkDefault false;
 
     # Keep diagnostic logs across boots without unbounded disk consumption.
-    journald.extraConfig = ''
-      Storage=persistent
-      SystemMaxUse=512M
-      RuntimeMaxUse=128M
-      MaxRetentionSec=30day
-    '';
+    journald.settings.Journal = {
+      Storage = "persistent";
+      SystemMaxUse = "512M";
+      RuntimeMaxUse = "128M";
+      MaxRetentionSec = "30day";
+    };
   };
 }
