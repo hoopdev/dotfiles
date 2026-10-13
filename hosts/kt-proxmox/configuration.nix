@@ -32,8 +32,6 @@
   networking = {
     hostName = "kt-proxmox";
     networkmanager.enable = true;
-    # Ollama is reachable over Tailscale only; the LAN side stays closed.
-    firewall.interfaces.tailscale0.allowedTCPPorts = [ 11434 ];
   };
 
   # Hardware graphics
@@ -53,14 +51,15 @@
   ];
 
   services = {
-    openssh.enable = true;
-    tailscale.enable = true;
-    ollama = {
+    openssh = {
       enable = true;
-      # TODO: package = pkgs.ollama-cuda; — enable once GPU recognition is confirmed
-      host = "0.0.0.0";
-      port = 11434;
+      settings = {
+        PasswordAuthentication = false;
+        KbdInteractiveAuthentication = false;
+        PermitRootLogin = "no";
+      };
     };
+    tailscale.enable = true;
   };
 
   virtualisation.docker = {
@@ -77,9 +76,4 @@
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
   system.stateVersion = "24.05"; # Did you read the comment?
 
-  # Host-specific Nix settings (extends modules/nixos/nix-settings.nix)
-  nix.settings.trusted-users = [
-    "root"
-    primaryUser
-  ];
 }

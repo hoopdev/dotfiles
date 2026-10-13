@@ -15,7 +15,6 @@
 
   home.sessionVariables = {
     USE_SYMENGINE = "1";
-    OLLAMA_HOST = "0.0.0.0";
   };
 
   programs.neovim.obsidianVaults = [

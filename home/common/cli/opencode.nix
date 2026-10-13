@@ -44,8 +44,8 @@ in
     "$schema" = "https://opencode.ai/config.json";
     theme = "shonan";
     plugin = [
-      "opencode-openai-codex-auth@latest"
-      "opencode-gemini-auth@latest"
+      "opencode-openai-codex-auth@4.4.0"
+      "opencode-gemini-auth@2.0.1"
     ];
     # anthropic/google accessed via opencode-openai-codex-auth/opencode-gemini-auth plugins above
     disabled_providers = [

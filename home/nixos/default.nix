@@ -3,7 +3,6 @@
 {
   imports = [
     ../common
-    ./cli
     ./gui
   ];
 

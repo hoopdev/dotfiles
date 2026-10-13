@@ -71,7 +71,7 @@ such as `gtk4ThemeSilencer` in `flake-modules/shared.nix`.
 
 `systemProfiles` are NixOS-only (`base`, `headless`, `onepassword`, `nvidia`);
 `homeProfiles` work across host kinds (`cli`, `developer`, `syncthing`,
-`nixos-desktop`, `nixos-headless`, `ollama`, `mac`). The base NixOS profile no
+`nixos-desktop`, `nixos-headless`, `mac`). The base NixOS profile no
 longer installs the 1Password GUI. Hyprland is taken from nixpkgs, so no extra
 binary cache is trusted anywhere.
 
@@ -93,7 +93,7 @@ Nix owns runtime dependencies. `AGENTS.md` describes repository behavior and
 
 ### Chezmoi source tree (non-Nix targets)
 
-Dotfiles for environments without Nix (Windows, bare Jupyter) live under `chezmoi/`, isolated from the Nix flake. A root `.chezmoiroot` points [Chezmoi](https://chezmoi.io) at that subdirectory, so Chezmoi only ever sees dotfile sources — the Nix tree, docs, and build outputs sit outside its root and need no `.chezmoiignore` entries.
+Dotfiles for environments without Nix (Windows, non-Nix Linux) live under `chezmoi/`, isolated from the Nix flake. A root `.chezmoiroot` points [Chezmoi](https://chezmoi.io) at that subdirectory, so Chezmoi only ever sees dotfile sources — the Nix tree, docs, and build outputs sit outside its root and need no `.chezmoiignore` entries.
 
 ```
 ├── .chezmoiroot               # Contains "chezmoi" — sets the Chezmoi source root
@@ -102,7 +102,6 @@ Dotfiles for environments without Nix (Windows, bare Jupyter) live under `chezmo
     ├── dot_config/            # → ~/.config   (nvim, wezterm, starship, zoxide, scoop)
     ├── dot_glzr/              # → ~/.glzr     (GlazeWM + Zebar, Windows)
     ├── AppData/               # → ~/AppData   (Nushell, Windows)
-    ├── private_dot_jupyter/   # → ~/.jupyter  (JupyterLab settings)
     └── .chezmoiignore         # Only per-OS target exclusions remain
 ```
 
@@ -112,7 +111,7 @@ Files in this tree come from three places, and it matters which:
 |------|--------|
 | `dot_config/nvim/init.lua` | Copied from `home/common/cli/init.lua` on every rebuild, by an activation hook in `home/common/cli/neovim.nix` |
 | `dot_config/readonly_starship.toml`, `dot_config/wezterm/` | **Generated** — rendered from the Nix config by `nix run .#export-dotfiles` (see below) |
-| `dot_glzr/`, `AppData/`, `dot_config/{scoop,winget}`, `private_dot_jupyter/` | Hand-maintained; these targets have no Nix equivalent |
+| `dot_glzr/`, `AppData/`, `dot_config/{scoop,winget}` | Hand-maintained; these targets have no Nix equivalent |
 
 ### Why starship / wezterm are generated, not hand-written
 

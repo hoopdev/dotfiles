@@ -42,8 +42,28 @@ in
           }) value.users
         ) (lib.attrsToList (lib.filterAttrs (_: meta: meta.type == "home" && meta.system == system) hosts))
       );
+      secretsModule = import ../home/common/cli/onepassword.nix {
+        inherit lib;
+        pkgs = { };
+        config.dotfiles.secrets.env = { };
+      };
+      secretReference = secretsModule.options.dotfiles.secrets.env.type.nestedTypes.elemType;
+      secretReferenceCheck =
+        assert secretReference.check "op://Personal/Example/credential";
+        assert secretReference.check "op://Personal/Example/section/field";
+        assert !(secretReference.check "plaintext-credential");
+        assert !(secretReference.check "op://Personal/Example");
+        assert !(secretReference.check "op://Personal/Example/field\nINJECTED=value");
+        assert !(secretReference.check "op://Personal/Example/field\rINJECTED=value");
+        "ok\n";
     in
     {
-      checks = nixosChecks // darwinChecks // homeChecks;
+      checks =
+        nixosChecks
+        // darwinChecks
+        // homeChecks
+        // {
+          secrets-reference-type = evalCheck "secrets-reference-type" secretReferenceCheck;
+        };
     };
 }

@@ -242,7 +242,7 @@ Typical profiles are `cli`, `developer`, `syncthing`, `nixos-desktop`,
 Keep machine-specific values in metadata (`primaryUser`, `system`, optional
 `paths.repo`) rather than embedding them in a shared module.
 
-The **Chezmoi source tree** for non-Nix targets lives under `chezmoi/` (`dot_config/` → `~/.config`, `dot_glzr/`, `AppData/`, `private_dot_jupyter/`); a root `.chezmoiroot` points Chezmoi at it, so the Nix flake and docs stay out of `chezmoi apply` automatically. Most of `dot_config/` is generated from the Nix config by `nix run .#export-dotfiles` — see [Chezmoi](#chezmoi) below. The `wallpaper/` asset stays at the root (Nix-owned, used by Stylix + Hyprland).
+The **Chezmoi source tree** for non-Nix targets lives under `chezmoi/` (`dot_config/` → `~/.config`, `dot_glzr/`, `AppData/`); a root `.chezmoiroot` points Chezmoi at it, so the Nix flake and docs stay out of `chezmoi apply` automatically. Most of `dot_config/` is generated from the Nix config by `nix run .#export-dotfiles` — see [Chezmoi](#chezmoi) below. The `wallpaper/` asset stays at the root (Nix-owned, used by Stylix + Hyprland).
 
 ## Key Components
 
@@ -306,11 +306,11 @@ This renders `dot_config/readonly_starship.toml`, `dot_config/wezterm/` and `dot
 
 Neovim's `init.lua` is *also* copied on every Nix rebuild by an activation hook in `home/common/cli/neovim.nix`, so it stays current even without running the export.
 
-Everything else — `dot_glzr/` (GlazeWM, Zebar), `AppData/` (Nushell on Windows), scoop, winget and `private_dot_jupyter/` — has no Nix equivalent and is maintained by hand.
+Everything else — `dot_glzr/` (GlazeWM, Zebar), `AppData/` (Nushell on Windows), scoop and winget — has no Nix equivalent and is maintained by hand.
 
 Chezmoi applies Windows-only targets (`AppData`, `.glzr`, Scoop, Winget) only
 on Windows. On macOS, Nix owns the full `.config` directory; on non-Nix Linux,
-portable terminal/editor/Jupyter config can still be applied without Windows
+portable terminal/editor config can still be applied without Windows
 desktop files.
 
 ## License

@@ -8,7 +8,6 @@
     syncthing = ../home/common/services/syncthing.nix;
     nixos-desktop = ../home/nixos;
     nixos-headless = ../home/nixos/headless.nix;
-    ollama = ../home/nixos/cli;
     mac = ../home/mac;
   };
 

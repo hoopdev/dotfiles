@@ -12,6 +12,5 @@
     "nixos-headless"
     "developer"
     "syncthing"
-    "ollama"
   ];
 }
