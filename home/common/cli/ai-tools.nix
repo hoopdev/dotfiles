@@ -7,6 +7,7 @@ let
   installerHashes = {
     claude = "3a68d3406cf674e17bed1733a4dcf37805e2e47d87417700007d7e1aa766a944";
     codex = "150e3cf675682efeaac115aa3747add3f27887896d04ce6d0b56478d8b428bf6";
+    antigravity = "62966c07365423bd4dc209355060744058fb30d60f5323e2d360e39de64e5042";
   };
 
   mkCommand =
@@ -27,14 +28,14 @@ let
       text = ''
         mode=${mode}
         if [[ $# -gt 1 ]]; then
-          echo "Usage: ai-tools-${mode} [all|claude|codex]" >&2
+          echo "Usage: ai-tools-${mode} [all|claude|codex|antigravity]" >&2
           exit 2
         fi
         case "''${1:-all}" in
-          all) apps=(claude codex) ;;
-          claude|codex) apps=("$1") ;;
+          all) apps=(claude codex antigravity) ;;
+          claude|codex|antigravity) apps=("$1") ;;
           -h|--help)
-            echo "Usage: ai-tools-${mode} [all|claude|codex]"
+            echo "Usage: ai-tools-${mode} [all|claude|codex|antigravity]"
             echo "Manage official user-local installations; running services are not restarted."
             exit 0 ;;
           *) echo "Unknown app: $1" >&2; exit 2 ;;
@@ -46,11 +47,14 @@ let
         failed=0
         for app in "''${apps[@]}"; do
           launcher="$HOME/.local/bin/$app"
-          if [[ "$app" == claude ]]; then
-            root="$HOME/.local/share/claude"
-          else
-            root="''${CODEX_HOME:-$HOME/.codex}/packages/standalone"
-          fi
+          case "$app" in
+            claude) root="$HOME/.local/share/claude" ;;
+            codex) root="''${CODEX_HOME:-$HOME/.codex}/packages/standalone" ;;
+            # Installs a single self-updating `agy` binary into ~/.local/bin.
+            antigravity)
+              launcher="$HOME/.local/bin/agy"
+              root="$HOME/.local/bin" ;;
+          esac
           if [[ -e "$launcher" || -L "$launcher" ]]; then
             resolved=$(realpath -m "$launcher")
             case "$resolved" in
@@ -90,6 +94,13 @@ let
                   exit 1
                 fi
                 bash "$installer" || exit 1
+              elif [[ "$app" == antigravity ]]; then
+                curl -fsSL https://antigravity.google/cli/install.sh -o "$installer" || exit 1
+                if ! echo "${installerHashes.antigravity}  $installer" | sha256sum --check --status; then
+                  echo "$app: installer checksum mismatch; review upstream changes before updating the pinned hash." >&2
+                  exit 1
+                fi
+                bash "$installer" || exit 1
               else
                 curl -fsSL https://chatgpt.com/codex/install.sh -o "$installer" || exit 1
                 if ! echo "${installerHashes.codex}  $installer" | sha256sum --check --status; then
@@ -105,7 +116,9 @@ let
             fi
           fi
 
-          if [[ "$mode" == update ]]; then
+          if [[ "$mode" == update && "$app" == antigravity ]]; then
+            echo "$app: self-updates in the background; no manual update step."
+          elif [[ "$mode" == update ]]; then
             if ! "$launcher" update; then
               echo "$app: update failed." >&2
               failed=1

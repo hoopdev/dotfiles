@@ -14,7 +14,7 @@ class InstallerIntegrityTests(unittest.TestCase):
         source = (Path(__file__).resolve().parents[1] /
                   "home/common/cli/ai-tools.nix").read_text()
         script = source.split("            if ! (\n", 1)[1].split("\n            ); then", 1)[0]
-        for app in ("claude", "codex"):
+        for app in ("claude", "codex", "antigravity"):
             digest = re.search(rf'{app} = "([a-f0-9]{{64}})";', source).group(1)
             script = script.replace("${installerHashes." + app + "}", digest)
 
@@ -37,13 +37,13 @@ exit 2
             sha256sum = shutil.which("sha256sum")
             self.assertTrue(sha256sum, "run in the Nix development shell")
             (root / "sha256sum").symlink_to(sha256sum)
-            for app in ("claude", "codex"):
+            for app in ("claude", "codex", "antigravity"):
                 with self.subTest(app=app):
                     marker = root / f"{app}-executed"
                     result = subprocess.run(
                         ["bash", "-c", "set -euo pipefail\n" + script],
                         env=dict(os.environ) | {
-                            "PATH": f"{root}:/usr/bin:/bin",
+                            "PATH": f"{root}:{os.environ['PATH']}",
                             "app": app,
                             "TEST_INSTALLER_PAYLOAD": str(payload),
                             "TEST_INSTALLER_MARKER": str(marker),

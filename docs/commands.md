@@ -113,17 +113,19 @@ Manage skills in Orca independently of dotfiles. See [Orca workflow](orca.md).
 Apply Home Manager first, then open a new shell:
 
 ```bash
-ai-tools-bootstrap          # Install missing Claude Code / Codex native apps
-ai-tools-update             # Update both apps without rebuilding Nix
+ai-tools-bootstrap          # Install missing Claude Code / Codex / Antigravity (agy) native apps
+ai-tools-update             # Update the apps without rebuilding Nix
 ai-tools-bootstrap codex    # Install just Codex
 ai-tools-update claude      # Update just Claude Code
 ```
 
 Nix manages these commands, PATH, and the NixOS `nix-ld` runtime. App binaries
 live in writable user directories and are installed by the
-[Claude Code](https://code.claude.com/docs/en/setup) and
-[Codex](https://learn.chatgpt.com/docs/codex/cli) official installers.
-Home Manager activation does not download either app. Bootstrap skips existing
+[Claude Code](https://code.claude.com/docs/en/setup),
+[Codex](https://learn.chatgpt.com/docs/codex/cli), and
+Antigravity CLI (`agy`, `https://antigravity.google/cli/install.sh`) official
+installers. Antigravity self-updates, so `ai-tools-update` only verifies it.
+Home Manager activation does not download these apps. Bootstrap skips existing
 native installations; update requires them to be installed. Both commands refuse
 to overwrite installations managed by Nix, npm, Homebrew, or custom launchers.
 Bootstrap also refuses scripts whose SHA-256 differs from the inspected version
