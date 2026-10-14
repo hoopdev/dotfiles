@@ -86,5 +86,51 @@ printf '%s\\n' "$result" "${REVIEW_FIRST-unset}" "${REVIEW_SECOND-unset}" "${REV
         self.assertNotIn("sensitive", err)
 
 
+class WithSecretsTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="with-secrets-review-")
+        self.addCleanup(self.tmp.cleanup)
+        root = Path(self.tmp.name)
+        mock_op = root / "op"
+        mock_op.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
+        mock_op.chmod(0o700)
+        source = (Path(__file__).resolve().parents[1] /
+                  "home/common/cli/onepassword.nix").read_text()
+        env_files = source.split("  envFilesSh = ''\n", 1)[1].split("\n  '';", 1)[0]
+        script = source.split("    text = ''\n", 1)[1].split("\n    '';", 1)[0]
+        self.script = (script.replace("${envFilesSh}", env_files)
+                      .replace("${envFile}", str(root / "managed.env"))
+                      .replace("${localEnvFile}", str(root / "local.env"))
+                      .replace("''${", "${"))
+        self.env = dict(os.environ) | {"PATH": f"{root}:{os.environ['PATH']}"}
+
+    def run_command(self, *args):
+        return subprocess.run(
+            ["bash", "-c", self.script, "with-secrets", *args],
+            env=self.env, capture_output=True, text=True, timeout=3,
+        )
+
+    def test_redirected_output_keeps_masking_and_command_arguments(self):
+        result = self.run_command("example", "space separated", "--no-masking")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        args = result.stdout.splitlines()
+        self.assertEqual(args[0], "run")
+        self.assertEqual(args[-4:], ["--", "example", "space separated", "--no-masking"])
+        self.assertNotIn("--no-masking", args[:args.index("--")])
+
+    def test_explicit_opt_out(self):
+        result = self.run_command("--no-masking", "example")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        args = result.stdout.splitlines()
+        self.assertIn("--no-masking", args[:args.index("--")])
+
+    def test_missing_command(self):
+        for args in ((), ("--no-masking",)):
+            with self.subTest(args=args):
+                result = self.run_command(*args)
+                self.assertEqual(result.returncode, 2)
+                self.assertEqual(result.stdout, "")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -2,6 +2,13 @@
 # mutable app installations. No network access is needed during activation.
 { config, pkgs, ... }:
 let
+  # Official installer scripts inspected on 2026-10-14. Changed content must
+  # be reviewed and these hashes updated before bootstrap can execute it.
+  installerHashes = {
+    claude = "3a68d3406cf674e17bed1733a4dcf37805e2e47d87417700007d7e1aa766a944";
+    codex = "150e3cf675682efeaac115aa3747add3f27887896d04ce6d0b56478d8b428bf6";
+  };
+
   mkCommand =
     mode:
     pkgs.writeShellApplication {
@@ -78,9 +85,17 @@ let
               trap 'rm -f "$installer"' EXIT
               if [[ "$app" == claude ]]; then
                 curl -fsSL https://claude.ai/install.sh -o "$installer" || exit 1
+                if ! echo "${installerHashes.claude}  $installer" | sha256sum --check --status; then
+                  echo "$app: installer checksum mismatch; review upstream changes before updating the pinned hash." >&2
+                  exit 1
+                fi
                 bash "$installer" || exit 1
               else
                 curl -fsSL https://chatgpt.com/codex/install.sh -o "$installer" || exit 1
+                if ! echo "${installerHashes.codex}  $installer" | sha256sum --check --status; then
+                  echo "$app: installer checksum mismatch; review upstream changes before updating the pinned hash." >&2
+                  exit 1
+                fi
                 CODEX_INSTALL_DIR="$HOME/.local/bin" CODEX_NON_INTERACTIVE=1 bash "$installer" || exit 1
               fi
             ); then

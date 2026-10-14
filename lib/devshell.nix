@@ -132,6 +132,7 @@ in
 
         # Version control tools
         pre-commit
+        gitleaks
       ]
       ++ libraries;
 

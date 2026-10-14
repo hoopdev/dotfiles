@@ -15,6 +15,20 @@ repos:
         stages: [pre-commit]
   - repo: local
     hooks:
+      - id: secrets-staged
+        name: Detect staged secrets (redacted)
+        entry: nix develop --command gitleaks git --pre-commit --staged --redact .
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: secrets-history
+        name: Detect secrets in every Git ref (redacted)
+        entry: nix develop --command gitleaks git --redact --log-opts="--all --full-history -m" .
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
       - id: treefmt
         name: Nix formatting and lint checks
         entry: nix fmt -- --ci

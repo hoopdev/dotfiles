@@ -142,7 +142,14 @@
     # UPower for battery monitoring (used by the Wayle battery module)
     upower.enable = true;
 
-    openssh.enable = true;
+    openssh = {
+      enable = true;
+      settings = {
+        PasswordAuthentication = false;
+        KbdInteractiveAuthentication = false;
+        PermitRootLogin = "no";
+      };
+    };
   };
 
   security.rtkit.enable = true;

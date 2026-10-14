@@ -33,23 +33,35 @@ let
     runtimeInputs = [ pkgs._1password-cli ];
     text = ''
       if [[ $# -eq 0 || $1 == -h || $1 == --help ]]; then
-        echo "Usage: with-secrets <command> [args...]" >&2
+        echo "Usage: with-secrets [--no-masking] <command> [args...]" >&2
         echo "Runs <command> with the variables from ${envFile}" >&2
         echo "(and ${localEnvFile} if present) resolved from 1Password." >&2
         exit 2
       fi
       ${envFilesSh}
       args=()
+      # Keep masking for redirected output, logs and automation. Interactive
+      # TUIs need actual terminals; callers can also explicitly opt out.
+      if [[ "$1" == --no-masking ]]; then
+        args+=(--no-masking)
+        shift
+        if [[ $# -eq 0 ]]; then
+          echo "with-secrets: --no-masking requires a command" >&2
+          exit 2
+        fi
+      elif [[ -t 1 && -t 2 ]]; then
+        args+=(--no-masking)
+      fi
       for f in "''${files[@]}"; do args+=("--env-file=$f"); done
-      # --no-masking: masking pipes stdout through op, which breaks TUIs
-      # (claude, codex, opencode) and adds latency to everything else.
-      exec op run "''${args[@]}" --no-masking -- "$@"
+      exec op run "''${args[@]}" -- "$@"
     '';
   };
 in
 {
   options.dotfiles.secrets.env = lib.mkOption {
-    type = lib.types.attrsOf lib.types.str;
+    # Reject plaintext values and line breaks before rendering the env file.
+    # The flake source itself enters the store, so never put secrets in Nix.
+    type = lib.types.attrsOf (lib.types.strMatching "op://[^/\r\n]+/[^/\r\n]+/[^/\r\n]+(/[^/\r\n]+)?");
     default = { };
     example = {
       BRAVE_API_KEY = "op://Personal/BraveAPI/credential";
@@ -62,6 +74,15 @@ in
   };
 
   config = lib.mkIf (cfg.env != { }) {
+    assertions = [
+      {
+        assertion = lib.all (name: builtins.match "[A-Za-z_][A-Za-z0-9_]*" name != null) (
+          builtins.attrNames cfg.env
+        );
+        message = "dotfiles.secrets.env keys must be valid environment variable names.";
+      }
+    ];
+
     home.packages = [ withSecrets ];
 
     xdg.configFile."op/secrets.env".text = ''
@@ -74,7 +95,7 @@ in
     programs.zsh.initContent = ''
       # Resolve ~/.config/op/secrets*.env through 1Password and export the
       # result into this shell. One auth prompt per call; values live only in
-      # this process' environment.
+      # this shell's environment and are inherited by subsequent children.
       secrets-load() {
         emulate -L zsh
         local -a files

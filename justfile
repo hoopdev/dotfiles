@@ -15,4 +15,10 @@ test:
 export-check:
     nix run .#check-export-dotfiles
 
-verify: format-check eval test export-check
+secrets-check:
+    gitleaks dir --redact .
+
+secrets-history:
+    gitleaks git --redact --log-opts="--all --full-history -m" .
+
+verify: secrets-check secrets-history format-check eval test export-check

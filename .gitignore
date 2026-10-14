@@ -15,3 +15,21 @@ result-*
 .claude/worktrees/
 # Machine-local Claude Code permissions
 .claude/settings.local.json
+
+# Machine-local credentials and secret scan reports
+.env
+.env.*
+!.env.example
+!.env.*.example
+secrets.local.env
+local.zsh
+config.local
+local.json
+credentials.json
+credentials.yaml
+credentials.yml
+id_rsa
+id_ed25519
+*.pem
+*.key
+gitleaks-report.*

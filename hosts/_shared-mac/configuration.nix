@@ -19,7 +19,7 @@
       # 更新は意図的に `brew update && brew upgrade` を実行する。
       autoUpdate = false;
       upgrade = false;
-      cleanup = "none"; # 手動 brew install を消さない (以前は "zap" で ollama 等が毎回消えていた)
+      cleanup = "none"; # 手動 brew install を消さない
     };
     masApps = {
       # WindowsApp = 1295203466;

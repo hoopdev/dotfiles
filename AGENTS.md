@@ -19,7 +19,7 @@ Apply changes with `nh {os,darwin,home} switch` — full command reference (appl
 - Determine target platform (NixOS vs macOS) before suggesting system-level changes
 - `flake.nix` / `flake.lock` changes affect all hosts — verify carefully
 - Chezmoi sync: an activation hook in `home/common/cli/neovim.nix` copies `init.lua` into `dot_config/nvim/` on rebuild — don't remove it
-- Generated Chezmoi files: `dot_config/{readonly_starship.toml,wezterm/}` are rendered from the Nix config by `nix run .#export-dotfiles` — edit the Nix source, never the copy. Their values (base16 colors, fonts) come from Stylix and cannot be written as static files. Genuinely non-Nix targets (`dot_glzr/`, `AppData/`, scoop, winget, Jupyter) stay hand-maintained
+- Generated Chezmoi files: `dot_config/{readonly_starship.toml,wezterm/}` are rendered from the Nix config by `nix run .#export-dotfiles` — edit the Nix source, never the copy. Their values (base16 colors, fonts) come from Stylix and cannot be written as static files. Genuinely non-Nix targets (`dot_glzr/`, `AppData/`, scoop, winget) stay hand-maintained
 - GC runs weekly automatically, once per host (NixOS: system `programs.nh.clean`; macOS: `nix.gc`; standalone home-manager: HM `programs.nh.clean`); manual GC rarely needed
 
 ## Orca workflow
@@ -37,6 +37,9 @@ Apply changes with `nh {os,darwin,home} switch` — full command reference (appl
 - Run commands in the selected worktree. `.direnv` and virtual environments belong
   to that checkout; do not share them between worktrees.
 - Keep credentials and mutable Orca/agent settings outside Git and the Nix store.
+- Use only `op://` references in `dotfiles.secrets.env`. Run the redacted
+  Gitleaks checks in `just verify` before publishing; never add credentials or
+  secret scan reports to Git. Existing commit author identities are retained.
   Orca's desktop and an SSH execution host have separate skill installations.
 - Before using an Orca command, resolve `ORCA_CLI_COMMAND` if provided, otherwise
   the installed Orca executable, and consult its live help. A relay can control
