@@ -33,6 +33,14 @@
     common-pc-ssd
   ]);
 
+  # 7.5GB RAM and no disk swap: heavy local builds (e.g. Rust packages with
+  # LTO, like wayle) can get OOM-killed ("rustc was terminated by a deadly
+  # signal"). Compressed RAM swap gives headroom without a disk partition.
+  zramSwap = {
+    enable = true;
+    memoryPercent = 100;
+  };
+
   boot = {
     loader = {
       timeout = 2;
